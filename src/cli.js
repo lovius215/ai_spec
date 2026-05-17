@@ -11,6 +11,9 @@ function main() {
   const command = args[0];
 
   switch (command) {
+    case "install":
+      installPrompts();
+      return;
     case "init":
       initProject();
       return;
@@ -195,13 +198,97 @@ function installPrompts() {
   results.push(...copyTemplateTree("prompts/claude", path.join(homeDir, ".claude", "commands")));
   results.push(...copyTemplateTree("prompts/gemini/commands", path.join(homeDir, ".gemini", "commands")));
   results.push(...copyTemplateTree("prompts/gemini/skills", path.join(homeDir, ".gemini", "skills")));
+  results.push(...installGeminiCodeAssistCommands());
 
   printResultList("install-prompts", results);
   console.log("");
-  console.log("Reload sidebars after install:");
+  console.log("No VS Code extension was installed.");
+  console.log("Reload native AI sidebars after install:");
   console.log("- Codex: Developer: Reload Window");
   console.log("- Claude: restart Claude sidebar or start a new session");
-  console.log("- Gemini: run /commands reload and /skills reload");
+  console.log("- Gemini CLI: run /commands reload and /skills reload");
+  console.log("- Gemini Code Assist: run Developer: Reload Window, then open Quick Pick with Cmd+I/Ctrl+I");
+}
+
+function installGeminiCodeAssistCommands() {
+  const settingsPath = getVsCodeUserSettingsPath();
+  const settings = readJsonFile(settingsPath);
+  if (!settings) {
+    return [];
+  }
+
+  const existingCommands = settings.geminicodeassist?.customCommands || settings["geminicodeassist.customCommands"] || {};
+  const customCommands = {
+    ...existingCommands,
+    ...buildGeminiCodeAssistCommands()
+  };
+
+  settings["geminicodeassist.customCommands"] = customCommands;
+  fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+  fs.writeFileSync(settingsPath, `${JSON.stringify(settings, null, 4)}\n`, "utf8");
+
+  return [{
+    action: "create",
+    target: path.relative(homeDirForDisplay(), settingsPath)
+  }];
+}
+
+function getVsCodeUserSettingsPath() {
+  const homeDir = os.homedir();
+
+  if (process.env.SA_SPEC_VSCODE_SETTINGS) {
+    return path.resolve(process.env.SA_SPEC_VSCODE_SETTINGS);
+  }
+
+  if (process.platform === "darwin") {
+    return path.join(homeDir, "Library", "Application Support", "Code", "User", "settings.json");
+  }
+
+  if (process.platform === "win32") {
+    const appData = process.env.APPDATA || path.join(homeDir, "AppData", "Roaming");
+    return path.join(appData, "Code", "User", "settings.json");
+  }
+
+  const configHome = process.env.XDG_CONFIG_HOME || path.join(homeDir, ".config");
+  return path.join(configHome, "Code", "User", "settings.json");
+}
+
+function readJsonFile(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return {};
+  }
+
+  const content = fs.readFileSync(filePath, "utf8").trim();
+  if (!content) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(content);
+  } catch {
+    fail(`Cannot update ${filePath}; please remove comments/trailing commas or set SA_SPEC_VSCODE_SETTINGS to a JSON settings file.`);
+    return null;
+  }
+}
+
+function buildGeminiCodeAssistCommands() {
+  const commandDir = path.join(templatesDir, "prompts", "gemini", "commands", "spec");
+  const commands = {};
+
+  for (const commandName of ["init", "propose", "apply", "review", "status"]) {
+    const templatePath = path.join(commandDir, `${commandName}.toml`);
+    const prompt = extractGeminiTomlPrompt(readFileIfExists(templatePath));
+    if (prompt) {
+      commands[`spec-${commandName}`] = prompt.replaceAll("{{args}}", "");
+    }
+  }
+
+  return commands;
+}
+
+function extractGeminiTomlPrompt(content) {
+  const match = content.match(/prompt\s*=\s*"""([\s\S]*?)"""/);
+  return match ? match[1].trim() : "";
 }
 
 function copyTemplateTree(templateRelativeDir, targetAbsoluteDir) {
@@ -265,6 +352,14 @@ function readTemplate(relativePath) {
   return fs.readFileSync(templatePath, "utf8");
 }
 
+function readFileIfExists(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return "";
+  }
+
+  return fs.readFileSync(filePath, "utf8");
+}
+
 function applyReplacements(content, replacements) {
   let result = content;
   for (const [key, value] of Object.entries(replacements)) {
@@ -313,6 +408,7 @@ function showHelp() {
   console.log(`sa-spec
 
 Usage:
+  sa-spec install
   sa-spec init
   sa-spec doctor
   sa-spec status

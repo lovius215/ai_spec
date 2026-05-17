@@ -1,98 +1,18 @@
 {
   "name": "sa-spec",
-  "displayName": "SA Spec",
-  "publisher": "lovius",
   "version": "0.1.0",
-  "description": "VS Code Chat participant for system analysis with Codex and Claude",
-  "main": "./extension.js",
+  "description": "System analysis prompt kit for Codex, Claude Code, and Gemini sidebars",
   "bin": {
     "sa-spec": "bin/sa-spec.js"
   },
   "files": [
     "bin/",
     "src/",
-    "media/",
     "templates/",
-    "extension.js",
     "readme.md"
   ],
-  "engines": {
-    "vscode": "^1.95.0"
-  },
-  "categories": [
-    "AI",
-    "Other"
-  ],
-  "activationEvents": [
-    "onChatParticipant:saSpec"
-  ],
-  "contributes": {
-    "configuration": {
-      "title": "SA Spec",
-      "properties": {
-        "saSpec.chatProvider": {
-          "type": "string",
-          "enum": [
-            "codex",
-            "claude"
-          ],
-          "default": "codex",
-          "description": "Default CLI provider used by the @sa-spec VS Code Chat participant."
-        },
-        "saSpec.codexPath": {
-          "type": "string",
-          "default": "",
-          "description": "Optional absolute path to the Codex CLI binary."
-        },
-        "saSpec.claudePath": {
-          "type": "string",
-          "default": "",
-          "description": "Optional absolute path to the Claude Code CLI binary."
-        }
-      }
-    },
-    "chatParticipants": [
-      {
-        "id": "saSpec",
-        "fullName": "SA Spec",
-        "name": "sa-spec",
-        "description": "系統分析助手，讀取工作區規則與文件，可搭配側邊欄 Codex/Claude Chat 使用",
-        "isSticky": true,
-        "commands": [
-          {
-            "name": "codex",
-            "description": "使用 Codex 處理本次訊息"
-          },
-          {
-            "name": "claude",
-            "description": "使用 Claude 處理本次訊息"
-          },
-          {
-            "name": "init",
-            "description": "初始化系統規格書"
-          },
-          {
-            "name": "propose",
-            "description": "整理需求草稿"
-          },
-          {
-            "name": "status",
-            "description": "查看目前規格書狀態"
-          },
-          {
-            "name": "review",
-            "description": "審查目前文件"
-          },
-          {
-            "name": "apply",
-            "description": "套用變更到文件"
-          }
-        ]
-      }
-    ]
-  },
   "scripts": {
-    "check": "node --check extension.js && node --check src/cli.js && node --check bin/sa-spec.js",
+    "check": "node --check src/cli.js && node --check bin/sa-spec.js",
     "prepublishOnly": "npm run check"
   },
   "keywords": [
