@@ -18,9 +18,10 @@
 - 每個需求使用獨立資料夾，放入 `project/`。
 - 資料夾命名格式：`REQ-流水號-需求短名`，例如 `REQ-001-login`。
 - 每個需求資料夾至少包含：
-  - `spec.md`：需求規格。
+  - `srs.md`：需求規格。
   - `history.md`：需求歷程。
-  - `risk.md`：風險評估。
+  - `uml.puml`：UML 圖。
+  - `openapi.yaml`：OpenAPI 草稿。
 - 若需求涉及畫面，使用 `wireframe.md`。
 - 若需求需要 UML，放入 `uml/` 資料夾。
 - 若需求需要 API 或資料模型，使用 `api.md` 或獨立資料模型文件。
@@ -31,10 +32,11 @@
 project/
   index.md
   REQ-001-login/
-    spec.md
+    srs.md
     wireframe.md
     history.md
-    risk.md
+    uml.puml
+    openapi.yaml
     uml/
       use-case.puml
       sequence.puml

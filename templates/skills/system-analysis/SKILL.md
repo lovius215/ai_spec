@@ -1,0 +1,101 @@
+---
+name: system-analysis
+description: 用 init、propose、analyze、commit 四段流程整理需求，並產出 SRS、UML、OpenAPI、DB Schema。
+---
+
+# System Analysis Skill
+
+## 核心交付物
+
+- `srs.md`：需求規格。
+- `uml.puml`：UML 圖。
+- `openapi.yaml`：OpenAPI 草稿。
+- `db-schema.md`：DB Schema 草稿。
+- `history.md`：版本歷程。
+
+## 指令流程
+
+| 指令 | 用途 | 執行規則 |
+|---|---|---|
+| `spec:init` | 初始化 | 載入並遵守 `AGENTS.md`、本 skill 與必要規則，確認 `project/` 結構是否存在。 |
+| `spec:propose` | 提出需求 | 整理使用者需求為摘要、目標、初步流程與待確認事項；不歸檔、不修改既有需求。 |
+| `spec:analyze` | 分析與起草 | 先檢查新需求是否與 `project/` 內所有既有需求衝突；無衝突才產出 SRS、UML、OpenAPI、DB Schema 草稿；有衝突則只列出衝突與待釐清問題，待使用者釐清後再次執行 `spec:analyze`。 |
+| `spec:commit` | 確認歸檔 | 只把使用者已確認的版本歸檔到該需求資料夾，並更新 `project/index.md` 與 `history.md`。 |
+
+## 硬性限制
+
+- 使用繁體中文。
+- 不可自行幻想未確認的業務規則、角色、流程、資料或系統行為。
+- `spec:analyze` 必須先檢查所有既有需求是否衝突。
+- 若發現衝突，不得產出最終文件，不得修改任何需求文件，只能向使用者釐清。
+- 衝突釐清後，流程回到 `spec:analyze`，重新檢查衝突並產出草稿；不可直接進入 `spec:commit`。
+- 任何流程都不得修改其他需求資料夾中的文件，除非使用者明確指定該需求也要變更。
+- `spec:commit` 只能套用已由 `spec:analyze` 產出的、且使用者已確認的無衝突版本。
+- 文件未經使用者確認，不得標示為 `已審核`。
+- 一次最多問 3 個待確認問題，優先詢問會影響範圍、資料、權限、API、DB 或驗收的問題。
+
+## analyze 衝突檢查
+
+執行 `spec:analyze` 時，先讀取：
+
+- `project/index.md`
+- `project/system-spec.md`
+- 所有 `project/REQ-*/srs.md`
+- 所有 `project/REQ-*/openapi.yaml`
+- 所有 `project/REQ-*/db-schema.md`
+- 必要時讀取 `project/REQ-*/uml.puml`
+
+至少檢查：
+
+- 是否與既有需求目標或流程重疊。
+- 是否改變既有角色、權限或資料存取規則。
+- 是否影響既有 API 路徑、request/response 或狀態碼。
+- 是否影響既有 DB Table、欄位、唯一性或關聯。
+- 是否與既有驗收條件矛盾。
+
+## analyze 發現衝突時
+
+若 `spec:analyze` 發現衝突：
+
+1. 列出衝突的既有需求編號與檔案。
+2. 說明衝突原因與影響範圍。
+3. 提出最多 3 個待釐清問題。
+4. 停止產出 SRS、UML、OpenAPI、DB Schema。
+5. 等使用者釐清後，再由使用者執行 `spec:analyze` 繼續。
+6. 不得修改任何既有需求文件。
+
+## analyze 無衝突輸出
+
+無衝突時，輸出一個待確認版本，包含：
+
+- SRS 草稿。
+- UML PlantUML 草稿。
+- OpenAPI YAML 草稿。
+- DB Schema 草稿。
+- 待確認事項。
+- 本次未修改其他需求的聲明。
+
+## commit 歸檔
+
+`spec:commit` 只能套用已由 `spec:analyze` 產出的無衝突版本。使用者明確確認後，才可歸檔：
+
+```text
+project/
+  REQ-001-name/
+    srs.md
+    uml.puml
+    openapi.yaml
+    db-schema.md
+    history.md
+```
+
+## 狀態機
+
+```text
+init -> propose -> analyze
+
+analyze 無衝突 -> 產出待確認版本 -> commit
+analyze 有衝突 -> 釐清問題 -> analyze
+
+commit -> 歸檔
+```

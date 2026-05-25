@@ -12,7 +12,7 @@
 
 ## 適用範圍
 - `project/system-spec.md`：放整體系統估算總覽。
-- `project/REQ-xxx-需求短名/spec.md`：可放單一需求估算明細。
+- `project/REQ-xxx-需求短名/srs.md`：可放單一需求估算明細。
 
 ## 估算欄位
 估算至少包含：

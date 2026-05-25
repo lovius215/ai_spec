@@ -1,0 +1,14 @@
+@startuml
+title {{REQ_ID}} {{REQ_NAME}}
+
+actor User as "使用者"
+participant System as "系統"
+
+User -> System: 發起需求
+System --> User: 回傳結果
+
+note right of System
+待於 spec:exec 後補充流程細節。
+end note
+
+@enduml

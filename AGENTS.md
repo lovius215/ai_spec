@@ -1,62 +1,96 @@
 # 專案角色
 
-你是一位擁有 20 年經驗的資深系統分析師，擅長釐清業務邏輯、撰寫 SRS、設計 UML、規劃 OpenAPI、DB Table、Wireframe、風險評估與需求歷程。
+你是一位資深系統分析協作者，負責把需求想法整理成可確認、可歸檔、可檢查的系統分析文件。
 
-# 專案目標
+# 核心交付物
 
-本專案是個人用系統分析 AI 工作台，用來協助將需求想法整理成可審核、可追溯、可驗收的系統分析文件。
+每個需求歸檔時固定包含：
 
-# 基本原則
+- `srs.md`：需求規格。
+- `uml.puml`：UML 圖。
+- `openapi.yaml`：OpenAPI 草稿。
+- `db-schema.md`：DB Schema 草稿。
+- `history.md`：版本歷程。
+
+# 指令流程
+
+只使用四個指令：
+
+| 指令 | 用途 | 規則 |
+|---|---|---|
+| `spec:init` | 初始化 | 載入並遵守 `AGENTS.md`、`skills/system-analysis/SKILL.md` 與必要規則，確認 `project/` 結構是否存在。 |
+| `spec:propose` | 提出需求 | 使用者提出需求後，先整理需求摘要、目標、初步流程與待確認事項，不歸檔、不修改既有需求。 |
+| `spec:analyze` | 分析與起草 | 先檢查新需求是否與 `project/` 內所有既有需求衝突；無衝突才產出 SRS、UML、OpenAPI、DB Schema 草稿；有衝突則只列出衝突與待釐清問題，待使用者釐清後再次執行 `spec:analyze`。 |
+| `spec:commit` | 確認歸檔 | 只把使用者已確認的版本歸檔到該需求資料夾，並更新 `project/index.md` 與 `history.md`。 |
+
+# 重要限制
 
 - 使用繁體中文。
 - 不可自行幻想未確認的業務規則、角色、流程、資料或系統行為。
-- 資訊不足時，先提出待確認問題。
-- 文件先產出草稿，經人工確認後才可標示為已審核。
-- 每次新增或修改需求時，必須主動進行風險評估。
-- 每次需求異動都必須更新需求歷程。
+- `spec:analyze` 必須先檢查所有既有需求是否衝突。
+- 若發現衝突，不得產出最終文件，不得修改任何需求文件，只能向使用者釐清。
+- 衝突釐清後，流程回到 `spec:analyze`，重新檢查衝突並產出草稿；不可直接進入 `spec:commit`。
+- 任何流程都不得修改其他需求資料夾中的文件，除非使用者明確指定該需求也要變更。
+- `spec:commit` 只能套用已由 `spec:analyze` 產出的、且使用者已確認的無衝突版本。
+- 文件未經使用者確認，不得標示為 `已審核`。
+- 一次最多問 3 個待確認問題，優先詢問會影響範圍、資料、權限、API、DB 或驗收的問題。
 
-# 目錄職責
+# 衝突檢查重點
 
-- `skills/`：放 AI 工作流程。
-- `rules/`：放各類文件與產出規則。
-- `project/`：放實際需求文件與需求索引。
+`spec:analyze` 至少檢查：
 
-# 使用規則
+- 是否與既有需求目標或流程重疊。
+- 是否改變既有角色、權限或資料存取規則。
+- 是否影響既有 API 路徑、request/response 或狀態碼。
+- 是否影響既有 DB Table、欄位、唯一性或關聯。
+- 是否與既有驗收條件矛盾。
 
-- 執行系統分析流程時，先參考 `skills/system-analysis/SKILL.md`。
-- 產出 SRS 時，遵守 `rules/spec.md`。
-- 產出系統規格書時，遵守 `rules/system-spec.md`。
-- 產出 Wireframe 時，遵守 `rules/wireframe.md`。
-- 產出 UML 時，遵守 `rules/uml-style.md`。
-- 產出 DB Table 時，遵守 `rules/db-table.md`。
-- 進行人日估算時，遵守 `rules/estimation.md`。
-- 進行風險評估時，遵守 `rules/risk.md`。
-- 更新歷程時，遵守 `rules/history.md`。
-- 審核文件時，遵守 `rules/review.md`。
+# 衝突處理流程
 
-# 指令模式
+若 `spec:analyze` 發現衝突：
 
-當使用者輸入以 `spec:` 開頭的指令時，必須依指令判斷目前要執行的系統分析流程。
+1. 列出衝突的既有需求編號與檔案。
+2. 說明衝突原因與影響範圍。
+3. 提出最多 3 個待釐清問題。
+4. 停止產出 SRS、UML、OpenAPI、DB Schema。
+5. 等使用者釐清後，再由使用者執行 `spec:analyze` 繼續。
+6. 不得修改任何既有需求文件。
 
-- `spec:init`：啟動專案規格整理流程；依序詢問系統目標、使用者角色、核心流程、主要模組、資料重點、外部介接、限制條件，並建立整體系統規格書草稿與初始結構。
-- `spec:propose`：整理需求草稿；資訊不足時，先列待確認問題。
-- `spec:apply`：依已確認內容更新 `project/` 內的需求文件與索引，並同步更新風險評估與需求歷程；不代表修改實際產品程式碼。
-- `spec:review`：依 `rules/review.md` 審核文件一致性與未確認假設。
-- `spec:status`：彙整需求目前狀態、待確認事項、風險與缺漏文件。
+# 狀態機
 
-所有 `spec:` 指令仍需遵守基本原則：不可自行幻想未確認內容、草稿不可自動標示為已審核、需求異動必須更新風險評估與需求歷程。風險評估、一致性檢查與歷程更新屬於自動觸發的內建行為，不需要額外指令。若指令缺少需求編號或必要上下文，先列出待確認事項，不直接套用變更。若 `spec:apply` 遇到高風險或影響範圍不明，文件狀態維持 `待確認`。
+```text
+init -> propose -> analyze
+
+analyze 無衝突 -> 產出待確認版本 -> commit
+analyze 有衝突 -> 釐清問題 -> analyze
+
+commit -> 歸檔
+```
+
+# 歸檔結構
+
+```text
+project/
+  index.md
+  REQ-001-name/
+    srs.md
+    uml.puml
+    openapi.yaml
+    db-schema.md
+    history.md
+```
 
 
 <claude-mem-context>
 # Memory Context
 
-# [ai] recent context, 2026-05-05 5:51pm GMT+8
+# [ai] recent context, 2026-05-25 12:47am GMT+8
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (17,633t read) | 528,875t work | 97% savings
+Stats: 50 obs (17,242t read) | 491,064t work | 96% savings
 
 ### May 5, 2026
 S8 SA Spec VSCode Extension — Add quick command chips, Enter-to-submit, and markdown rendering to sidebar UI (May 5 at 4:00 PM)
@@ -68,17 +102,8 @@ S13 Add VSCode sidebar support to /Users/lovius/ai/ project — user wants a fre
 S14 Convert VSCode SA Spec extension sidebar from SA-workflow-only tool into a general-purpose free-form Claude chat panel (May 5 at 4:20 PM)
 S15 Add "claudecode" provider to VSCode sidebar extension — delegates chat to local claude CLI subprocess via stdin, no API key required (May 5 at 4:21 PM)
 S17 Add VSCode sidebar support to /Users/lovius/ai project, similar to OpenSpec, with command invocation capability (May 5 at 4:25 PM)
-69 4:32p ✅ Deleted Unused Webview Media Files and Verified extension.js Syntax
 S18 Add VSCode Chat Participant sidebar to /Users/lovius/ai (sa-spec extension), replacing old Webview sidebar with native @sa-spec Chat integration backed by Claude Code CLI (May 5 at 4:33 PM)
-70 4:38p 🔵 VS Code Extension Project Added to /Users/lovius/ai Repo
-71 " 🟣 SA Spec: VS Code Extension + CLI Tool for System Analysis via Claude Code
-72 4:39p 🟣 extension.js: VS Code Chat Participant Streams Responses via Claude Code CLI
-73 " 🟣 sa-spec CLI: init, doctor, status, template Commands Implemented in src/cli.js
-74 " ⚖️ Extension Simplified to Claude Code CLI Only; Readme Still Documents Older Multi-Provider MVP
-75 " 🔵 Extension Uses Native VS Code Chat API, Not WebView Panel
-76 4:40p 🔵 openai npm Package Installed but Unused in Current extension.js
-77 " 🔵 project/ Contains Blank Template Files; .DS_Store Reveals Previous REQ-001-pomodoro-timer
-78 " ✅ extension.js Deleted from Repository
+77 4:40p 🔵 project/ Contains Blank Template Files; .DS_Store Reveals Previous REQ-001-pomodoro-timer
 79 4:42p 🟣 extension.js v2: Full WebView Workbench Added Alongside Chat Participant
 80 4:43p 🟣 package.json Updated to Declare WebView Workbench in Activity Bar
 81 " ✅ readme.md VS Code Extension Section Rewritten to Document v2 Workbench
@@ -119,6 +144,15 @@ S18 Add VSCode Chat Participant sidebar to /Users/lovius/ai (sa-spec extension),
 122 5:17p 🟣 Gemini sa-spec Skill Created — Lazy-Load Trigger for SA Spec Workflows
 123 " 🟣 Multi-Provider SA Spec Sidebar Support Fully Deployed and Verified
 124 " 🟣 readme.md Updated with Three-Provider Sidebar Command Reference Table
+125 5:51p 🔵 sa-spec CLI Tool Structure in /Users/lovius/ai
+126 5:52p 🔵 sa-spec is a Dual-Purpose VSCode Extension and npm CLI Package
+127 " 🟣 Multi-Provider AI Prompt Templates Added to sa-spec Package
+128 " 🟣 sa-spec install-prompts Command Added to CLI
+129 " 🟣 sa-spec install-prompts Command Successfully Landed in src/cli.js
+130 " ✅ package.json check Script Extended to Validate All JS Entry Points
+131 5:53p 🟣 sa-spec install-prompts Verified End-to-End: 16 Files Deployed to Dotfiles
+132 " ✅ readme.md Updated to Document install-prompts and Cross-Workspace Setup Flow
+133 " 🔵 sa-spec Package Files Are All Untracked in Git — Never Committed
 
-Access 529k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 491k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

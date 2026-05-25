@@ -78,4 +78,4 @@ project/
 ## 審核要求
 - Wireframe 草稿完成後必須人工審核。
 - Wireframe 審核通過前，不得視為 API 或 DB Table 的正式依據。
-- 若 Wireframe 造成 SRS、API、DB Table 或驗收條件異動，必須更新 `history.md` 與 `risk.md`。
+- 若 Wireframe 造成 SRS、API、DB Table 或驗收條件異動，必須更新 `history.md`；若產生高風險，需在需求文件的注意事項中標示。

@@ -1,106 +1,101 @@
 ---
 name: system-analysis
-description: 個人用系統分析工作流程。當使用者要新增、修改、審核需求，或產出 SRS、Wireframe、UML、OpenAPI、DB Table、資料模型、風險評估與需求歷程時使用。
+description: 用 init、propose、analyze、commit 四段流程整理需求，並產出 SRS、UML、OpenAPI、DB Schema。
 ---
 
 # System Analysis Skill
 
-## 角色
-你是使用者的系統分析協作者。你負責協助釐清需求、產出草稿、主動分析風險、提醒人工審核，並維護每個需求的歷程。
+## 核心交付物
 
-## 核心原則
-- 使用繁體中文。
-- 不可自行幻想未確認的業務規則、角色、流程、資料或系統行為。
-- 資訊不足時，先提出待確認問題。
-- 文件先以草稿產出，經使用者確認後才可視為已審核。
-- 每次需求新增或修改時，必須主動進行風險評估並提醒使用者。
-- 每次需求異動都必須更新該需求的 `history.md`。
+- `srs.md`：需求規格。
+- `uml.puml`：UML 圖。
+- `openapi.yaml`：OpenAPI 草稿。
+- `db-schema.md`：DB Schema 草稿。
+- `history.md`：版本歷程。
 
-## 參考規則
-- 產出或修改需求規格時，遵守 `rules/spec.md`。
-- 產出或修改系統規格書時，遵守 `rules/system-spec.md`。
-- 產出 Wireframe 時，遵守 `rules/wireframe.md`。
-- 產出 UML 時，遵守 `rules/uml-style.md`。
-- 產出 DB Table 設計時，遵守 `rules/db-table.md`。
-- 進行人日估算時，遵守 `rules/estimation.md`。
-- 建立或調整檔案時，遵守 `rules/file-style.md`。
-- 審核文件時，遵守 `rules/review.md`。
-- 進行風險評估時，遵守 `rules/risk.md`。
-- 更新需求歷程時，遵守 `rules/history.md`。
-
-## 指令模式
-當使用者輸入以 `spec:` 開頭的指令時，依下列對照表判斷工作模式：
+## 指令流程
 
 | 指令 | 用途 | 執行規則 |
 |---|---|---|
-| `spec:init` | 初始化系統規格書 | 依序詢問系統目標、使用者角色、核心流程、主要模組、資料重點、外部介接與限制條件，建立整體系統規格書草稿與初始文件結構。 |
-| `spec:propose` | 整理需求草稿 | 依目前資訊建立需求摘要或 SRS 草稿；資訊不足時，先列待確認問題。 |
-| `spec:apply` | 套用已確認內容 | 只更新 `project/` 內的需求文件與索引，並同步更新 `risk.md` 與 `history.md`；不修改實際產品程式碼。 |
-| `spec:review` | 審核文件一致性 | 依 `rules/review.md` 檢查 SRS、Wireframe、UML、API、DB Table、風險與歷程是否一致，並找出未確認假設。 |
-| `spec:status` | 查看需求狀態 | 彙整需求目前狀態、待確認事項、風險等級、缺漏文件與下一個人工審核點。 |
+| `spec:init` | 初始化 | 載入並遵守 `AGENTS.md`、本 skill 與必要規則，確認 `project/` 結構是否存在。 |
+| `spec:propose` | 提出需求 | 整理使用者需求為摘要、目標、初步流程與待確認事項；不歸檔、不修改既有需求。 |
+| `spec:analyze` | 分析與起草 | 先檢查新需求是否與 `project/` 內所有既有需求衝突；無衝突才產出 SRS、UML、OpenAPI、DB Schema 草稿；有衝突則只列出衝突與待釐清問題，待使用者釐清後再次執行 `spec:analyze`。 |
+| `spec:commit` | 確認歸檔 | 只把使用者已確認的版本歸檔到該需求資料夾，並更新 `project/index.md` 與 `history.md`。 |
 
-### 指令執行規則
-- 所有 `spec:` 指令仍需遵守核心原則與參考規則。
-- `spec:init` 用於建立整體系統規格書脈絡，後續需求文件應掛在這個脈絡下。
-- `spec:init` 需優先更新 `project/system-spec.md`，並視情況補充需求索引或拆出個別需求。
-- `spec:apply` 僅限需求文件流程，不代表實作產品程式碼。
-- 若指令缺少需求編號、需求內容或必要上下文，先列出待確認事項，不直接套用變更。
-- 若 `spec:apply` 遇到高風險或影響範圍不明，文件狀態維持 `待確認`。
-- 風險評估、跨文件一致性檢查與 `history.md` 更新屬於自動觸發的內建行為，不需要獨立指令。
-- 人日估算屬於系統分析輸出的一部分；若需求範圍或前提不足，估算狀態應維持 `待確認`。
-- 每次需求新增或修改仍必須更新 `risk.md` 與 `history.md`。
-- 文件未經使用者人工確認，不得標示為 `已審核`。
+## 硬性限制
 
-## 工作流程
-1. 判斷使用者輸入是新增需求、修改需求、審核需求，還是產出特定文件。
-2. 若資訊不足，先列出待確認事項，不直接產出最終文件。
-3. 若是新增需求，建立需求摘要草稿，並規劃對應需求資料夾。
-4. 若是修改需求，先整理本次變更點與可能受影響文件。
-5. 對每次新增或修改需求，主動產生 AI 初步風險分析。
-6. 明確列出需要使用者人工確認的風險與待確認事項。
-7. 依需求階段產出或更新 `spec.md`、`wireframe.md`、`risk.md`、`history.md`、UML、API 或 DB Table 文件。
-8. 每份文件產出後停在人工審核點，不自行推進為已審核。
+- 使用繁體中文。
+- 不可自行幻想未確認的業務規則、角色、流程、資料或系統行為。
+- `spec:analyze` 必須先檢查所有既有需求是否衝突。
+- 若發現衝突，不得產出最終文件，不得修改任何需求文件，只能向使用者釐清。
+- 衝突釐清後，流程回到 `spec:analyze`，重新檢查衝突並產出草稿；不可直接進入 `spec:commit`。
+- 任何流程都不得修改其他需求資料夾中的文件，除非使用者明確指定該需求也要變更。
+- `spec:commit` 只能套用已由 `spec:analyze` 產出的、且使用者已確認的無衝突版本。
+- 文件未經使用者確認，不得標示為 `已審核`。
+- 一次最多問 3 個待確認問題，優先詢問會影響範圍、資料、權限、API、DB 或驗收的問題。
 
-## 文件產出順序
-- 預設順序為：SRS 草稿、Wireframe 草稿、UML 草稿、API / DB Table 草稿。
-- 若需求不涉及畫面，可略過 Wireframe，但需在回覆中說明略過原因。
-- Wireframe 發現 SRS 缺口時，需回到 SRS 待確認事項，不直接推進 API 或 DB Table。
+## analyze 衝突檢查
 
-## 風險分析要求
-AI 必須主動檢查：
-- 既有業務流程影響。
-- 使用者角色、權限與資料存取影響。
-- SRS、Wireframe、UML、API、DB Table 或資料模型一致性。
-- Wireframe 欄位、按鈕、狀態或錯誤訊息是否影響 API request / response、DB Table 欄位、權限規則或驗收條件。
-- 新增例外情境。
-- 驗收條件與測試案例影響。
-- 未確認假設。
-- 需求範圍擴大。
-- 法規、安全性、效能或維運風險。
+執行 `spec:analyze` 時，先讀取：
 
-風險分析後，需輸出：
-- 本次異動摘要。
-- AI 初步風險分析表。
-- AI 提醒的 3 到 5 個重點。
-- 是否需要人工確認。
+- `project/index.md`
+- `project/system-spec.md`
+- 所有 `project/REQ-*/srs.md`
+- 所有 `project/REQ-*/openapi.yaml`
+- 所有 `project/REQ-*/db-schema.md`
+- 必要時讀取 `project/REQ-*/uml.puml`
 
-## 歷程更新要求
-每次需求異動時，需在 `history.md` 追加紀錄，不可覆蓋既有紀錄。歷程需包含：
-- 時間。
-- 異動類型。
-- 異動摘要。
-- 異動原因。
-- 影響範圍。
-- 風險等級。
-- 狀態。
+至少檢查：
 
-## 人工審核停點
-以下情況必須停下並等待使用者確認：
-- 需求摘要草稿完成。
-- SRS 草稿完成。
-- Wireframe 草稿完成。
-- UML 草稿完成。
-- API 或資料模型草稿完成。
-- DB Table 設計草稿完成。
-- 風險等級為高。
-- 有任何待確認事項會影響需求範圍、權限、資料或驗收條件。
+- 是否與既有需求目標或流程重疊。
+- 是否改變既有角色、權限或資料存取規則。
+- 是否影響既有 API 路徑、request/response 或狀態碼。
+- 是否影響既有 DB Table、欄位、唯一性或關聯。
+- 是否與既有驗收條件矛盾。
+
+## analyze 發現衝突時
+
+若 `spec:analyze` 發現衝突：
+
+1. 列出衝突的既有需求編號與檔案。
+2. 說明衝突原因與影響範圍。
+3. 提出最多 3 個待釐清問題。
+4. 停止產出 SRS、UML、OpenAPI、DB Schema。
+5. 等使用者釐清後，再由使用者執行 `spec:analyze` 繼續。
+6. 不得修改任何既有需求文件。
+
+## analyze 無衝突輸出
+
+無衝突時，輸出一個待確認版本，包含：
+
+- SRS 草稿。
+- UML PlantUML 草稿。
+- OpenAPI YAML 草稿。
+- DB Schema 草稿。
+- 待確認事項。
+- 本次未修改其他需求的聲明。
+
+## commit 歸檔
+
+`spec:commit` 只能套用已由 `spec:analyze` 產出的無衝突版本。使用者明確確認後，才可歸檔：
+
+```text
+project/
+  REQ-001-name/
+    srs.md
+    uml.puml
+    openapi.yaml
+    db-schema.md
+    history.md
+```
+
+## 狀態機
+
+```text
+init -> propose -> analyze
+
+analyze 無衝突 -> 產出待確認版本 -> commit
+analyze 有衝突 -> 釐清問題 -> analyze
+
+commit -> 歸檔
+```

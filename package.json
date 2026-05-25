@@ -1,7 +1,7 @@
 {
   "name": "sa-spec",
   "version": "0.1.0",
-  "description": "System analysis prompt kit for Codex, Claude Code, and Gemini sidebars",
+  "description": "Personal system analysis documentation workspace CLI",
   "bin": {
     "sa-spec": "bin/sa-spec.js"
   },
@@ -12,17 +12,13 @@
     "readme.md"
   ],
   "scripts": {
-    "check": "node --check src/cli.js && node --check bin/sa-spec.js",
-    "prepublishOnly": "npm run check"
+    "check": "node --check src/cli.js && node --check bin/sa-spec.js"
   },
   "keywords": [
     "system-analysis",
-    "specification",
     "requirements",
-    "codex",
-    "claude",
-    "ai",
-    "chat"
+    "srs",
+    "documentation"
   ],
   "license": "MIT"
 }

@@ -1,5 +1,4 @@
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
 
 const cwd = process.cwd();
@@ -11,11 +10,14 @@ function main() {
   const command = args[0];
 
   switch (command) {
-    case "install":
-      installPrompts();
-      return;
     case "init":
-      initProject();
+      initProject(args.slice(1));
+      return;
+    case "new":
+      createReqTemplate(args.slice(1));
+      return;
+    case "check":
+      runCheck();
       return;
     case "doctor":
       runDoctor();
@@ -25,9 +27,6 @@ function main() {
       return;
     case "template":
       runTemplate(args.slice(1));
-      return;
-    case "install-prompts":
-      installPrompts();
       return;
     case "help":
     case "--help":
@@ -40,39 +39,50 @@ function main() {
   }
 }
 
-function initProject() {
-  const createResults = [];
+function initProject(args = []) {
+  const includeRules = args.includes("--full");
+  const results = [
+    ensureDir("skills"),
+    ensureDir(path.join("skills", "system-analysis")),
+    ensureDir("project"),
+    ensureFileFromTemplate("AGENTS.md", "AGENTS.md"),
+    ensureFileFromTemplate("readme.md", "readme.md"),
+    ensureFileFromTemplate(path.join("skills", "system-analysis", "SKILL.md"), path.join("skills", "system-analysis", "SKILL.md")),
+    ensureFileFromTemplate(path.join("project", "index.md"), path.join("project", "index.md")),
+    ensureFileFromTemplate(path.join("project", "system-spec.md"), path.join("project", "system-spec.md"))
+  ];
 
-  createResults.push(ensureDir(path.join(cwd, "project")));
-  createResults.push(ensureDir(path.join(cwd, "rules")));
-  createResults.push(ensureFileFromTemplate("project/index.md", "project/index.md"));
-  createResults.push(ensureFileFromTemplate("project/system-spec.md", "project/system-spec.md"));
-  createResults.push(ensureFileFromTemplate("rules/system-spec.md", "rules/system-spec.md"));
-  createResults.push(ensureFileFromTemplate("rules/estimation.md", "rules/estimation.md"));
+  if (includeRules) {
+    results.push(ensureDir("rules"));
+    for (const file of listFilesRecursive(path.join(templatesDir, "rules"))) {
+      const relativePath = path.relative(templatesDir, file);
+      results.push(ensureFileFromTemplate(relativePath, relativePath));
+    }
+  }
 
-  printResultList("init", createResults);
+  printResultList("init", results);
 }
 
 function runDoctor() {
+  return checkRequiredPaths("sa-spec doctor");
+}
+
+function checkRequiredPaths(heading) {
   const requiredPaths = [
-    "project/index.md",
-    "project/system-spec.md",
-    "rules/spec.md",
-    "rules/system-spec.md",
-    "rules/estimation.md",
-    "rules/risk.md",
-    "rules/history.md",
-    "rules/review.md"
+    "AGENTS.md",
+    path.join("skills", "system-analysis", "SKILL.md"),
+    path.join("project", "index.md"),
+    path.join("project", "system-spec.md")
   ];
 
   let hasMissing = false;
-  console.log("sa-spec doctor");
+  if (heading) {
+    console.log(heading);
+  }
 
   for (const relativePath of requiredPaths) {
-    const absolutePath = path.join(cwd, relativePath);
-    const exists = fs.existsSync(absolutePath);
-    const status = exists ? "OK" : "MISSING";
-    console.log(`${status.padEnd(8)} ${relativePath}`);
+    const exists = fs.existsSync(path.join(cwd, relativePath));
+    console.log(`${exists ? "OK" : "MISSING"} ${relativePath}`);
     if (!exists) {
       hasMissing = true;
     }
@@ -81,13 +91,26 @@ function runDoctor() {
   if (hasMissing) {
     process.exitCode = 1;
   }
+
+  return !hasMissing;
 }
 
-function showStatus() {
-  const systemSpecPath = path.join(cwd, "project/system-spec.md");
-  const indexPath = path.join(cwd, "project/index.md");
+function runCheck() {
+  console.log("sa-spec check");
+  if (!checkRequiredPaths(null)) {
+    return;
+  }
+  console.log("");
+  showStatus(false);
+}
 
-  console.log("sa-spec status");
+function showStatus(showHeading = true) {
+  if (showHeading) {
+    console.log("sa-spec status");
+  }
+
+  const systemSpecPath = path.join(cwd, "project", "system-spec.md");
+  const indexPath = path.join(cwd, "project", "index.md");
 
   if (fs.existsSync(systemSpecPath)) {
     const content = fs.readFileSync(systemSpecPath, "utf8");
@@ -95,6 +118,7 @@ function showStatus() {
     console.log(`系統規格書狀態: ${match ? match[1].trim() : "未標示"}`);
   } else {
     console.log("系統規格書狀態: 缺少 project/system-spec.md");
+    process.exitCode = 1;
   }
 
   if (!fs.existsSync(indexPath)) {
@@ -103,14 +127,7 @@ function showStatus() {
     return;
   }
 
-  const indexContent = fs.readFileSync(indexPath, "utf8");
-  const rows = parseIndexRows(indexContent);
-  const counts = rows.reduce((acc, row) => {
-    const status = row.status || "未標示";
-    acc[status] = (acc[status] || 0) + 1;
-    return acc;
-  }, {});
-
+  const rows = parseIndexRows(fs.readFileSync(indexPath, "utf8"));
   console.log(`需求總數: ${rows.length}`);
 
   if (rows.length === 0) {
@@ -118,26 +135,21 @@ function showStatus() {
     return;
   }
 
-  for (const [status, count] of Object.entries(counts)) {
-    console.log(`- ${status}: ${count}`);
-  }
-
-  const recentRows = rows.slice(-5);
-  console.log("最近需求:");
-  for (const row of recentRows) {
+  for (const row of rows.slice(-5)) {
     console.log(`- ${row.id} ${row.title} [${row.status}]`);
   }
 }
 
 function runTemplate(args) {
   const type = args[0];
+
   if (type === "system-spec") {
-    outputTemplate("project/system-spec.md", args.slice(1));
+    outputTemplate(path.join("project", "system-spec.md"), args.slice(1));
     return;
   }
 
   if (type === "req") {
-    createReqTemplate(args.slice(1));
+    createReqTemplate(args.slice(1), "template req");
     return;
   }
 
@@ -145,172 +157,102 @@ function runTemplate(args) {
 }
 
 function outputTemplate(templatePath, args) {
-  const stdout = args.includes("--stdout");
   const outputIndex = args.indexOf("--output");
   const output = outputIndex >= 0 ? args[outputIndex + 1] : null;
   const content = readTemplate(templatePath);
 
-  if (stdout || !output) {
-    process.stdout.write(content);
-    if (!content.endsWith("\n")) {
-      process.stdout.write("\n");
-    }
+  if (args.includes("--stdout") || !output) {
+    process.stdout.write(content.endsWith("\n") ? content : `${content}\n`);
     return;
   }
 
-  const absoluteOutput = path.resolve(cwd, output);
-  fs.mkdirSync(path.dirname(absoluteOutput), { recursive: true });
-  fs.writeFileSync(absoluteOutput, content, "utf8");
-  console.log(`Created ${path.relative(cwd, absoluteOutput)}`);
+  writeFileIfMissing(path.resolve(cwd, output), content);
+  console.log(`Created ${output}`);
 }
 
-function createReqTemplate(args) {
+function createReqTemplate(args, label = "new") {
   const id = getOption(args, "--id");
   const name = getOption(args, "--name");
 
   if (!id || !name) {
     fail("Usage: sa-spec template req --id REQ-001 --name login");
+    return;
   }
 
   const slug = slugify(name);
-  const reqDir = path.join(cwd, "project", `${id}-${slug}`);
-
-  const replacements = {
-    REQ_ID: id,
-    REQ_NAME: name
-  };
-
+  const reqDir = path.join("project", `${id}-${slug}`);
+  const replacements = { REQ_ID: id, REQ_NAME: name };
   const results = [
     ensureDir(reqDir),
-    ensureFileFromTemplate("project/req/spec.md", path.join("project", `${id}-${slug}`, "spec.md"), replacements),
-    ensureFileFromTemplate("project/req/risk.md", path.join("project", `${id}-${slug}`, "risk.md"), replacements),
-    ensureFileFromTemplate("project/req/history.md", path.join("project", `${id}-${slug}`, "history.md"), replacements)
+    ensureFileFromTemplate(path.join("project", "req", "srs.md"), path.join(reqDir, "srs.md"), replacements),
+    ensureFileFromTemplate(path.join("project", "req", "uml.puml"), path.join(reqDir, "uml.puml"), replacements),
+    ensureFileFromTemplate(path.join("project", "req", "openapi.yaml"), path.join(reqDir, "openapi.yaml"), replacements),
+    ensureFileFromTemplate(path.join("project", "req", "db-schema.md"), path.join(reqDir, "db-schema.md"), replacements),
+    ensureFileFromTemplate(path.join("project", "req", "history.md"), path.join(reqDir, "history.md"), replacements),
+    ensureIndexRow(id, name)
   ];
 
-  printResultList("template req", results);
+  printResultList(label, results);
 }
 
-function installPrompts() {
-  const homeDir = os.homedir();
-  const results = [];
+function ensureIndexRow(id, name) {
+  const indexPath = path.join(cwd, "project", "index.md");
+  if (!fs.existsSync(indexPath)) {
+    return { action: "skip", target: path.join("project", "index.md") };
+  }
 
-  results.push(...copyTemplateTree("prompts/codex", path.join(homeDir, ".codex", "prompts")));
-  results.push(...copyTemplateTree("prompts/claude", path.join(homeDir, ".claude", "commands")));
-  results.push(...copyTemplateTree("prompts/gemini/commands", path.join(homeDir, ".gemini", "commands")));
-  results.push(...copyTemplateTree("prompts/gemini/skills", path.join(homeDir, ".gemini", "skills")));
-  results.push(...installGeminiCodeAssistCommands());
+  const content = fs.readFileSync(indexPath, "utf8");
+  if (content.includes(`| ${id} |`)) {
+    return { action: "skip", target: path.join("project", "index.md") };
+  }
 
-  printResultList("install-prompts", results);
-  console.log("");
-  console.log("No VS Code extension was installed.");
-  console.log("Reload native AI sidebars after install:");
-  console.log("- Codex: Developer: Reload Window");
-  console.log("- Claude: restart Claude sidebar or start a new session");
-  console.log("- Gemini CLI: run /commands reload and /skills reload");
-  console.log("- Gemini Code Assist: run Developer: Reload Window, then open Quick Pick with Cmd+I/Ctrl+I");
+  const now = formatLocalDateTime(new Date());
+  const row = `| ${id} | ${name} | 待補充 | 待確認 | ${now} | ${now} |`;
+  const nextContent = content.endsWith("\n") ? `${content}${row}\n` : `${content}\n${row}\n`;
+  fs.writeFileSync(indexPath, nextContent, "utf8");
+  return { action: "update", target: path.join("project", "index.md") };
 }
 
-function installGeminiCodeAssistCommands() {
-  const settingsPath = getVsCodeUserSettingsPath();
-  const settings = readJsonFile(settingsPath);
-  if (!settings) {
-    return [];
-  }
-
-  const existingCommands = settings.geminicodeassist?.customCommands || settings["geminicodeassist.customCommands"] || {};
-  const customCommands = {
-    ...existingCommands,
-    ...buildGeminiCodeAssistCommands()
-  };
-
-  settings["geminicodeassist.customCommands"] = customCommands;
-  fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
-  fs.writeFileSync(settingsPath, `${JSON.stringify(settings, null, 4)}\n`, "utf8");
-
-  return [{
-    action: "create",
-    target: path.relative(homeDirForDisplay(), settingsPath)
-  }];
+function formatLocalDateTime(date) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate())
+  ].join("-") + " " + [
+    pad(date.getHours()),
+    pad(date.getMinutes())
+  ].join(":");
 }
 
-function getVsCodeUserSettingsPath() {
-  const homeDir = os.homedir();
-
-  if (process.env.SA_SPEC_VSCODE_SETTINGS) {
-    return path.resolve(process.env.SA_SPEC_VSCODE_SETTINGS);
+function ensureDir(relativeDir) {
+  const absoluteDir = path.join(cwd, relativeDir);
+  if (fs.existsSync(absoluteDir)) {
+    return { action: "skip", target: relativeDir };
   }
 
-  if (process.platform === "darwin") {
-    return path.join(homeDir, "Library", "Application Support", "Code", "User", "settings.json");
-  }
-
-  if (process.platform === "win32") {
-    const appData = process.env.APPDATA || path.join(homeDir, "AppData", "Roaming");
-    return path.join(appData, "Code", "User", "settings.json");
-  }
-
-  const configHome = process.env.XDG_CONFIG_HOME || path.join(homeDir, ".config");
-  return path.join(configHome, "Code", "User", "settings.json");
+  fs.mkdirSync(absoluteDir, { recursive: true });
+  return { action: "create", target: relativeDir };
 }
 
-function readJsonFile(filePath) {
-  if (!fs.existsSync(filePath)) {
-    return {};
+function ensureFileFromTemplate(templateRelativePath, targetRelativePath, replacements = {}) {
+  const targetAbsolutePath = path.join(cwd, targetRelativePath);
+  if (fs.existsSync(targetAbsolutePath)) {
+    return { action: "skip", target: targetRelativePath };
   }
 
-  const content = fs.readFileSync(filePath, "utf8").trim();
-  if (!content) {
-    return {};
-  }
-
-  try {
-    return JSON.parse(content);
-  } catch {
-    fail(`Cannot update ${filePath}; please remove comments/trailing commas or set SA_SPEC_VSCODE_SETTINGS to a JSON settings file.`);
-    return null;
-  }
+  const content = applyReplacements(readTemplate(templateRelativePath), replacements);
+  writeFileIfMissing(targetAbsolutePath, content);
+  return { action: "create", target: targetRelativePath };
 }
 
-function buildGeminiCodeAssistCommands() {
-  const commandDir = path.join(templatesDir, "prompts", "gemini", "commands", "spec");
-  const commands = {};
-
-  for (const commandName of ["init", "propose", "apply", "review", "status"]) {
-    const templatePath = path.join(commandDir, `${commandName}.toml`);
-    const prompt = extractGeminiTomlPrompt(readFileIfExists(templatePath));
-    if (prompt) {
-      commands[`spec-${commandName}`] = prompt.replaceAll("{{args}}", "");
-    }
-  }
-
-  return commands;
+function writeFileIfMissing(filePath, content) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, content, "utf8");
 }
 
-function extractGeminiTomlPrompt(content) {
-  const match = content.match(/prompt\s*=\s*"""([\s\S]*?)"""/);
-  return match ? match[1].trim() : "";
-}
-
-function copyTemplateTree(templateRelativeDir, targetAbsoluteDir) {
-  const sourceDir = path.join(templatesDir, templateRelativeDir);
-  const results = [];
-
-  if (!fs.existsSync(sourceDir)) {
-    return results;
-  }
-
-  for (const sourceFile of listFilesRecursive(sourceDir)) {
-    const relativePath = path.relative(sourceDir, sourceFile);
-    const targetFile = path.join(targetAbsoluteDir, relativePath);
-    fs.mkdirSync(path.dirname(targetFile), { recursive: true });
-    fs.copyFileSync(sourceFile, targetFile);
-    results.push({
-      action: "create",
-      target: path.relative(homeDirForDisplay(), targetFile)
-    });
-  }
-
-  return results;
+function readTemplate(relativePath) {
+  return fs.readFileSync(path.join(templatesDir, relativePath), "utf8");
 }
 
 function listFilesRecursive(dir) {
@@ -322,50 +264,11 @@ function listFilesRecursive(dir) {
     });
 }
 
-function homeDirForDisplay() {
-  return os.homedir();
-}
-
-function ensureDir(absoluteDir) {
-  if (fs.existsSync(absoluteDir)) {
-    return { action: "skip", target: path.relative(cwd, absoluteDir) || "." };
-  }
-
-  fs.mkdirSync(absoluteDir, { recursive: true });
-  return { action: "create", target: path.relative(cwd, absoluteDir) || "." };
-}
-
-function ensureFileFromTemplate(templateRelativePath, targetRelativePath, replacements = {}) {
-  const targetAbsolutePath = path.join(cwd, targetRelativePath);
-  if (fs.existsSync(targetAbsolutePath)) {
-    return { action: "skip", target: targetRelativePath };
-  }
-
-  fs.mkdirSync(path.dirname(targetAbsolutePath), { recursive: true });
-  const content = applyReplacements(readTemplate(templateRelativePath), replacements);
-  fs.writeFileSync(targetAbsolutePath, content, "utf8");
-  return { action: "create", target: targetRelativePath };
-}
-
-function readTemplate(relativePath) {
-  const templatePath = path.join(templatesDir, relativePath);
-  return fs.readFileSync(templatePath, "utf8");
-}
-
-function readFileIfExists(filePath) {
-  if (!fs.existsSync(filePath)) {
-    return "";
-  }
-
-  return fs.readFileSync(filePath, "utf8");
-}
-
 function applyReplacements(content, replacements) {
-  let result = content;
-  for (const [key, value] of Object.entries(replacements)) {
-    result = result.split(`{{${key}}}`).join(value);
-  }
-  return result;
+  return Object.entries(replacements).reduce(
+    (result, [key, value]) => result.split(`{{${key}}}`).join(value),
+    content
+  );
 }
 
 function parseIndexRows(content) {
@@ -383,10 +286,7 @@ function parseIndexRows(content) {
 
 function getOption(args, flag) {
   const index = args.indexOf(flag);
-  if (index < 0) {
-    return null;
-  }
-  return args[index + 1] || null;
+  return index >= 0 ? args[index + 1] || null : null;
 }
 
 function slugify(value) {
@@ -400,7 +300,8 @@ function slugify(value) {
 function printResultList(label, results) {
   console.log(`sa-spec ${label}`);
   for (const result of results) {
-    console.log(`${result.action === "create" ? "CREATED" : "SKIPPED"} ${result.target}`);
+    const action = result.action === "create" ? "CREATED" : result.action === "update" ? "UPDATED" : "SKIPPED";
+    console.log(`${action} ${result.target}`);
   }
 }
 
@@ -408,13 +309,9 @@ function showHelp() {
   console.log(`sa-spec
 
 Usage:
-  sa-spec install
-  sa-spec init
-  sa-spec doctor
-  sa-spec status
-  sa-spec install-prompts
-  sa-spec template system-spec [--stdout|--output <path>]
-  sa-spec template req --id REQ-001 --name login
+  sa-spec init [--full]
+  sa-spec new --id REQ-001 --name login
+  sa-spec check
 `);
 }
 
