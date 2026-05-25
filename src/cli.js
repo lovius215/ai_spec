@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { spawnSync } = require("child_process");
 
 const cwd = process.cwd();
 const rootDir = path.resolve(__dirname, "..");
@@ -42,6 +43,7 @@ function main() {
 function initProject(args = []) {
   const includeRules = args.includes("--full");
   const results = [
+    ensureGitRepository(),
     ensureDir("skills"),
     ensureDir(path.join("skills", "system-analysis")),
     ensureDir("project"),
@@ -61,6 +63,42 @@ function initProject(args = []) {
   }
 
   printResultList("init", results);
+}
+
+function ensureGitRepository() {
+  const gitVersion = spawnSync("git", ["--version"], { cwd, encoding: "utf8" });
+  if (gitVersion.error && gitVersion.error.code === "ENOENT") {
+    return {
+      action: "warn",
+      target: "git",
+      message: "Git 未安裝；後續歸檔會使用版本管理，請先安裝 Git。"
+    };
+  }
+
+  if (gitVersion.status !== 0) {
+    return {
+      action: "warn",
+      target: "git",
+      message: "無法確認 Git 是否可用；後續歸檔可能無法使用版本管理。"
+    };
+  }
+
+  const workTree = spawnSync("git", ["rev-parse", "--is-inside-work-tree"], { cwd, encoding: "utf8" });
+  if (workTree.status === 0 && workTree.stdout.trim() === "true") {
+    return { action: "skip", target: "git repository" };
+  }
+
+  const init = spawnSync("git", ["init"], { cwd, encoding: "utf8" });
+  if (init.status !== 0) {
+    process.exitCode = 1;
+    return {
+      action: "warn",
+      target: "git init",
+      message: (init.stderr || init.stdout || "git init 執行失敗。").trim()
+    };
+  }
+
+  return { action: "update", target: ".git" };
 }
 
 function runDoctor() {
@@ -300,8 +338,8 @@ function slugify(value) {
 function printResultList(label, results) {
   console.log(`sa-spec ${label}`);
   for (const result of results) {
-    const action = result.action === "create" ? "CREATED" : result.action === "update" ? "UPDATED" : "SKIPPED";
-    console.log(`${action} ${result.target}`);
+    const action = result.action === "create" ? "CREATED" : result.action === "update" ? "UPDATED" : result.action === "warn" ? "WARNING" : "SKIPPED";
+    console.log(`${action} ${result.target}${result.message ? ` - ${result.message}` : ""}`);
   }
 }
 
