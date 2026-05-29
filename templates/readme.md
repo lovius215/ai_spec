@@ -212,6 +212,32 @@ sa-spec init --full
 
 `spec:...` 是 AI 工作流程指令，要輸入在 VS Code 的 AI 對話側邊欄，例如 Codex、Claude Code、Gemini CLI，或其他已載入本專案規則的 AI 對話工具。
 
+### 建議安裝的 VS Code 套件
+
+至少需要安裝一個能和專案檔案協作的 AI 對話套件。不同使用者可以依自己的帳號與模型選擇其中一種：
+
+| 類型 | 套件或工具 | 是否必要 | 用途 |
+|---|---|---|---|
+| AI 對話 | OpenAI Codex / ChatGPT 類型的 VS Code AI 套件 | 擇一 | 在側邊欄輸入 `spec:init`、`spec:propose`、`spec:analyze`、`spec:commit`。 |
+| AI 對話 | Claude Code 類型的 VS Code AI 套件或 CLI 整合 | 擇一 | 用 Claude 讀取工作區規則並協作產出需求文件。 |
+| AI 對話 | Gemini 類型的 VS Code AI 套件或 CLI 整合 | 擇一 | 用 Gemini 讀取工作區規則並協作產出需求文件。 |
+| Markdown | Markdown 預覽或 Markdown All in One 類型套件 | 選用 | 預覽 `srs.md`、`history.md`、`system-spec.md`。 |
+| UML | PlantUML 類型套件 | 選用 | 預覽 `uml.puml`。 |
+| YAML | YAML 類型套件 | 選用 | 編輯與檢查 `openapi.yaml`。 |
+| Git | GitLens 類型套件 | 選用 | 查看需求文件修改歷程。 |
+
+最小可用組合：
+
+```text
+VS Code
++ 一個 AI 對話套件
++ VS Code 內建 Terminal
++ Git
++ sa-spec CLI
+```
+
+Markdown、PlantUML、YAML、GitLens 這類套件可以提升閱讀與檢查體驗，但不是執行 `sa-spec` 或 `spec:*` 流程的必要條件。
+
 | 類型 | 指令範例 | 使用位置 | 用途 |
 |---|---|---|---|
 | CLI | `sa-spec init --full` | 終端機或 VS Code Terminal | 建立文件骨架與規則檔。 |
