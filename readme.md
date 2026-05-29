@@ -213,7 +213,7 @@ sa-spec init --full
 | `spec:init` | 初始化並載入 `AGENTS.md`、`skills/system-analysis/SKILL.md` 與必要規則。 |
 | `spec:propose` | 使用者提出需求後，整理需求摘要、目標、初步流程與待確認事項。 |
 | `spec:analyze` | 檢查是否與既有需求衝突；無衝突才產出 SRS、UML、OpenAPI、DB Schema 草稿。 |
-| `spec:commit` | 使用者確認無衝突版本後，將版本歸檔到 `project/`。 |
+| `spec:commit` | 使用者確認無衝突版本後，將版本歸檔到 `project/`，並建立本機 Git commit。 |
 
 狀態機：
 
@@ -223,10 +223,18 @@ init -> propose -> analyze
 analyze 無衝突 -> 產出待確認版本 -> commit
 analyze 有衝突 -> 釐清問題 -> analyze
 
-commit -> 歸檔
+commit -> 歸檔 -> 本機 Git commit
 ```
 
 `spec:analyze` 若發現衝突，只會列出衝突與待釐清問題，不會修改任何需求文件，也不會產出最終文件。釐清後應再次執行 `spec:analyze`，重新檢查並產出草稿。
+
+`spec:commit` 完成歸檔後會自動建立本機 Git commit。commit message 會以需求編號與需求名稱為主，並加上簡短需求說明：
+
+```text
+docs(REQ-001): 番茄時鐘 - 新增專注與休息計時需求
+```
+
+只有在使用者明確要求推送 remote，或專案設定啟用 auto-push 時，才會執行 `git push`。如果 push 失敗，只回報認證或網路問題，不會回滾已完成的文件歸檔與本機 commit。
 
 ## 完整範例：番茄時鐘
 
@@ -385,7 +393,7 @@ title REQ-001 番茄時鐘狀態圖
 spec:commit
 ```
 
-AI 才能把已確認版本寫入需求資料夾，並更新索引與歷程。
+AI 才能把已確認版本寫入需求資料夾、更新索引與歷程，並建立本機 Git commit。
 
 ### 6. 歸檔後結構
 
@@ -417,22 +425,22 @@ project/
 | 2026-05-29 21:30 | v0.1 | 新增 | 建立番茄時鐘需求草稿 | 使用者確認 | SRS、UML、OpenAPI、DB Schema | 低 | 待確認 |
 ```
 
-### 7. 提交到 Git
+### 7. Git commit 與 remote push
 
-確認檔案：
+`spec:commit` 完成後，AI 會自動建立本機 Git commit，例如：
+
+```text
+docs(REQ-001): 番茄時鐘 - 新增專注與休息計時需求
+```
+
+可以用以下指令確認：
 
 ```bash
 git status
+git log -1 --oneline
 ```
 
-提交：
-
-```bash
-git add AGENTS.md readme.md skills project rules
-git commit -m "docs: add pomodoro timer requirement"
-```
-
-若已設定 remote：
+若要推送到 remote，需要明確要求 AI 執行 push，或自行執行：
 
 ```bash
 git push origin main
@@ -449,4 +457,5 @@ git push origin master
 - 未經使用者確認，不得標示為 `已審核`。
 - `spec:analyze` 發現衝突時不得產出最終文件，也不得修改既有需求文件。
 - `project/system-spec.md` 只能在 `spec:commit` 依使用者確認內容更新。
+- `spec:commit` 會自動建立本機 Git commit；remote push 需使用者明確要求或啟用 auto-push。
 - 一次最多問 3 個待確認問題，優先詢問會影響範圍、資料、權限、API、DB 或驗收的問題。
