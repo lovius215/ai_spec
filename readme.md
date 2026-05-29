@@ -206,6 +206,42 @@ sa-spec init --full
 
 `sa-spec new` 是快速建空白模板的輔助工具。正式需求流程仍建議使用 `spec:init`、`spec:propose`、`spec:analyze`、`spec:commit`。
 
+## CLI 與 VS Code 用法
+
+`sa-spec ...` 是 CLI 指令，要在終端機執行，例如 macOS/Linux 的 Terminal、Windows 的 PowerShell，或 VS Code 內建 Terminal。
+
+`spec:...` 是 AI 工作流程指令，要輸入在 VS Code 的 AI 對話側邊欄，例如 Codex、Claude Code、Gemini CLI，或其他已載入本專案規則的 AI 對話工具。
+
+| 類型 | 指令範例 | 使用位置 | 用途 |
+|---|---|---|---|
+| CLI | `sa-spec init --full` | 終端機或 VS Code Terminal | 建立文件骨架與規則檔。 |
+| CLI | `sa-spec check` | 終端機或 VS Code Terminal | 檢查必要文件是否存在。 |
+| CLI | `sa-spec status` | 終端機或 VS Code Terminal | 查看系統規格與需求索引狀態。 |
+| AI 工作流程 | `spec:init` | VS Code AI 對話側邊欄 | 載入規則並確認工作區狀態。 |
+| AI 工作流程 | `spec:propose` | VS Code AI 對話側邊欄 | 整理使用者提出的需求。 |
+| AI 工作流程 | `spec:analyze` | VS Code AI 對話側邊欄 | 檢查衝突並產出待確認草稿。 |
+| AI 工作流程 | `spec:commit` | VS Code AI 對話側邊欄 | 歸檔已確認版本並建立本機 Git commit。 |
+
+建議操作順序：
+
+```bash
+mkdir my-spec
+cd my-spec
+sa-spec init --full
+code .
+```
+
+接著在 VS Code 的 AI 對話側邊欄輸入：
+
+```text
+spec:init
+spec:propose
+spec:analyze
+spec:commit
+```
+
+如果你有安裝 prompts 或 slash commands，可以用對應的快捷指令；沒有安裝也可以直接手動輸入上面的文字指令。
+
 ## AI 工作流程
 
 | 指令 | 用途 |
