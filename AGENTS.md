@@ -21,12 +21,13 @@
 | `spec:init` | 初始化 | 載入並遵守 `AGENTS.md`、`skills/system-analysis/SKILL.md` 與必要規則，確認 `project/` 結構是否存在。 |
 | `spec:propose` | 提出需求 | 使用者提出需求後，先整理需求摘要、目標、初步流程與待確認事項，不歸檔、不修改既有需求。 |
 | `spec:analyze` | 分析與起草 | 先檢查新需求是否與 `project/` 內所有既有需求衝突；無衝突才產出 SRS、UML、OpenAPI、DB Schema 草稿；有衝突則只列出衝突與待釐清問題，待使用者釐清後再次執行 `spec:analyze`。 |
-| `spec:commit` | 確認歸檔 | 只把使用者已確認的版本歸檔到該需求資料夾，並更新 `project/index.md` 與 `history.md`。 |
+| `spec:commit` | 確認歸檔 | 只把使用者已確認的版本歸檔到該需求資料夾，並更新 `project/index.md`、`project/system-spec.md` 與 `history.md`。 |
 
 # 重要限制
 
-- 使用繁體中文。
+- 使用繁體中文，並採用台灣常用語。
 - `spec:init` 必須檢查 Git 狀態：若 Git 未安裝，提醒使用者後續歸檔會使用版本管理但不可中斷初始化；若 Git 已安裝且目前目錄尚未初始化為 Git repository，則自動執行 `git init`；若已是 Git repository，僅回報狀態，不重複初始化。
+- `project/system-spec.md` 由 `sa-spec init` 建立；`spec:analyze` 只能讀取它做衝突檢查，並提出待確認的系統規格更新建議，不得寫入；`spec:commit` 才能依使用者確認後的內容更新 `project/system-spec.md`。
 - 不可自行幻想未確認的業務規則、角色、流程、資料或系統行為。
 - `spec:analyze` 必須先檢查所有既有需求是否衝突。
 - 若發現衝突，不得產出最終文件，不得修改任何需求文件，只能向使用者釐清。
@@ -86,7 +87,7 @@ project/
 <claude-mem-context>
 # Memory Context
 
-# [ai] recent context, 2026-05-25 12:30pm GMT+8
+# [ai] recent context, 2026-05-25 9:41pm GMT+8
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
@@ -128,7 +129,7 @@ S18 Add VSCode Chat Participant sidebar to /Users/lovius/ai (sa-spec extension),
 102 5:05p 🔴 `--skip-git-repo-check` Added to Codex Exec Args to Support Non-Git Workspaces
 103 " 🔵 `codex exec --skip-git-repo-check` Confirmed Working with `--output-last-message` Pattern
 104 5:09p 🔵 openspec NPM 安裝後在 VSCode Codex 側邊欄顯示 /prompts:opsx-apply 命令
-105 " 🔵 openspec 透過 ~/.codex/prompts/ 目錄向 VSCode Codex 側邊欄注冊命令
+105 " 🔵 openspec 透過 ~/.codex/prompts/ 目錄向 VSCode Codex 側邊欄註冊命令
 106 " 🔵 openspec NPM 套件為 @fission-ai/openspec v1.3.1，主項目為 VSCode 擴充功能
 107 5:10p 🔵 opsx Codex prompt 文件結構：YAML frontmatter 的 argument-hint 欄位控制側邊欄顯示
 108 " 🔵 opsx-apply 工作流程：透過 openspec CLI 讀取 contextFiles 實現 AI 驅動任務執行
