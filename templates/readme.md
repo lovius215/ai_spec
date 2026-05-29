@@ -1,6 +1,8 @@
 # 個人系統分析 AI 工作台
 
-這是一個輕量需求整理工作台。AI 工作流固定為四個指令：
+`sa-spec` 是一個輕量的系統分析文件工作台，用固定流程把需求想法整理成可確認、可歸檔、可檢查的文件。
+
+AI 工作流只使用四個指令：
 
 ```text
 spec:init
@@ -9,29 +11,7 @@ spec:analyze
 spec:commit
 ```
 
-## 流程
-
-| 指令 | 用途 |
-|---|---|
-| `spec:init` | 初始化並載入相關 skills/rules。 |
-| `spec:propose` | 使用者提出需求後，整理需求摘要、目標、初步流程與待確認事項。 |
-| `spec:analyze` | 先檢查是否與既有需求衝突；無衝突才產出 SRS、UML、OpenAPI、DB Schema 草稿；有衝突則釐清後再次執行 `spec:analyze`。 |
-| `spec:commit` | 使用者確認無衝突版本後，將版本歸檔到 `project/`。 |
-
-`spec:analyze` 若發現衝突，只會列出衝突與待釐清問題，不會修改任何需求文件，也不會產出最終文件。釐清後應再次執行 `spec:analyze`，重新檢查並產出草稿；不是進入 `spec:commit`。除非使用者明確指定，任何流程都不能修改其他需求資料夾。
-
-狀態機：
-
-```text
-init -> propose -> analyze
-
-analyze 無衝突 -> 產出待確認版本 -> commit
-analyze 有衝突 -> 釐清問題 -> analyze
-```
-
-## 歸檔文件
-
-每個需求歸檔後包含：
+每個需求歸檔後固定包含：
 
 ```text
 project/
@@ -43,16 +23,404 @@ project/
     history.md
 ```
 
-## CLI
+## 安裝前準備
+
+請先安裝：
+
+- Node.js 18 或以上版本。
+- npm。
+- Git。
+
+確認版本：
+
+```bash
+node --version
+npm --version
+git --version
+```
+
+## macOS 安裝
+
+使用 Git 下載專案：
+
+```bash
+git clone https://github.com/teyhawzhe/open_sa.git
+cd open_sa
+npm install
+npm link
+```
+
+確認 CLI 可用：
+
+```bash
+sa-spec help
+```
+
+若 `sa-spec` 找不到，請確認 npm global 路徑是否在 `PATH`：
+
+```bash
+npm prefix -g
+```
+
+macOS 常見執行檔路徑會是該目錄底下的 `bin` 資料夾。
+
+## Linux 安裝
+
+使用 Git 下載專案：
+
+```bash
+git clone https://github.com/teyhawzhe/open_sa.git
+cd open_sa
+npm install
+npm link
+```
+
+確認 CLI 可用：
+
+```bash
+sa-spec help
+```
+
+若遇到權限問題，建議調整 npm global prefix，不建議直接使用 `sudo npm link`：
+
+```bash
+mkdir -p ~/.npm-global
+npm config set prefix ~/.npm-global
+```
+
+再把以下內容加入 shell 設定檔，例如 `~/.bashrc` 或 `~/.zshrc`：
+
+```bash
+export PATH="$HOME/.npm-global/bin:$PATH"
+```
+
+重新載入 shell 後再執行：
+
+```bash
+npm link
+sa-spec help
+```
+
+## Windows 安裝
+
+請使用 PowerShell。
+
+使用 Git 下載專案：
+
+```powershell
+git clone https://github.com/teyhawzhe/open_sa.git
+cd open_sa
+npm install
+npm link
+```
+
+確認 CLI 可用：
+
+```powershell
+sa-spec help
+```
+
+若 PowerShell 找不到 `sa-spec`，請確認 npm global 路徑是否在 `Path` 環境變數：
+
+```powershell
+npm prefix -g
+```
+
+常見路徑類似：
+
+```text
+C:\Users\你的使用者名稱\AppData\Roaming\npm
+```
+
+把該路徑加入 Windows 的使用者環境變數 `Path` 後，重新開啟 PowerShell，再執行：
+
+```powershell
+sa-spec help
+```
+
+## 專案初始化
+
+在你要管理需求文件的資料夾執行：
 
 ```bash
 sa-spec init
-sa-spec new --id REQ-001 --name login
-sa-spec check
 ```
+
+這會建立最小文件骨架：
+
+```text
+AGENTS.md
+readme.md
+skills/
+  system-analysis/
+    SKILL.md
+project/
+  index.md
+  system-spec.md
+```
+
+若想同時建立完整規則文件：
+
+```bash
+sa-spec init --full
+```
+
+`spec:init` 規則會檢查 Git 狀態；若目前資料夾還不是 Git repository，會自動執行 `git init`。
+
+## CLI 指令
 
 | 指令 | 用途 |
 |---|---|
 | `sa-spec init` | 建立最小文件骨架。 |
-| `sa-spec new --id REQ-001 --name login` | 建立需求資料夾與空白文件。 |
-| `sa-spec check` | 檢查基本文件是否存在並顯示狀態。 |
+| `sa-spec init --full` | 建立文件骨架與完整規則文件。 |
+| `sa-spec new --id REQ-001 --name login` | 建立需求資料夾與空白文件模板。 |
+| `sa-spec check` | 檢查基本文件是否存在。 |
+| `sa-spec status` | 顯示系統規格與需求索引狀態。 |
+| `sa-spec doctor` | 檢查必要檔案是否存在。 |
+
+`sa-spec new` 是快速建空白模板的輔助工具。正式需求流程仍建議使用 `spec:init`、`spec:propose`、`spec:analyze`、`spec:commit`。
+
+## AI 工作流程
+
+| 指令 | 用途 |
+|---|---|
+| `spec:init` | 初始化並載入 `AGENTS.md`、`skills/system-analysis/SKILL.md` 與必要規則。 |
+| `spec:propose` | 使用者提出需求後，整理需求摘要、目標、初步流程與待確認事項。 |
+| `spec:analyze` | 檢查是否與既有需求衝突；無衝突才產出 SRS、UML、OpenAPI、DB Schema 草稿。 |
+| `spec:commit` | 使用者確認無衝突版本後，將版本歸檔到 `project/`。 |
+
+狀態機：
+
+```text
+init -> propose -> analyze
+
+analyze 無衝突 -> 產出待確認版本 -> commit
+analyze 有衝突 -> 釐清問題 -> analyze
+
+commit -> 歸檔
+```
+
+`spec:analyze` 若發現衝突，只會列出衝突與待釐清問題，不會修改任何需求文件，也不會產出最終文件。釐清後應再次執行 `spec:analyze`，重新檢查並產出草稿。
+
+## 完整範例：番茄時鐘
+
+以下示範從空資料夾開始，建立一個「番茄時鐘」需求。
+
+### 1. 建立工作資料夾
+
+```bash
+mkdir pomodoro-spec
+cd pomodoro-spec
+sa-spec init --full
+```
+
+確認狀態：
+
+```bash
+sa-spec check
+sa-spec status
+```
+
+預期會看到 `AGENTS.md`、`skills/system-analysis/SKILL.md`、`project/index.md`、`project/system-spec.md` 都存在。
+
+### 2. 啟動 AI 流程
+
+在支援此專案規則的 AI 對話中輸入：
+
+```text
+spec:init
+```
+
+AI 會讀取規則、確認 `project/` 結構，並回報 Git 狀態。
+
+### 3. 提出需求
+
+輸入：
+
+```text
+spec:propose
+
+我想做一個番茄時鐘，使用者可以設定專注 25 分鐘、休息 5 分鐘。
+可以開始、暫停、繼續、重設計時。
+時間結束時要通知使用者。
+先不用登入，也不用同步到雲端。
+```
+
+AI 應先整理，而不是直接歸檔：
+
+```text
+需求摘要：
+- 建立番茄時鐘功能，支援專注與休息計時。
+
+目標：
+- 讓使用者可以用固定週期管理工作與休息時間。
+
+初步流程：
+1. 使用者設定專注時間與休息時間。
+2. 使用者開始專注計時。
+3. 使用者可暫停、繼續或重設。
+4. 專注時間結束後，系統通知使用者並進入休息計時。
+5. 休息時間結束後，系統通知使用者。
+
+待確認事項：
+1. 時間結束通知要用瀏覽器通知、音效，還是畫面提示？
+2. 是否需要記錄完成幾輪番茄鐘？
+3. 設定時間是否需要保存到下次開啟？
+```
+
+使用者補充確認：
+
+```text
+1. 通知先用畫面提示和音效。
+2. 需要記錄本次開啟頁面後完成幾輪，不需要永久保存。
+3. 設定時間只保留在本次頁面，不需要資料庫。
+```
+
+### 4. 分析與起草
+
+輸入：
+
+```text
+spec:analyze
+```
+
+AI 必須先檢查 `project/` 內所有既有需求，包括：
+
+- 是否與既有需求目標或流程重疊。
+- 是否改變既有角色、權限或資料存取規則。
+- 是否影響既有 API。
+- 是否影響既有 DB Table。
+- 是否與既有驗收條件矛盾。
+
+若沒有衝突，AI 會產出待確認草稿，包含：
+
+```text
+需求編號：REQ-001
+需求名稱：番茄時鐘
+狀態：待確認
+
+SRS 草稿：
+- 需求摘要
+- 業務目標
+- 使用者與角色
+- 前置條件
+- 主要流程
+- 例外流程
+- 功能需求
+- 非功能需求
+- 驗收條件
+- 待確認事項
+
+UML 草稿：
+- 依需求選擇活動圖或狀態圖。
+
+OpenAPI 草稿：
+- 若本需求不需要後端 API，需明確標示「無 API 需求」。
+
+DB Schema 草稿：
+- 若本需求不需要資料庫，需明確標示「無 DB 需求」。
+
+project/system-spec.md 更新建議：
+- 建議新增番茄時鐘模組摘要。
+
+本次未修改其他需求。
+```
+
+番茄時鐘的 UML 可能選擇狀態圖，因為此需求重點是計時器狀態：
+
+```plantuml
+@startuml
+title REQ-001 番茄時鐘狀態圖
+
+[*] --> 閒置
+閒置 --> 專注計時中 : 開始
+專注計時中 --> 暫停 : 暫停
+暫停 --> 專注計時中 : 繼續
+專注計時中 --> 休息計時中 : 專注時間結束
+休息計時中 --> 閒置 : 休息時間結束
+專注計時中 --> 閒置 : 重設
+休息計時中 --> 閒置 : 重設
+暫停 --> 閒置 : 重設
+
+@enduml
+```
+
+### 5. 使用者確認
+
+若草稿內容正確，輸入：
+
+```text
+我確認這版番茄時鐘需求，可以歸檔。
+```
+
+接著輸入：
+
+```text
+spec:commit
+```
+
+AI 才能把已確認版本寫入需求資料夾，並更新索引與歷程。
+
+### 6. 歸檔後結構
+
+完成後預期會有：
+
+```text
+project/
+  index.md
+  system-spec.md
+  REQ-001-pomodoro-timer/
+    srs.md
+    uml.puml
+    openapi.yaml
+    db-schema.md
+    history.md
+```
+
+`project/index.md` 會新增一列：
+
+```text
+| REQ-001 | 番茄時鐘 | 使用者可進行專注與休息計時 | 待確認或已審核 | 建立時間 | 更新時間 |
+```
+
+`history.md` 會記錄本次歸檔，例如：
+
+```text
+| 時間 | 版本 | 類型 | 說明 | 來源 | 影響範圍 | 風險 | 狀態 |
+|---|---|---|---|---|---|---|---|
+| 2026-05-29 21:30 | v0.1 | 新增 | 建立番茄時鐘需求草稿 | 使用者確認 | SRS、UML、OpenAPI、DB Schema | 低 | 待確認 |
+```
+
+### 7. 提交到 Git
+
+確認檔案：
+
+```bash
+git status
+```
+
+提交：
+
+```bash
+git add AGENTS.md readme.md skills project rules
+git commit -m "docs: add pomodoro timer requirement"
+```
+
+若已設定 remote：
+
+```bash
+git push origin main
+```
+
+若分支是 `master`：
+
+```bash
+git push origin master
+```
+
+## 注意事項
+
+- 未經使用者確認，不得標示為 `已審核`。
+- `spec:analyze` 發現衝突時不得產出最終文件，也不得修改既有需求文件。
+- `project/system-spec.md` 只能在 `spec:commit` 依使用者確認內容更新。
+- 一次最多問 3 個待確認問題，優先詢問會影響範圍、資料、權限、API、DB 或驗收的問題。
