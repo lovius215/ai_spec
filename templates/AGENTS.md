@@ -10,6 +10,7 @@
 - `uml.puml`：UML 圖。
 - `openapi.yaml`：OpenAPI 草稿。
 - `db-schema.md`：DB Schema 草稿。
+- `handoff.md`：給 OpenSpec 或其他 AI 開發工具的開發交接摘要。
 - `history.md`：版本歷程。
 
 # 指令流程
@@ -34,6 +35,8 @@
 - 衝突釐清後，流程回到 `spec:analyze`，重新檢查衝突並產出草稿；不可直接進入 `spec:commit`。
 - 任何流程都不得修改其他需求資料夾中的文件，除非使用者明確指定該需求也要變更。
 - `spec:commit` 只能套用已由 `spec:analyze` 產出的、且使用者已確認的無衝突版本。
+- `handoff.md` 只能根據已確認的 SRS、UML、OpenAPI、DB Schema 與限制整理，不得新增未確認的開發假設。
+- 交給 OpenSpec 或其他 AI 開發工具時，必須指定它先閱讀 `handoff.md`，並以 `handoff.md` 作為開發入口與限制摘要；其他規格文件作為詳細來源。
 - `spec:commit` 完成文件歸檔後，必須自動建立本機 Git commit；commit message 以需求編號與需求名稱為主，並加上簡短需求說明，格式為 `docs(REQ-001): 需求名稱 - 簡短需求說明`。
 - `spec:commit` 只有在使用者明確要求推送 remote，或專案設定啟用 auto-push 時，才可執行 `git push`；push 失敗時只回報認證或網路問題，不得回滾已完成的文件歸檔與本機 commit。
 - 文件未經使用者確認，不得標示為 `已審核`。
@@ -82,5 +85,6 @@ project/
     uml.puml
     openapi.yaml
     db-schema.md
+    handoff.md
     history.md
 ```

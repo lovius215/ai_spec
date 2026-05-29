@@ -20,6 +20,7 @@ project/
     uml.puml
     openapi.yaml
     db-schema.md
+    handoff.md
     history.md
 ```
 
@@ -199,7 +200,7 @@ sa-spec init --full
 |---|---|
 | `sa-spec init` | 建立最小文件骨架。 |
 | `sa-spec init --full` | 建立文件骨架與完整規則文件。 |
-| `sa-spec new --id REQ-001 --name login` | 建立需求資料夾與空白文件模板。 |
+| `sa-spec new --id REQ-001 --name login` | 建立需求資料夾與空白文件模板，包含 SRS、UML、OpenAPI、DB Schema、handoff 與 history。 |
 | `sa-spec check` | 檢查基本文件是否存在。 |
 | `sa-spec status` | 顯示系統規格與需求索引狀態。 |
 | `sa-spec doctor` | 檢查必要檔案是否存在。 |
@@ -289,6 +290,18 @@ commit -> 歸檔 -> 本機 Git commit
 ```
 
 `spec:analyze` 若發現衝突，只會列出衝突與待釐清問題，不會修改任何需求文件，也不會產出最終文件。釐清後應再次執行 `spec:analyze`，重新檢查並產出草稿。
+
+`handoff.md` 是給 OpenSpec 或其他 AI 開發工具的開發交接摘要。它會從已確認的 SRS、UML、OpenAPI、DB Schema 與限制整理出「要開發什麼」、「不要開發什麼」、「已確認規則」、「API 契約」、「DB 變更」、「驗收條件」與「開發限制」。它只能整理已確認內容，不得新增未確認的開發假設。
+
+交給 OpenSpec 或其他 AI 開發工具時，應指定它先閱讀 `handoff.md`，並以 `handoff.md` 作為開發入口與限制摘要；其他規格文件作為詳細來源。可使用以下提示：
+
+```text
+請先閱讀 project/REQ-001-pomodoro-timer/handoff.md。
+以 handoff.md 作為本次開發入口與限制摘要。
+如需完整需求細節，再查閱同資料夾內的 srs.md、uml.puml、openapi.yaml、db-schema.md 與 history.md。
+不得自行新增 handoff.md 未確認的角色、權限、流程、狀態、API 或 DB 欄位。
+若發現 handoff.md 與既有程式或規格衝突，請停止開發並回報。
+```
 
 `spec:commit` 完成歸檔後會自動建立本機 Git commit。commit message 會以需求編號與需求名稱為主，並加上簡短需求說明：
 
@@ -416,6 +429,10 @@ OpenAPI 草稿：
 DB Schema 草稿：
 - 若本需求不需要資料庫，需明確標示「無 DB 需求」。
 
+Handoff 交接摘要草稿：
+- 整理給 OpenSpec 或 AI 開發工具使用的開發交接摘要。
+- 明確列出要開發什麼、不要開發什麼、已確認規則、API 契約、DB 變更、驗收條件與開發限制。
+
 project/system-spec.md 更新建議：
 - 建議新增番茄時鐘模組摘要。
 
@@ -470,7 +487,24 @@ project/
     uml.puml
     openapi.yaml
     db-schema.md
+    handoff.md
     history.md
+```
+
+`handoff.md` 會整理給 OpenSpec 或 AI 開發工具使用的交接內容，例如：
+
+```text
+要開發什麼：番茄時鐘前端計時功能。
+不要開發什麼：登入、雲端同步、永久資料保存。
+API 契約：無 API 需求。
+DB 變更：無 DB 需求。
+開發限制：不得自行新增未確認的角色、狀態、API 或 DB 欄位。
+```
+
+交給 OpenSpec 開發時，可以直接指定：
+
+```text
+請先閱讀 project/REQ-001-pomodoro-timer/handoff.md，並以 handoff.md 作為本次開發入口與限制摘要。
 ```
 
 `project/index.md` 會新增一列：
@@ -484,7 +518,7 @@ project/
 ```text
 | 時間 | 版本 | 類型 | 說明 | 來源 | 影響範圍 | 風險 | 狀態 |
 |---|---|---|---|---|---|---|---|
-| 2026-05-29 21:30 | v0.1 | 新增 | 建立番茄時鐘需求草稿 | 使用者確認 | SRS、UML、OpenAPI、DB Schema | 低 | 待確認 |
+| 2026-05-29 21:30 | v0.1 | 新增 | 建立番茄時鐘需求草稿 | 使用者確認 | SRS、UML、OpenAPI、DB Schema、Handoff | 低 | 待確認 |
 ```
 
 ### 7. Git commit 與 remote push

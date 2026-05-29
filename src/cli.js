@@ -226,6 +226,7 @@ function createReqTemplate(args, label = "new") {
     ensureFileFromTemplate(path.join("project", "req", "uml.puml"), path.join(reqDir, "uml.puml"), replacements),
     ensureFileFromTemplate(path.join("project", "req", "openapi.yaml"), path.join(reqDir, "openapi.yaml"), replacements),
     ensureFileFromTemplate(path.join("project", "req", "db-schema.md"), path.join(reqDir, "db-schema.md"), replacements),
+    ensureFileFromTemplate(path.join("project", "req", "handoff.md"), path.join(reqDir, "handoff.md"), replacements),
     ensureFileFromTemplate(path.join("project", "req", "history.md"), path.join(reqDir, "history.md"), replacements),
     ensureIndexRow(id, name)
   ];

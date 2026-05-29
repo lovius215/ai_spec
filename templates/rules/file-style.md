@@ -22,6 +22,8 @@
   - `history.md`：需求歷程。
   - `uml.puml`：UML 圖。
   - `openapi.yaml`：OpenAPI 草稿。
+  - `db-schema.md`：DB Schema 草稿。
+  - `handoff.md`：給 OpenSpec 或其他 AI 開發工具的開發交接摘要。
 - 若需求涉及畫面，使用 `wireframe.md`。
 - 若需求需要 UML，放入 `uml/` 資料夾。
 - 若需求需要 API 或資料模型，使用 `api.md` 或獨立資料模型文件。
@@ -37,6 +39,8 @@ project/
     history.md
     uml.puml
     openapi.yaml
+    db-schema.md
+    handoff.md
     uml/
       use-case.puml
       sequence.puml

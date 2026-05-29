@@ -11,6 +11,7 @@ description: 用 init、propose、analyze、commit 四段流程整理需求，�
 - `uml.puml`：UML 圖。
 - `openapi.yaml`：OpenAPI 草稿。
 - `db-schema.md`：DB Schema 草稿。
+- `handoff.md`：給 OpenSpec 或其他 AI 開發工具的開發交接摘要。
 - `history.md`：版本歷程。
 
 ## 指令流程
@@ -36,6 +37,8 @@ description: 用 init、propose、analyze、commit 四段流程整理需求，�
 - 衝突釐清後，流程回到 `spec:analyze`，重新檢查衝突並產出草稿；不可直接進入 `spec:commit`。
 - 任何流程都不得修改其他需求資料夾中的文件，除非使用者明確指定該需求也要變更。
 - `spec:commit` 只能套用已由 `spec:analyze` 產出的、且使用者已確認的無衝突版本。
+- `handoff.md` 只能根據已確認的 SRS、UML、OpenAPI、DB Schema 與限制整理，不得新增未確認的開發假設。
+- 交給 OpenSpec 或其他 AI 開發工具時，必須指定它先閱讀 `handoff.md`，並以 `handoff.md` 作為開發入口與限制摘要；其他規格文件作為詳細來源。
 - `spec:commit` 完成文件歸檔後，必須自動建立本機 Git commit；commit message 以需求編號與需求名稱為主，並加上簡短需求說明，格式為 `docs(REQ-001): 需求名稱 - 簡短需求說明`。
 - `spec:commit` 只有在使用者明確要求推送 remote，或專案設定啟用 auto-push 時，才可執行 `git push`；push 失敗時只回報認證或網路問題，不得回滾已完成的文件歸檔與本機 commit。
 - 文件未經使用者確認，不得標示為 `已審核`。
@@ -51,6 +54,7 @@ description: 用 init、propose、analyze、commit 四段流程整理需求，�
 - 所有 `project/REQ-*/srs.md`
 - 所有 `project/REQ-*/openapi.yaml`
 - 所有 `project/REQ-*/db-schema.md`
+- 所有 `project/REQ-*/handoff.md`
 - 必要時讀取 `project/REQ-*/uml.puml`
 
 至少檢查：
@@ -80,6 +84,7 @@ description: 用 init、propose、analyze、commit 四段流程整理需求，�
 - UML PlantUML 草稿。
 - OpenAPI YAML 草稿。
 - DB Schema 草稿。
+- Handoff 交接摘要草稿。
 - `project/system-spec.md` 更新建議。
 - 待確認事項。
 - 本次未修改其他需求的聲明。
@@ -95,8 +100,26 @@ project/
     uml.puml
     openapi.yaml
     db-schema.md
+    handoff.md
     history.md
 ```
+
+`handoff.md` 用於交接給 OpenSpec 或其他 AI 開發工具，必須包含：
+
+- 需求來源與相關文件。
+- 要開發什麼。
+- 不要開發什麼。
+- 已確認規則。
+- 狀態與流程。
+- API 契約。
+- DB 變更。
+- 驗收條件。
+- 開發限制。
+- 建議實作範圍。
+
+若需求不需要 API 或 DB，必須明確標示「無 API 需求」或「無 DB 需求」。不得在 `handoff.md` 中新增未經使用者確認的角色、權限、資料、流程、狀態、API 或 DB 欄位。
+
+交給 OpenSpec 或其他 AI 開發工具時，應要求它先閱讀 `handoff.md`，並以 `handoff.md` 作為本次開發入口與限制摘要。若需要完整細節，再查閱同需求資料夾內的 `srs.md`、`uml.puml`、`openapi.yaml`、`db-schema.md` 與 `history.md`。
 
 歸檔完成後，必須只 stage 本次歸檔相關檔案，並建立本機 Git commit。commit message 格式：
 
