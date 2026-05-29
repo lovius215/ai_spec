@@ -167,6 +167,32 @@ sa-spec init --full
 
 `spec:init` 規則會檢查 Git 狀態；若目前資料夾還不是 Git repository，會自動執行 `git init`。
 
+### `init` 與 `init --full` 差異
+
+| 指令 | 會建立什麼 | 適合情境 |
+|---|---|---|
+| `sa-spec init` | 最小文件骨架：`AGENTS.md`、`readme.md`、`skills/system-analysis/SKILL.md`、`project/index.md`、`project/system-spec.md`。 | 想快速開始整理需求，先保持規則簡單。 |
+| `sa-spec init --full` | 最小文件骨架，加上 `rules/` 內的 SRS、審核、UML、DB Table、估算、檔案格式等補充規則。 | 想讓 AI 產出的文件格式更一致，或團隊需要比較完整的檢查依據。 |
+
+`rules/` 是補充規則，不是強制流程。即使使用 `sa-spec init --full` 建立完整規則，用戶也可以先不使用或之後自行刪除 `rules/`；基本流程仍會依 `AGENTS.md` 與 `skills/system-analysis/SKILL.md` 運作。
+
+簡單範例：
+
+```bash
+mkdir my-spec
+cd my-spec
+sa-spec init
+sa-spec check
+```
+
+若後來發現需要更完整的審核與文件規則，可以在同一個資料夾補上：
+
+```bash
+sa-spec init --full
+```
+
+既有檔案不會被覆蓋；已存在的檔案會顯示為 `SKIPPED`，缺少的規則檔才會被建立。
+
 ## CLI 指令
 
 | 指令 | 用途 |
