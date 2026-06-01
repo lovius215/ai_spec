@@ -60,11 +60,17 @@ git --version
 
 ## macOS 安裝
 
+使用 npm 安裝：
+
+```bash
+npm install -g @loviusc/sa-spec
+```
+
 使用 Git 下載專案：
 
 ```bash
-git clone https://github.com/teyhawzhe/open_sa.git
-cd open_sa
+git clone https://github.com/lovius215/ai_spec.git
+cd ai_spec
 npm install
 npm link
 ```
@@ -85,11 +91,17 @@ macOS 常見執行檔路徑會是該目錄底下的 `bin` 資料夾。
 
 ## Linux 安裝
 
+使用 npm 安裝：
+
+```bash
+npm install -g @loviusc/sa-spec
+```
+
 使用 Git 下載專案：
 
 ```bash
-git clone https://github.com/teyhawzhe/open_sa.git
-cd open_sa
+git clone https://github.com/lovius215/ai_spec.git
+cd ai_spec
 npm install
 npm link
 ```
@@ -127,8 +139,14 @@ sa-spec help
 使用 Git 下載專案：
 
 ```powershell
-git clone https://github.com/teyhawzhe/open_sa.git
-cd open_sa
+npm install -g @loviusc/sa-spec
+```
+
+或使用 Git 下載專案：
+
+```powershell
+git clone https://github.com/lovius215/ai_spec.git
+cd ai_spec
 npm install
 npm link
 ```
