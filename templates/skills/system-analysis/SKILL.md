@@ -16,12 +16,14 @@ description: 用 init、propose、analyze、commit 四段流程整理需求，�
 
 ## 指令流程
 
-| 指令 | 用途 | 執行規則 |
-|---|---|---|
-| `spec:init` | 初始化 | 載入並遵守 `AGENTS.md`、本 skill 與必要規則，確認 `project/` 結構是否存在。 |
-| `spec:propose` | 提出需求 | 整理使用者需求為摘要、目標、初步流程與待確認事項；不歸檔、不修改既有需求。 |
-| `spec:analyze` | 分析與起草 | 先檢查新需求是否與 `project/` 內所有既有需求衝突；無衝突才產出 SRS、UML、OpenAPI、DB Schema 草稿；有衝突則只列出衝突與待釐清問題，待使用者釐清後再次執行 `spec:analyze`。 |
-| `spec:commit` | 確認歸檔 | 只把使用者已確認的版本歸檔到該需求資料夾，更新 `project/index.md`、`project/system-spec.md` 與 `history.md`，並建立本機 Git commit。 |
+使用四個核心指令，並支援簡寫別名（兩者等價）：
+
+| 指令 | 簡寫 | 用途 | 執行規則 |
+|---|---|---|---|
+| `spec:init` | `sci` | 初始化 | 載入並遵守 `AGENTS.md`、本 skill 與必要規則，確認 `project/` 結構是否存在。 |
+| `spec:propose` | `scp` | 提出需求 | 整理使用者需求為摘要、目標、初步流程與待確認事項；不歸檔、不修改既有需求。 |
+| `spec:analyze` | `sca` | 分析與起草 | 先檢查新需求是否與 `project/` 內所有既有需求衝突；無衝突才產出 SRS、UML、OpenAPI、DB Schema 草稿；有衝突則只列出衝突與待釐清問題，待使用者釐清後再次執行 `spec:analyze`（或 `sca`）。 |
+| `spec:commit` | `scc` | 確認歸檔 | 只把使用者已確認的版本歸檔到該需求資料夾，更新 `project/index.md`、`project/system-spec.md` 與 `history.md`，並建立本機 Git commit。 |
 
 ## 硬性限制
 
@@ -133,10 +135,10 @@ docs(REQ-001): 需求名稱 - 簡短需求說明
 ## 狀態機
 
 ```text
-init -> propose -> analyze
+init (sci) -> propose (scp) -> analyze (sca)
 
-analyze 無衝突 -> 產出待確認版本 -> commit
-analyze 有衝突 -> 釐清問題 -> analyze
+analyze 無衝突 -> 產出待確認版本 -> commit (scc)
+analyze 有衝突 -> 釐清問題 -> analyze (sca)
 
-commit -> 歸檔 -> 本機 Git commit
+commit (scc) -> 歸檔 -> 本機 Git commit
 ```

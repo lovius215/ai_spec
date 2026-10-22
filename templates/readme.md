@@ -2,14 +2,14 @@
 
 `sa-spec` 是一個輕量的系統分析文件工作台，用固定流程把需求想法整理成可確認、可歸檔、可檢查的文件。
 
-AI 工作流只使用四個指令：
+AI 工作流只使用四個指令，並支援簡寫別名（兩者等價）：
 
-```text
-spec:init
-spec:propose
-spec:analyze
-spec:commit
-```
+| 標準指令 | 簡寫 | 說明 |
+|---|---|---|
+| `spec:init` | `sci` | 初始化專案與規則 |
+| `spec:propose` | `scp` | 提出需求並整理摘要 |
+| `spec:analyze` | `sca` | 衝突檢查與規格起草 |
+| `spec:commit` | `scc` | 確認歸檔並建立 Git commit |
 
 每個需求歸檔後固定包含：
 
@@ -282,10 +282,10 @@ Markdown、PlantUML、YAML、GitLens 這類套件可以提升閱讀與檢查體�
 | CLI | `sa-spec init --full` | 終端機或 VS Code Terminal | 建立文件骨架與規則檔。 |
 | CLI | `sa-spec check` | 終端機或 VS Code Terminal | 檢查必要文件是否存在。 |
 | CLI | `sa-spec status` | 終端機或 VS Code Terminal | 查看系統規格與需求索引狀態。 |
-| AI 工作流程 | `spec:init` | VS Code AI 對話側邊欄 | 載入規則並確認工作區狀態。 |
-| AI 工作流程 | `spec:propose` | VS Code AI 對話側邊欄 | 整理使用者提出的需求。 |
-| AI 工作流程 | `spec:analyze` | VS Code AI 對話側邊欄 | 檢查衝突並產出待確認草稿。 |
-| AI 工作流程 | `spec:commit` | VS Code AI 對話側邊欄 | 歸檔已確認版本並建立本機 Git commit。 |
+| AI 工作流程 | `spec:init` / `sci` | VS Code AI 對話側邊欄 | 載入規則並確認工作區狀態。 |
+| AI 工作流程 | `spec:propose` / `scp` | VS Code AI 對話側邊欄 | 整理使用者提出的需求。 |
+| AI 工作流程 | `spec:analyze` / `sca` | VS Code AI 對話側邊欄 | 檢查衝突並產出待確認草稿。 |
+| AI 工作流程 | `spec:commit` / `scc` | VS Code AI 對話側邊欄 | 歸檔已確認版本並建立本機 Git commit。 |
 
 建議操作順序：
 
@@ -299,32 +299,32 @@ code .
 接著在 VS Code 的 AI 對話側邊欄輸入：
 
 ```text
-spec:init
-spec:propose
-spec:analyze
-spec:commit
+spec:init    # 或簡寫 sci
+spec:propose # 或簡寫 scp
+spec:analyze # 或簡寫 sca
+spec:commit  # 或簡寫 scc
 ```
 
 如果你有安裝 prompts 或 slash commands，可以用對應的快捷指令；沒有安裝也可以直接手動輸入上面的文字指令。
 
 ## AI 工作流程
 
-| 指令 | 用途 |
-|---|---|
-| `spec:init` | 初始化並載入 `AGENTS.md`、`skills/system-analysis/SKILL.md` 與必要規則。 |
-| `spec:propose` | 使用者提出需求後，整理需求摘要、目標、初步流程與待確認事項。 |
-| `spec:analyze` | 檢查是否與既有需求衝突；無衝突才產出 SRS、UML、OpenAPI、DB Schema 草稿。 |
-| `spec:commit` | 使用者確認無衝突版本後，將版本歸檔到 `project/`，並建立本機 Git commit。 |
+| 指令 | 簡寫 | 用途 |
+|---|---|---|
+| `spec:init` | `sci` | 初始化並載入 `AGENTS.md`、`skills/system-analysis/SKILL.md` 與必要規則。 |
+| `spec:propose` | `scp` | 使用者提出需求後，整理需求摘要、目標、初步流程與待確認事項。 |
+| `spec:analyze` | `sca` | 檢查是否與既有需求衝突；無衝突才產出 SRS、UML、OpenAPI、DB Schema 草稿。 |
+| `spec:commit` | `scc` | 使用者確認無衝突版本後，將版本歸檔到 `project/`，並建立本機 Git commit。 |
 
 狀態機：
 
 ```text
-init -> propose -> analyze
+init (sci) -> propose (scp) -> analyze (sca)
 
-analyze 無衝突 -> 產出待確認版本 -> commit
-analyze 有衝突 -> 釐清問題 -> analyze
+analyze 無衝突 -> 產出待確認版本 -> commit (scc)
+analyze 有衝突 -> 釐清問題 -> analyze (sca)
 
-commit -> 歸檔 -> 本機 Git commit
+commit (scc) -> 歸檔 -> 本機 Git commit
 ```
 
 `spec:analyze` 若發現衝突，只會列出衝突與待釐清問題，不會修改任何需求文件，也不會產出最終文件。釐清後應再次執行 `spec:analyze`，重新檢查並產出草稿。
@@ -596,6 +596,14 @@ git push origin master
 - 一次最多問 3 個待確認問題，優先詢問會影響範圍、資料、權限、API、DB 或驗收的問題。
 
 ## 更新紀錄
+
+### v0.1.3
+- **支援指令簡寫別名（同時保留完整指令）**：
+  - `sci` ＝ `spec:init`
+  - `scp` ＝ `spec:propose`
+  - `sca` ＝ `spec:analyze`
+  - `scc` ＝ `spec:commit`
+  - 兩者完全等價，使用者可依輸入習慣自由選擇長指令或 3 字母縮寫。
 
 ### v0.1.2
 - **新增 `sa-spec upgrade` 版本升級指令**：
