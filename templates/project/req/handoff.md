@@ -1,7 +1,7 @@
 # {{REQ_ID}} {{REQ_NAME}} Handoff
 
 - 狀態：待確認
-- 來源文件：`srs.md`、`uml.puml`、`openapi.yaml`、`db-schema.md`
+- 來源文件：`srs.md`、`uml/`、`openapi.yaml`、`db-schema.md`
 - 目標讀者：OpenSpec、Codex、Claude、Gemini 或其他 AI 開發工具
 
 ## 要開發什麼

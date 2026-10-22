@@ -17,7 +17,8 @@ spec:commit
 project/
   REQ-001-login/
     srs.md
-    uml.puml
+    uml/
+      main.puml
     openapi.yaml
     db-schema.md
     handoff.md
@@ -259,7 +260,7 @@ sa-spec init --full
 | AI 對話 | Claude Code 類型的 VS Code AI 套件或 CLI 整合 | 擇一 | 用 Claude 讀取工作區規則並協作產出需求文件。 |
 | AI 對話 | Gemini 類型的 VS Code AI 套件或 CLI 整合 | 擇一 | 用 Gemini 讀取工作區規則並協作產出需求文件。 |
 | Markdown | Markdown 預覽或 Markdown All in One 類型套件 | 選用 | 預覽 `srs.md`、`history.md`、`system-spec.md`。 |
-| UML | PlantUML 類型套件 | 選用 | 預覽 `uml.puml`。 |
+| UML | PlantUML 類型套件 | 選用 | 預覽需求內的 `uml/*.puml`。 |
 | YAML | YAML 類型套件 | 選用 | 編輯與檢查 `openapi.yaml`。 |
 | Git | GitLens 類型套件 | 選用 | 查看需求文件修改歷程。 |
 
@@ -334,7 +335,7 @@ commit -> 歸檔 -> 本機 Git commit
 ```text
 請先閱讀 project/REQ-001-pomodoro-timer/handoff.md。
 以 handoff.md 作為本次開發入口與限制摘要。
-如需完整需求細節，再查閱同資料夾內的 srs.md、uml.puml、openapi.yaml、db-schema.md 與 history.md。
+如需完整需求細節，再查閱同資料夾內的 srs.md、uml/、openapi.yaml、db-schema.md 與 history.md。
 不得自行新增 handoff.md 未確認的角色、權限、流程、狀態、API 或 DB 欄位。
 若發現 handoff.md 與既有程式或規格衝突，請停止開發並回報。
 ```
@@ -520,7 +521,8 @@ project/
   system-spec.md
   REQ-001-pomodoro-timer/
     srs.md
-    uml.puml
+    uml/
+      state.puml
     openapi.yaml
     db-schema.md
     handoff.md
@@ -591,3 +593,14 @@ git push origin master
 - `project/system-spec.md` 只能在 `spec:commit` 依使用者確認內容更新。
 - `spec:commit` 會自動建立本機 Git commit；remote push 需使用者明確要求或啟用 auto-push。
 - 一次最多問 3 個待確認問題，優先詢問會影響範圍、資料、權限、API、DB 或驗收的問題。
+
+## 更新紀錄
+
+### v0.1.1
+- **PlantUML 檔案架構重構（解決多圖渲染與預覽開不起來問題）**：
+  - **目錄化結構**：每個需求目錄下由原本單一檔案 `uml.puml` 改為 `uml/` 資料夾（預設提供 `uml/main.puml` 骨架）。
+  - **單檔單圖原則**：嚴格規範每個 `.puml` 檔案僅包含單一組 `@startuml` 與 `@enduml`，禁止在單一檔案內混放多張圖。
+  - **支援多面向拆分**：需求若涉及多個面向（如業務流程、循序互動、狀態轉換），必須拆分為獨立 `.puml` 檔案（例如 `uml/main.puml`、`uml/sequence.puml`、`uml/state.puml`），確保 PlantUML 預覽外掛能順暢開啟與渲染。
+  - **CLI 自動化**：`sa-spec new` 與 `sa-spec template req` 自動建立 `uml/` 資料夾並產出預設的 `uml/main.puml`。
+  - **全專案規範同步**：同步更新 `AGENTS.md`、`system-analysis` skill、`rules/uml-style.md`、`rules/file-style.md` 與 `handoff.md`。
+

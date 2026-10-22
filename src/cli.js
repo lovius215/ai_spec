@@ -219,11 +219,13 @@ function createReqTemplate(args, label = "new") {
 
   const slug = slugify(name);
   const reqDir = path.join("project", `${id}-${slug}`);
+  const umlDir = path.join(reqDir, "uml");
   const replacements = { REQ_ID: id, REQ_NAME: name };
   const results = [
     ensureDir(reqDir),
+    ensureDir(umlDir),
     ensureFileFromTemplate(path.join("project", "req", "srs.md"), path.join(reqDir, "srs.md"), replacements),
-    ensureFileFromTemplate(path.join("project", "req", "uml.puml"), path.join(reqDir, "uml.puml"), replacements),
+    ensureFileFromTemplate(path.join("project", "req", "uml", "main.puml"), path.join(umlDir, "main.puml"), replacements),
     ensureFileFromTemplate(path.join("project", "req", "openapi.yaml"), path.join(reqDir, "openapi.yaml"), replacements),
     ensureFileFromTemplate(path.join("project", "req", "db-schema.md"), path.join(reqDir, "db-schema.md"), replacements),
     ensureFileFromTemplate(path.join("project", "req", "handoff.md"), path.join(reqDir, "handoff.md"), replacements),

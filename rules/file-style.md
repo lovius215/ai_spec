@@ -20,12 +20,11 @@
 - 每個需求資料夾至少包含：
   - `srs.md`：需求規格。
   - `history.md`：需求歷程。
-  - `uml.puml`：UML 圖。
+  - `uml/`：UML 圖目錄，依面向拆分為獨立 `.puml` 檔（如 `main.puml`、`sequence.puml` 等，單檔單圖，禁止單檔混放多圖）。
   - `openapi.yaml`：OpenAPI 草稿。
   - `db-schema.md`：DB Schema 草稿。
   - `handoff.md`：給 OpenSpec 或其他 AI 開發工具的開發交接摘要。
 - 若需求涉及畫面，使用 `wireframe.md`。
-- 若需求需要 UML，放入 `uml/` 資料夾。
 - 若需求需要 API 或資料模型，使用 `api.md` 或獨立資料模型文件。
 - 若需求需要 DB Table 設計，使用 `db-table.md`。
 
@@ -37,13 +36,12 @@ project/
     srs.md
     wireframe.md
     history.md
-    uml.puml
+    uml/
+      main.puml
+      sequence.puml
     openapi.yaml
     db-schema.md
     handoff.md
-    uml/
-      use-case.puml
-      sequence.puml
     api.md
     db-table.md
 ```

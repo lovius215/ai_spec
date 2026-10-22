@@ -7,7 +7,7 @@
 每個需求歸檔時固定包含：
 
 - `srs.md`：需求規格。
-- `uml.puml`：UML 圖。
+- `uml/`：UML 圖目錄（依面向拆分為獨立 `.puml` 檔，如 `main.puml`、`sequence.puml` 等，禁止單檔混放多圖）。
 - `openapi.yaml`：OpenAPI 草稿。
 - `db-schema.md`：DB Schema 草稿。
 - `handoff.md`：給 OpenSpec 或其他 AI 開發工具的開發交接摘要。
@@ -40,7 +40,7 @@
 - `spec:commit` 完成文件歸檔後，必須自動建立本機 Git commit；commit message 以需求編號與需求名稱為主，並加上簡短需求說明，格式為 `docs(REQ-001): 需求名稱 - 簡短需求說明`。
 - `spec:commit` 只有在使用者明確要求推送 remote，或專案設定啟用 auto-push 時，才可執行 `git push`；push 失敗時只回報認證或網路問題，不得回滾已完成的文件歸檔與本機 commit。
 - 文件未經使用者確認，不得標示為 `已審核`。
-- `uml.puml` 不限單一 UML 圖型；`spec:analyze` 必須依需求選擇最能說明流程、互動、狀態或資料關係的 UML 圖，例如活動圖、循序圖、使用案例圖、狀態圖或類別圖，不可為了固定格式硬產生活動圖。需求複雜時，可在同一個 `uml.puml` 內放多張 PlantUML 圖並清楚分段。
+- `uml/` 內的 UML 圖不限單一 UML 圖型；`spec:analyze` 必須依需求選擇最能說明流程、互動、狀態或資料關係的 UML 圖，例如活動圖、循序圖、使用案例圖、狀態圖或類別圖，不可為了固定格式硬產生活動圖。**嚴禁將多張圖混在同一個檔案中**，必須在需求資料夾下的 `uml/` 目錄拆分成獨立的 `.puml` 檔案（例如 `uml/main.puml`、`uml/sequence.puml`、`uml/state.puml`），且每個檔案只能包含一組 `@startuml` 與 `@enduml`，以避免 PlantUML 渲染或預覽失敗。
 - 一次最多問 3 個待確認問題，優先詢問會影響範圍、資料、權限、API、DB 或驗收的問題。
 
 # 衝突檢查重點
@@ -82,7 +82,8 @@ project/
   index.md
   REQ-001-name/
     srs.md
-    uml.puml
+    uml/
+      main.puml
     openapi.yaml
     db-schema.md
     handoff.md
