@@ -241,6 +241,7 @@ sa-spec init --full
 | `sa-spec check` | 檢查基本文件是否存在。 |
 | `sa-spec status` | 顯示系統規格與需求索引狀態。 |
 | `sa-spec doctor` | 檢查必要檔案是否存在。 |
+| `sa-spec upgrade [--dry-run]` | 將既有專案升級為最新版本：同步最新 AGENTS 與規則文件，並將既有需求中的 `uml.puml` 自動遷移為 `uml/main.puml`。 |
 
 `sa-spec new` 是快速建空白模板的輔助工具。正式需求流程仍建議使用 `spec:init`、`spec:propose`、`spec:analyze`、`spec:commit`。
 
@@ -595,6 +596,12 @@ git push origin master
 - 一次最多問 3 個待確認問題，優先詢問會影響範圍、資料、權限、API、DB 或驗收的問題。
 
 ## 更新紀錄
+
+### v0.1.2
+- **新增 `sa-spec upgrade` 版本升級指令**：
+  - **工作區規則同步**：自動檢查並更新專案中的 `AGENTS.md`、`skills/system-analysis/SKILL.md` 以及 `rules/` 目錄下的規則文件至最新版本（自動保留既有的 memory context）。
+  - **既有需求自動遷移**：掃描 `project/REQ-*` 目錄，將舊版 `uml.puml` 自動重構移動為 `uml/main.puml`，並自動修復 `handoff.md` 中的來源引用路徑。
+  - **提供 `--dry-run` 模擬模式**：可加上 `--dry-run` 參數先行預覽哪些檔案會被更新或遷移，而不實際寫入檔案。
 
 ### v0.1.1
 - **PlantUML 檔案架構重構（解決多圖渲染與預覽開不起來問題）**：

@@ -20,6 +20,9 @@ function main() {
     case "check":
       runCheck();
       return;
+    case "upgrade":
+      upgradeProject(args.slice(1));
+      return;
     case "doctor":
       runDoctor();
       return;
@@ -338,10 +341,133 @@ function slugify(value) {
     .replace(/^-+|-+$/g, "");
 }
 
+function upgradeProject(args = []) {
+  const dryRun = args.includes("--dry-run");
+  const results = [];
+
+  results.push(ensureDir("skills"));
+  results.push(ensureDir(path.join("skills", "system-analysis")));
+
+  results.push(updateFileFromTemplate("AGENTS.md", "AGENTS.md", dryRun));
+  results.push(
+    updateFileFromTemplate(
+      path.join("skills", "system-analysis", "SKILL.md"),
+      path.join("skills", "system-analysis", "SKILL.md"),
+      dryRun
+    )
+  );
+
+  const rulesTargetDir = path.join(cwd, "rules");
+  if (fs.existsSync(rulesTargetDir)) {
+    const templateRulesDir = path.join(templatesDir, "rules");
+    for (const file of listFilesRecursive(templateRulesDir)) {
+      const relativePath = path.relative(templatesDir, file);
+      results.push(updateFileFromTemplate(relativePath, relativePath, dryRun));
+    }
+  }
+
+  const projectDir = path.join(cwd, "project");
+  if (fs.existsSync(projectDir)) {
+    const entries = fs.readdirSync(projectDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory() && entry.name.startsWith("REQ-")) {
+        const reqRelDir = path.join("project", entry.name);
+        const oldUmlRelPath = path.join(reqRelDir, "uml.puml");
+        const oldUmlAbsPath = path.join(cwd, oldUmlRelPath);
+        const newUmlRelDir = path.join(reqRelDir, "uml");
+        const newUmlAbsDir = path.join(cwd, newUmlRelDir);
+        const newMainUmlRelPath = path.join(newUmlRelDir, "main.puml");
+        const newMainUmlAbsPath = path.join(cwd, newMainUmlRelPath);
+
+        if (fs.existsSync(oldUmlAbsPath)) {
+          if (!fs.existsSync(newMainUmlAbsPath)) {
+            if (!dryRun) {
+              if (!fs.existsSync(newUmlAbsDir)) {
+                fs.mkdirSync(newUmlAbsDir, { recursive: true });
+              }
+              fs.renameSync(oldUmlAbsPath, newMainUmlAbsPath);
+            }
+            results.push({
+              action: "migrate",
+              target: `${oldUmlRelPath} -> ${newMainUmlRelPath}`
+            });
+          } else {
+            results.push({
+              action: "warn",
+              target: oldUmlRelPath,
+              message: `目標 ${newMainUmlRelPath} 已存在，請確認是否可手動移除舊檔。`
+            });
+          }
+        }
+
+        const handoffRelPath = path.join(reqRelDir, "handoff.md");
+        const handoffAbsPath = path.join(cwd, handoffRelPath);
+        if (fs.existsSync(handoffAbsPath)) {
+          const content = fs.readFileSync(handoffAbsPath, "utf8");
+          if (content.includes("uml.puml")) {
+            if (!dryRun) {
+              fs.writeFileSync(handoffAbsPath, content.replace(/uml\.puml/g, "uml/"), "utf8");
+            }
+            results.push({
+              action: "update",
+              target: handoffRelPath,
+              message: "更新來源參照 uml.puml -> uml/"
+            });
+          }
+        }
+      }
+    }
+  }
+
+  printResultList(dryRun ? "upgrade (dry-run)" : "upgrade", results);
+}
+
+function updateFileFromTemplate(templateRelativePath, targetRelativePath, dryRun = false) {
+  const targetAbsolutePath = path.join(cwd, targetRelativePath);
+  const templateAbsolutePath = path.join(templatesDir, templateRelativePath);
+  if (!fs.existsSync(templateAbsolutePath)) {
+    return { action: "skip", target: targetRelativePath };
+  }
+
+  let templateContent = readTemplate(templateRelativePath);
+  if (!fs.existsSync(targetAbsolutePath)) {
+    if (!dryRun) {
+      writeFileIfMissing(targetAbsolutePath, templateContent);
+    }
+    return { action: "create", target: targetRelativePath };
+  }
+
+  const currentContent = fs.readFileSync(targetAbsolutePath, "utf8");
+  if (currentContent.includes("<claude-mem-context>")) {
+    const memMatch = currentContent.match(/(<claude-mem-context>[\s\S]*?<\/claude-mem-context>)/);
+    if (memMatch && !templateContent.includes("<claude-mem-context>")) {
+      templateContent = `${templateContent.trimEnd()}\n\n\n${memMatch[1]}\n`;
+    }
+  }
+
+  if (currentContent.trim() === templateContent.trim()) {
+    return { action: "skip", target: targetRelativePath };
+  }
+
+  if (!dryRun) {
+    fs.writeFileSync(targetAbsolutePath, templateContent, "utf8");
+  }
+  return { action: "update", target: targetRelativePath };
+}
+
 function printResultList(label, results) {
   console.log(`sa-spec ${label}`);
   for (const result of results) {
-    const action = result.action === "create" ? "CREATED" : result.action === "update" ? "UPDATED" : result.action === "warn" ? "WARNING" : "SKIPPED";
+    const action =
+      result.action === "create"
+        ? "CREATED"
+        : result.action === "update"
+        ? "UPDATED"
+        : result.action === "migrate"
+        ? "MIGRATED"
+        : result.action === "warn"
+        ? "WARNING"
+        : "SKIPPED";
     console.log(`${action} ${result.target}${result.message ? ` - ${result.message}` : ""}`);
   }
 }
@@ -353,6 +479,7 @@ Usage:
   sa-spec init [--full]
   sa-spec new --id REQ-001 --name login
   sa-spec check
+  sa-spec upgrade [--dry-run]
 `);
 }
 
