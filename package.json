@@ -2,6 +2,9 @@
   "name": "@loviusc/sa-spec",
   "version": "0.1.3",
   "description": "Personal system analysis documentation workspace CLI",
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
     "sa-spec": "bin/sa-spec.js"
   },
