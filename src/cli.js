@@ -32,6 +32,11 @@ function main() {
     case "template":
       runTemplate(args.slice(1));
       return;
+    case "version":
+    case "--version":
+    case "-v":
+      showVersion();
+      return;
     case "help":
     case "--help":
     case "-h":
@@ -480,7 +485,13 @@ Usage:
   sa-spec new --id REQ-001 --name login
   sa-spec check
   sa-spec upgrade [--dry-run]
+  sa-spec --version
 `);
+}
+
+function showVersion() {
+  const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, "package.json"), "utf8"));
+  console.log(pkg.version);
 }
 
 function fail(message) {
