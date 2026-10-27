@@ -20,6 +20,7 @@
 - Sequence Diagram：用於描述角色、系統、服務或 API 之間的互動順序。
 - Class Diagram：用於描述主要資料物件、屬性與關聯。
 - State Diagram：用於描述有明確生命週期的物件狀態。
+- Wireframe / Mockup (PlantUML Salt)：用於描述前端介面佈局、表單欄位、按鈕與操作畫面，獨立存放於 `uml/wireframe.puml`（使用 `@startsalt` 與 `@endsalt`）。若需求涉及前端 UI 或使用者操作畫面時按需產出；純後端需求則在 `handoff.md` 標示「無 UI 介面需求」。
 
 ## 圖表說明
 每張 UML 圖旁邊或同一文件內需補充：
