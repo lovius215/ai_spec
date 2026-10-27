@@ -1,4 +1,41 @@
-# 個人系統分析 AI 工作台
+# 個人系統分析 AI 工作台 / System Analysis AI Workspace
+
+[![npm version](https://img.shields.io/npm/v/@loviusc/sa-spec.svg)](https://www.npmjs.com/package/@loviusc/sa-spec)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+> A lightweight system analysis documentation workspace CLI that turns ideas into verifiable, auditable, and conflict-checked specifications for AI-driven development.
+> 輕量級系統分析文件工作台，用固定流程把需求想法整理成可確認、可歸檔、可檢查的規格文件。
+
+<p align="center">
+  <b>🌐 Languages:</b>
+  <a href="./README.en.md"><b>English</b></a> |
+  <a href="./README.zh-TW.md"><b>繁體中文</b></a> |
+  <a href="./README.zh-CN.md"><b>简体中文</b></a> |
+  <a href="./README.ja.md"><b>日本語</b></a> |
+  <a href="./README.ko.md"><b>한국어</b></a>
+</p>
+
+---
+
+### Quick Start (English)
+
+```bash
+# Global installation via npm
+npm install -g @loviusc/sa-spec
+
+# Initialize project with English specification rules
+sa-spec init --full --lang en
+
+# Create a feature draft branch
+sa-spec new --name cart-checkout --branch
+```
+
+**Core AI Workflow in VS Code:**
+`spec:init (sci)` $\to$ `spec:propose (scp)` $\to$ `spec:analyze (sca)` $\to$ `spec:commit (scc)`
+
+👉 **Read full English documentation: [README.en.md](./README.en.md)**
+
+---
 
 `sa-spec` 是一個輕量的系統分析文件工作台，用固定流程把需求想法整理成可確認、可歸檔、可檢查的文件。
 
@@ -680,6 +717,12 @@ git push origin master
 - 一次最多問 3 個待確認問題，優先詢問會影響範圍、資料、權限、API、DB 或驗收的問題。
 
 ## 更新紀錄
+
+### v0.2.2
+- **npm 首頁與專案文件全多語系化（Multi-Language Documentation on npm）**：
+  - **5 國獨立完整說明文件**：新增 `README.en.md`（英文）、`README.zh-CN.md`（簡中）、`README.ja.md`（日文）、`README.ko.md`（韓文）與 `README.zh-TW.md`（繁中）。
+  - **npm 國際化首頁最佳化**：在主 `readme.md` 頂部加入醒目的 5 語系導覽切換列與英文 Quick Start 區塊，全球開發者造訪 npm 頁面時能秒懂工具用途與使用方式。
+  - **npm 發布配置補全**：在 `package.json` 補充 `repository`、`homepage` 與 `bugs` 欄位，確保 npm 頁面上的多語系相對連結能自動正確導向 GitHub。
 
 ### v0.2.1
 - **5 國語言與國際化支援（i18n）**：

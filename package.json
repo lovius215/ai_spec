@@ -1,10 +1,18 @@
 {
   "name": "@loviusc/sa-spec",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Personal system analysis documentation workspace CLI",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lovius215/ai_spec.git"
+  },
+  "homepage": "https://github.com/lovius215/ai_spec#readme",
+  "bugs": {
+    "url": "https://github.com/lovius215/ai_spec/issues"
   },
   "bin": {
     "sa-spec": "bin/sa-spec.js"
@@ -13,7 +21,8 @@
     "bin/",
     "src/",
     "templates/",
-    "readme.md"
+    "readme.md",
+    "README*.md"
   ],
   "scripts": {
     "check": "node --check src/cli.js && node --check bin/sa-spec.js"
@@ -22,7 +31,8 @@
     "system-analysis",
     "requirements",
     "srs",
-    "documentation"
+    "documentation",
+    "i18n"
   ],
   "license": "MIT"
 }
