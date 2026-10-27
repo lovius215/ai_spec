@@ -102,13 +102,13 @@ sa-spec --version
 
 ```mermaid
 flowchart TD
-    A[要件提案: sa-spec new --name cart --branch] --> B[feat/cart ブランチを作成して切替<br/>ドラフトディレクトリ: project/cart/]
-    B --> C[AI による分析: sca<br/>内部で {{REQ_ID}} プレースホルダー使用<br/>master の最新仕様との競合予防チェック]
-    C --> D{ユーザー承認?<br/>scc または finalize を実行}
-    D --> E[master から最新の利用可能番号 N を取得]
-    E --> F[project/REQ-N+1-cart/ にリネーム<br/>{{REQ_ID}} を正式番号に一括置換]
-    F --> G[sa-spec reindex: index.md を動的に再生成]
-    G --> H[master へマージ: 競合ゼロ、連番維持！]
+    A["要件提案: sa-spec new --name cart --branch"] --> B["feat/cart ブランチを作成して切替<br/>ドラフトディレクトリ: project/cart/"]
+    B --> C["AI による分析: sca<br/>内部で {{REQ_ID}} プレースホルダー使用<br/>master の最新仕様との競合予防チェック"]
+    C --> D{"ユーザー承認?<br/>scc または finalize を実行"}
+    D --> E["master から最新の利用可能番号 N を取得"]
+    E --> F["project/REQ-N+1-cart/ にリネーム<br/>{{REQ_ID}} を正式番号に一括置換"]
+    F --> G["sa-spec reindex: index.md を動的に再生成"]
+    G --> H["master へマージ: 競合ゼロ、連番維持！"]
 ```
 
 1. **ドラフト時は番号を奪い合わない**: `sa-spec new --name cart --branch` でブランチを切り、`{{REQ_ID}}` を使って作業します。途中で要件を破棄する場合も、ブランチを削除するだけで済み、欠番（ゴーストID）を残しません。

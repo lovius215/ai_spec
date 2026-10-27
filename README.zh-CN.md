@@ -102,13 +102,13 @@ sa-spec --version
 
 ```mermaid
 flowchart TD
-    A[提出需求: sa-spec new --name cart --branch] --> B[建立并切换至 feat/cart 分支<br/>创建草稿目录 project/cart/]
-    B --> C[AI 分析与起草: sca<br/>内部使用 {{REQ_ID}} 占位<br/>自动同步 master 最新规格防冲突]
-    C --> D{用户确认通过<br/>执行 scc 或 finalize}
-    D --> E[向 master 查询最新可用序号 N]
-    E --> F[重命名为 project/REQ-N+1-cart/<br/>批量替换 {{REQ_ID}} 为正式编号]
-    F --> G[sa-spec reindex: 动态重构 index.md]
-    G --> H[合并回 master: 零冲突、序号连续！]
+    A["提出需求: sa-spec new --name cart --branch"] --> B["建立并切换至 feat/cart 分支<br/>创建草稿目录 project/cart/"]
+    B --> C["AI 分析与起草: sca<br/>内部使用 {{REQ_ID}} 占位<br/>自动同步 master 最新规格防冲突"]
+    C --> D{"用户确认通过<br/>执行 scc 或 finalize"}
+    D --> E["向 master 查询最新可用序号 N"]
+    E --> F["重命名为 project/REQ-N+1-cart/<br/>批量替换 {{REQ_ID}} 为正式编号"]
+    F --> G["sa-spec reindex: 动态重构 index.md"]
+    G --> H["合并回 master: 零冲突、序号连续！"]
 ```
 
 1. **草稿不抢号**：在分支开发时使用 `project/cart/` 与 `{{REQ_ID}}` 占位符。多人同时提出需求互不冲突。如果需求放弃，直接删除分支，**绝不遗留幽灵跳号**。

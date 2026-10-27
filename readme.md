@@ -397,13 +397,13 @@ docs(REQ-001): 番茄時鐘 - 新增專注與休息計時需求
 
 ```mermaid
 flowchart TD
-    A[開新需求: sa-spec new --name cart --branch] --> B[建立並切換至 feat/cart 分支<br/>以 project/cart/ 建立草稿目錄]
-    B --> C[AI 分析與起草: sca<br/>內部使用 {{REQ_ID}} 佔位<br/>自動同步 master 規格防護]
-    C --> D{使用者確認通過<br/>執行 scc 或 finalize}
-    D --> E[查詢 master 最新序號 N]
-    E --> F[重命名為 project/REQ-N+1-cart/<br/>批次置換 {{REQ_ID}} 為正式號碼]
-    F --> G[sa-spec reindex: 動態重構 index.md]
-    G --> H[合併回 master: 零衝突、序號永遠連續！]
+    A["開新需求: sa-spec new --name cart --branch"] --> B["建立並切換至 feat/cart 分支<br/>以 project/cart/ 建立草稿目錄"]
+    B --> C["AI 分析與起草: sca<br/>內部使用 {{REQ_ID}} 佔位<br/>自動同步 master 規格防護"]
+    C --> D{"使用者確認通過<br/>執行 scc 或 finalize"}
+    D --> E["查詢 master 最新序號 N"]
+    E --> F["重命名為 project/REQ-N+1-cart/<br/>批次置換 {{REQ_ID}} 為正式號碼"]
+    F --> G["sa-spec reindex: 動態重構 index.md"]
+    G --> H["合併回 master: 零衝突、序號永遠連續！"]
 ```
 
 ### 多人協作四步流程

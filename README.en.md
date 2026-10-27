@@ -102,13 +102,13 @@ To solve sequential ID collisions and Git merge conflicts in team environments, 
 
 ```mermaid
 flowchart TD
-    A[New Requirement: sa-spec new --name cart --branch] --> B[Create & switch to feat/cart branch<br/>Draft directory: project/cart/]
-    B --> C[AI Analysis: sca<br/>Uses {{REQ_ID}} placeholder<br/>Pre-check against master spec baseline]
-    C --> D{User Approved?<br/>Execute scc or finalize}
-    D --> E[Query latest sequential ID N from master]
-    E --> F[Rename to project/REQ-N+1-cart/<br/>Substitute {{REQ_ID}} with actual ID]
-    F --> G[sa-spec reindex: Dynamically rebuild index.md]
-    G --> H[Merge into master: Zero conflicts, Continuous IDs!]
+    A["New Requirement: sa-spec new --name cart --branch"] --> B["Create & switch to feat/cart branch<br/>Draft directory: project/cart/"]
+    B --> C["AI Analysis: sca<br/>Uses {{REQ_ID}} placeholder<br/>Pre-check against master spec baseline"]
+    C --> D{"User Approved?<br/>Execute scc or finalize"}
+    D --> E["Query latest sequential ID N from master"]
+    E --> F["Rename to project/REQ-N+1-cart/<br/>Substitute {{REQ_ID}} with actual ID"]
+    F --> G["sa-spec reindex: Dynamically rebuild index.md"]
+    G --> H["Merge into master: Zero conflicts, Continuous IDs!"]
 ```
 
 1. **Draft Phase (No ID Contention)**: Run `sa-spec new --name checkout --branch` to create `feat/checkout` and `project/checkout/` using `{{REQ_ID}}`. Parallel branches never collide. If an idea is abandoned, deleting the branch leaves zero ghost IDs.

@@ -102,13 +102,13 @@ sa-spec --version
 
 ```mermaid
 flowchart TD
-    A[요구사항 제안: sa-spec new --name cart --branch] --> B[feat/cart 브랜치 생성 및 전환<br/>초안 디렉토리: project/cart/]
-    B --> C[AI 분석 및 초안: sca<br/>내부에서 {{REQ_ID}} 플레이스홀더 사용<br/>master 최신 사양 기반 충돌 검사]
-    C --> D{사용자 승인 완료?<br/>scc 또는 finalize 실행}
-    D --> E[master에서 최신 사용 가능 번호 N 확인]
-    E --> F[project/REQ-N+1-cart/ 폴더명 변경<br/>{{REQ_ID}}를 공식 번호로 일괄 치환]
-    F --> G[sa-spec reindex: index.md 동적 재생성]
-    G --> H[master로 머지: 충돌 제로, 연속된 번호 유지!]
+    A["요구사항 제안: sa-spec new --name cart --branch"] --> B["feat/cart 브랜치 생성 및 전환<br/>초안 디렉토리: project/cart/"]
+    B --> C["AI 분석 및 초안: sca<br/>내부에서 {{REQ_ID}} 플레이스홀더 사용<br/>master 최신 사양 기반 충돌 검사"]
+    C --> D{"사용자 승인 완료?<br/>scc 또는 finalize 실행"}
+    D --> E["master에서 최신 사용 가능 번호 N 확인"]
+    E --> F["project/REQ-N+1-cart/ 폴더명 변경<br/>{{REQ_ID}}를 공식 번호로 일괄 치환"]
+    F --> G["sa-spec reindex: index.md 동적 재생성"]
+    G --> H["master로 머지: 충돌 제로, 연속된 번호 유지!"]
 ```
 
 1. **초안 단계 번호 미선점**: `sa-spec new --name cart --branch` 명령으로 독립 브랜치를 생성하고 `{{REQ_ID}}` 플레이스홀더를 사용합니다. 요구사항이 중도 폐기되어도 브랜치만 삭제하면 되며, 결번(고스트 번호)이 발생하지 않습니다.
