@@ -409,16 +409,17 @@ flowchart TD
 ### 多人協作四步流程
 
 #### 1. 提出需求（草稿與分支隔離）
-開需求時**不搶序號**，直接以語意名稱建立分支與草稿目錄：
+開需求時**不搶序號**，直接以語意名稱建立分支與草稿目錄。支援兩種方式：
 
-```bash
-# 自動建立並切換至 feat/cart-checkout 分支，建立 project/cart-checkout/ 草稿目錄
-sa-spec new --name cart-checkout --branch
-```
-在 VS Code 側邊欄輸入：
-```text
-scp 購物車結帳需求
-```
+* **方式 A（純 AI 自動化，最推薦）**：在 AI 側邊欄直接輸入：
+  ```text
+  scp 購物車結帳需求
+  ```
+  AI 收到後，會**自動在背景執行 `git checkout -b feat/cart-checkout` 建立並切換分支**，並在 `project/cart-checkout/` 建立草稿目錄！
+* **方式 B（CLI 終端指令）**：
+  ```bash
+  sa-spec new --name cart-checkout --branch
+  ```
 * **特點**：目錄名稱為 `project/cart-checkout/`，內部所有檔案皆使用 `{{REQ_ID}}` 佔位符。多人同時提出需求互不干擾、零衝突。即使需求中途放棄，直接刪除分支即可，絕不留下幽靈跳號。
 
 #### 2. 分析與衝突檢查（規格基線同步）
