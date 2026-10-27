@@ -417,26 +417,49 @@ function getLatestMaxReqId(projectDir, mainBranch) {
 }
 
 function finalizeReq(args) {
-  const name = getOption(args, "--name") || getOption(args, "--draft") || args[0];
-  if (!name) {
+  const rawName = getOption(args, "--name") || getOption(args, "--draft") || args[0];
+  if (!rawName) {
     fail("Usage: sa-spec finalize --name <name-or-slug> [--no-merge]");
     return;
   }
 
-  const slug = slugify(name);
+  const slug = slugify(rawName);
   const projectDir = path.join(cwd, "project");
-  let draftRelDir = path.join("project", slug);
-  let draftAbsDir = path.join(cwd, draftRelDir);
+  let draftRelDir = null;
+  let draftAbsDir = null;
+  let cleanSlug = slug;
+  let oldId = null;
 
-  if (!fs.existsSync(draftAbsDir)) {
-    const altRelDir = path.join("project", `draft-${slug}`);
-    if (fs.existsSync(path.join(cwd, altRelDir))) {
-      draftRelDir = altRelDir;
-      draftAbsDir = path.join(cwd, altRelDir);
-    } else {
-      fail(`找不到草稿需求目錄: ${draftRelDir}`);
-      return;
+  // 1. 優先尋找草稿目錄 (project/<slug> 或 project/draft-<slug>)
+  if (fs.existsSync(path.join(cwd, "project", slug))) {
+    draftRelDir = path.join("project", slug);
+    draftAbsDir = path.join(cwd, draftRelDir);
+  } else if (fs.existsSync(path.join(cwd, "project", `draft-${slug}`))) {
+    draftRelDir = path.join("project", `draft-${slug}`);
+    draftAbsDir = path.join(cwd, draftRelDir);
+  } else if (fs.existsSync(projectDir)) {
+    // 2. 尋找既有 REQ-xxx 目錄 (支援序號衝突時的重新定號修復)
+    const entries = fs.readdirSync(projectDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const m = entry.name.match(/^(REQ-\d+)-(.*)$/i);
+        if (m) {
+          const entrySlug = slugify(m[2]);
+          if (entrySlug === slug || slugify(entry.name) === slug) {
+            oldId = m[1].toUpperCase();
+            cleanSlug = entrySlug;
+            draftRelDir = path.join("project", entry.name);
+            draftAbsDir = path.join(cwd, draftRelDir);
+            break;
+          }
+        }
+      }
     }
+  }
+
+  if (!draftAbsDir || !fs.existsSync(draftAbsDir)) {
+    fail(`找不到草稿或既有需求目錄: project/${slug}`);
+    return;
   }
 
   // 1. 自動向本地與主分支查詢最新已使用的最大 REQ 序號
@@ -446,32 +469,42 @@ function finalizeReq(args) {
 
   const nextIdNum = maxIdNum + 1;
   const nextId = `REQ-${String(nextIdNum).padStart(3, "0")}`;
-  const finalDirName = `${nextId}-${slug}`;
+  const finalDirName = `${nextId}-${cleanSlug}`;
   const finalRelDir = path.join("project", finalDirName);
   const finalAbsDir = path.join(cwd, finalRelDir);
 
-  if (fs.existsSync(finalAbsDir)) {
+  if (fs.existsSync(finalAbsDir) && finalAbsDir !== draftAbsDir) {
     fail(`目標目錄 ${finalRelDir} 已存在，請確認序號或目錄名稱。`);
     return;
   }
 
   // 2. 重命名目錄 (優先嘗試 git mv)
-  const gitMv = spawnSync("git", ["mv", draftRelDir, finalRelDir], { cwd, encoding: "utf8" });
-  if (gitMv.status === 0) {
-    console.log(`[Git] 已將目錄重命名為: ${finalRelDir}`);
-  } else {
-    fs.renameSync(draftAbsDir, finalAbsDir);
-    console.log(`已將目錄重命名為: ${finalRelDir}`);
+  if (draftAbsDir !== finalAbsDir) {
+    const gitMv = spawnSync("git", ["mv", draftRelDir, finalRelDir], { cwd, encoding: "utf8" });
+    if (gitMv.status === 0) {
+      console.log(`[Git] 已將目錄重命名為: ${finalRelDir}`);
+    } else {
+      fs.renameSync(draftAbsDir, finalAbsDir);
+      console.log(`已將目錄重命名為: ${finalRelDir}`);
+    }
   }
 
-  // 3. 替換目錄內檔案的 {{REQ_ID}} 佔位符
+  // 3. 替換目錄內檔案的 {{REQ_ID}} 佔位符及舊序號
   const files = listFilesRecursive(finalAbsDir);
   for (const filePath of files) {
     try {
-      const content = fs.readFileSync(filePath, "utf8");
+      let content = fs.readFileSync(filePath, "utf8");
+      let changed = false;
       if (content.includes("{{REQ_ID}}")) {
-        const updated = content.split("{{REQ_ID}}").join(nextId);
-        fs.writeFileSync(filePath, updated, "utf8");
+        content = content.split("{{REQ_ID}}").join(nextId);
+        changed = true;
+      }
+      if (oldId && content.includes(oldId)) {
+        content = content.split(oldId).join(nextId);
+        changed = true;
+      }
+      if (changed) {
+        fs.writeFileSync(filePath, content, "utf8");
       }
     } catch (_) {
       // 略過無法以文字讀取之檔案
