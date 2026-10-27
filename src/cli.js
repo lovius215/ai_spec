@@ -177,8 +177,46 @@ function runCheck() {
   if (!checkRequiredPaths(null)) {
     return;
   }
+  checkDuplicateReqIds();
   console.log("");
   showStatus(false);
+}
+
+function checkDuplicateReqIds() {
+  const projectDir = path.join(cwd, "project");
+  if (!fs.existsSync(projectDir)) return true;
+
+  const entries = fs.readdirSync(projectDir, { withFileTypes: true });
+  const idDirsMap = new Map();
+  for (const entry of entries) {
+    if (entry.isDirectory() && entry.name.startsWith("REQ-")) {
+      const m = entry.name.match(/^(REQ-\d+)/i);
+      if (m) {
+        const id = m[1].toUpperCase();
+        if (!idDirsMap.has(id)) idDirsMap.set(id, []);
+        idDirsMap.get(id).push(entry.name);
+      }
+    }
+  }
+
+  const duplicates = [];
+  for (const [id, dirs] of idDirsMap.entries()) {
+    if (dirs.length > 1) {
+      duplicates.push({ id, dirs });
+    }
+  }
+
+  if (duplicates.length > 0) {
+    console.log("序號唯一性: WARNING (發現重複編號)");
+    for (const dup of duplicates) {
+      console.log(`  - ${dup.id} 重複出現在: ${dup.dirs.join(", ")}`);
+    }
+    console.log("  提示：請將衝突目錄重新定號以維持序號連續與唯一。");
+    return false;
+  } else {
+    console.log("序號唯一性: OK");
+    return true;
+  }
 }
 
 function showStatus(showHeading = true) {
@@ -558,6 +596,20 @@ function reindexProject() {
 
   // 依數字循序排序
   rows.sort((a, b) => a.num - b.num);
+
+  // 檢查是否有重複編號衝突
+  const idCountMap = new Map();
+  for (const r of rows) {
+    idCountMap.set(r.id, (idCountMap.get(r.id) || 0) + 1);
+  }
+  const duplicateIds = Array.from(idCountMap.entries()).filter(([_, count]) => count > 1);
+  if (duplicateIds.length > 0) {
+    console.warn("\n[警告] 發現重複需求編號衝突：");
+    for (const [dupId, count] of duplicateIds) {
+      console.warn(`  - ${dupId}: 共有 ${count} 個需求目錄共用此編號！`);
+    }
+    console.warn("  修復建議：請將衝突目錄之一改回草稿名稱後，重新執行 sa-spec finalize 或 scc 重新領號。\n");
+  }
 
   const header = `# 需求索引\n\n| 編號 | 標題 | 敘述 | 狀態 | 建立時間 | 更新時間 |\n|---|---|---|---|---|---|\n`;
   const tableRows = rows
