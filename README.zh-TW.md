@@ -17,23 +17,23 @@
 
 ---
 
-### Quick Start (English)
+### Quick Start
 
 ```bash
-# Global installation via npm
+# 1. Global installation via npm
 npm install -g @loviusc/sa-spec
 
-# Initialize project with English specification rules
-sa-spec init --full --lang en
-
-# Create a feature draft branch
-sa-spec new --name cart-checkout --branch
+# 2. Initialize project specification rules (supports zh-TW, en, zh-CN, ja, ko)
+sa-spec init --full
 ```
 
-**Core AI Workflow in VS Code:**
-`spec:init (sci)` $\to$ `spec:propose (scp)` $\to$ `spec:analyze (sca)` $\to$ `spec:commit (scc)`
+**🤖 Core AI Workflow in Chat (VS Code / Claude / Antigravity / Cursor):**
+- `spec:init` (`sci`) $\to$ 鎖定專案主要語言與系統規格基準
+- `spec:propose` (`scp`) $\to$ **AI 自動建立 feature 分支與草稿目錄**（零手動指令）
+- `spec:analyze` (`sca`) $\to$ AI 衝突檢查並產出規格文件草稿
+- `spec:commit` (`scc`) $\to$ **AI 自動向主分支領取新號並自動合併回主分支！**
 
-👉 **Read full English documentation: [README.en.md](./README.en.md)**
+👉 **Language Guides: [English](./README.en.md) | [繁體中文](./README.zh-TW.md) | [简体中文](./README.zh-CN.md) | [日本語](./README.ja.md) | [한국어](./README.ko.md)**
 
 ---
 
