@@ -27,7 +27,12 @@ description: 用 init、propose、analyze、commit 四段流程整理需求，�
 
 ## 硬性限制
 
-- 使用繁體中文，並採用台灣常用語。
+- 語言與國際化規範（i18n）：
+  - 支援語系：繁體中文 (`zh-TW`，台灣常用語)、英文 (`en`)、簡體中文 (`zh-CN`)、日文 (`ja`)、韓文 (`ko`) 共 5 種語言。
+  - 初始化語言鎖定：執行 `spec:init` (或 `sci`) 時，若使用者未明確指定語言，AI 必須主動詢問使用者選擇上述 5 種語言之一，不得自行預設；選定後將主要語言寫入 `project/system-spec.md`。
+  - 全專案語言單一純粹：後續所有需求文件（`srs.md`、`uml/`、`openapi.yaml`、`db-schema.md`、`handoff.md`、`history.md`）必須 100% 統一使用該語言，不得在同一專案內混雜多種語言。
+  - 專有名詞保留原生英文：在中文、日文、韓文等非英語系模式下，業界公認標準之技術術語（如 REST API, Webhook, JWT, OAuth 2.0, Payload, Idempotency, Redis 等）強制保留原生英文，嚴禁生硬直譯。
+  - 升級保護：執行 `sa-spec upgrade` 時，自動偵測並繼承現有專案語言，不變更語言設定。
 - `spec:init` 必須檢查 Git 狀態：
   - 若 Git 未安裝，提醒使用者後續歸檔會使用版本管理，但不可中斷初始化。
   - 若 Git 已安裝且目前目錄尚未初始化為 Git repository，則自動執行 `git init`。

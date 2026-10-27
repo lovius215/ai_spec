@@ -54,29 +54,54 @@ function main() {
   }
 }
 
+const SUPPORTED_LANGS = {
+  "zh-tw": { code: "zh-TW", name: "繁體中文", label: "繁體中文 (zh-TW)" },
+  "en": { code: "en", name: "English", label: "English (en)" },
+  "zh-cn": { code: "zh-CN", name: "简体中文", label: "简体中文 (zh-CN)" },
+  "ja": { code: "ja", name: "日本語", label: "日本語 (ja)" },
+  "ko": { code: "ko", name: "한국어", label: "한국어 (ko)" }
+};
+
 function initProject(args = []) {
   const includeRules = args.includes("--full");
+  const langArg = getOption(args, "--lang");
+  let langConfig = SUPPORTED_LANGS["zh-tw"];
+  if (langArg) {
+    const key = langArg.toLowerCase();
+    if (SUPPORTED_LANGS[key]) {
+      langConfig = SUPPORTED_LANGS[key];
+    } else {
+      console.log(`警告: 不支援的語言代碼 "${langArg}"，支援語系: zh-TW, en, zh-CN, ja, ko。已預設使用繁體中文。`);
+    }
+  }
+
+  const replacements = {
+    LANG_LABEL: langConfig.label,
+    LANG_CODE: langConfig.code
+  };
+
   const results = [
     ensureGitRepository(),
     ensureDir("skills"),
     ensureDir(path.join("skills", "system-analysis")),
     ensureDir("project"),
-    ensureFileFromTemplate("AGENTS.md", "AGENTS.md"),
-    ensureFileFromTemplate("readme.md", "readme.md"),
-    ensureFileFromTemplate(path.join("skills", "system-analysis", "SKILL.md"), path.join("skills", "system-analysis", "SKILL.md")),
-    ensureFileFromTemplate(path.join("project", "index.md"), path.join("project", "index.md")),
-    ensureFileFromTemplate(path.join("project", "system-spec.md"), path.join("project", "system-spec.md"))
+    ensureFileFromTemplate("AGENTS.md", "AGENTS.md", replacements),
+    ensureFileFromTemplate("readme.md", "readme.md", replacements),
+    ensureFileFromTemplate(path.join("skills", "system-analysis", "SKILL.md"), path.join("skills", "system-analysis", "SKILL.md"), replacements),
+    ensureFileFromTemplate(path.join("project", "index.md"), path.join("project", "index.md"), replacements),
+    ensureFileFromTemplate(path.join("project", "system-spec.md"), path.join("project", "system-spec.md"), replacements)
   ];
 
   if (includeRules) {
     results.push(ensureDir("rules"));
     for (const file of listFilesRecursive(path.join(templatesDir, "rules"))) {
       const relativePath = path.relative(templatesDir, file);
-      results.push(ensureFileFromTemplate(relativePath, relativePath));
+      results.push(ensureFileFromTemplate(relativePath, relativePath, replacements));
     }
   }
 
   printResultList("init", results);
+  console.log(`專案規格主要語言已設定為: ${langConfig.label}`);
 }
 
 function ensureGitRepository() {
@@ -549,8 +574,33 @@ function slugify(value) {
     .replace(/^-+|-+$/g, "");
 }
 
+function detectProjectLanguage() {
+  const systemSpecPath = path.join(cwd, "project", "system-spec.md");
+  if (fs.existsSync(systemSpecPath)) {
+    const content = fs.readFileSync(systemSpecPath, "utf8");
+    const match = content.match(/^-\s*(?:主要語言|語言|Language)[：:]\s*(.+)$/im);
+    if (match) {
+      const val = match[1].trim();
+      for (const key of Object.keys(SUPPORTED_LANGS)) {
+        if (
+          val.toLowerCase().includes(key) ||
+          val.includes(SUPPORTED_LANGS[key].label) ||
+          val.includes(SUPPORTED_LANGS[key].name) ||
+          val.includes(SUPPORTED_LANGS[key].code)
+        ) {
+          return SUPPORTED_LANGS[key];
+        }
+      }
+      return { code: "custom", label: val };
+    }
+  }
+  return SUPPORTED_LANGS["zh-tw"];
+}
+
 function upgradeProject(args = []) {
   const dryRun = args.includes("--dry-run");
+  const langConfig = detectProjectLanguage();
+  console.log(`專案目前語言: ${langConfig.label}（依現有語言升級，不變更設定）`);
   const results = [];
 
   results.push(ensureDir("skills"));
@@ -684,7 +734,7 @@ function showHelp() {
   console.log(`sa-spec
 
 Usage:
-  sa-spec init [--full]
+  sa-spec init [--full] [--lang zh-TW|en|zh-CN|ja|ko]
   sa-spec new [--id REQ-001] --name login [--branch]
   sa-spec finalize --name login
   sa-spec reindex

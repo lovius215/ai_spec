@@ -235,8 +235,7 @@ sa-spec init --full
 
 | 指令 | 用途 |
 |---|---|
-| `sa-spec init` | 建立最小文件骨架。 |
-| `sa-spec init --full` | 建立文件骨架與完整規則文件。 |
+| `sa-spec init [--full] [--lang zh-TW|en|zh-CN|ja|ko]` | 建立文件骨架與規則文件（支援 5 種語言，預設 `zh-TW`）。 |
 | `sa-spec new [--id REQ-001] --name login [--branch]` | 建立需求資料夾與空白文件模板（未帶 `--id` 時啟用多人草稿模式，可選 `--branch` 自動建立並切換至 `feat/<name>` 分支）。 |
 | `sa-spec finalize --name login` | 將草稿需求定號歸檔為最新序號（自動計算最新號碼、重命名目錄、批次置換 `{{REQ_ID}}` 並重建索引）。 |
 | `sa-spec reindex` | 掃描 `project/REQ-*` 目錄，依序號重新生成乾淨無衝突的 `project/index.md`。 |
@@ -408,6 +407,31 @@ sa-spec finalize --name cart-checkout
 sa-spec reindex
 ```
 * 任何時候若有 PR 合併產生 index 衝突，只要執行 `sa-spec reindex`，即可依序號重新排序生成乾淨的總表，無需人工手動解 conflict。
+
+## 語言與國際化支援（i18n）
+
+`sa-spec` 支援 5 種主要語言的系統分析規格產出與規範手冊：
+
+| 語系代碼 | 語言名稱 | 內文與風格規範 | 專有名詞處理準則 |
+|---|---|---|---|
+| `zh-TW` | **繁體中文**（預設） | 台灣技術常用語（如：伺服器、支援、專案） | 強制保留原生英文（如 `REST API`, `Webhook`, `JWT`） |
+| `en` | **English** | 100% 標準技術英文，不可出現中/日/韓文字符 | 原生技術英文 |
+| `zh-CN` | **简体中文** | 大陸技術常用語（如：服务器、支持、项目） | 強制保留原生英文（如 `REST API`, `Webhook`, `JWT`） |
+| `ja` | **日本語** | 日語技術文體（です/ます 或 である），外來詞尊重 Katakana 慣例 | 強制保留原生英文（如 `REST API`, `Webhook`, `JWT`） |
+| `ko` | **한국어** | 韓語專業技術文體與規範敬語 | 強制保留原生英文（如 `REST API`, `Webhook`, `JWT`） |
+
+### 語言管理核心原則
+
+1. **初始化強制鎖定（Init-Time Lock）**：
+   * 語言由初始化階段決定，不可模稜兩可。
+   * **CLI 指令**：可直接指定語系參數，例如 `sa-spec init --lang en`。
+   * **AI 工作流**：在對話中輸入 `spec:init`（或 `sci`）時，若未指定語言，**AI 必須主動列出 5 種語言選單詢問使用者**，選定後寫入 `project/system-spec.md` 作為全專案唯一的真理之源（Single Source of Truth）。
+2. **全專案語言單一純粹（Single-Language Purity）**：
+   * 選定語言後，全專案的所有產出（`srs.md`、`openapi.yaml`、`db-schema.md`、`handoff.md`、`history.md` 與 `rules/`）必須 100% 統一使用該語言，禁止在同一專案內出現語言混雜。
+3. **專有名詞保留原生英文（Technical Terms Exception）**：
+   * 在非英語系模式（繁中、簡中、日文、韓文）下，業界公認標準之技術術語、協定、資料格式與元件名稱（例如：`REST API`、`Webhook`、`JWT`、`OAuth 2.0`、`Payload`、`Idempotency Key`、`Redis`、`UUID` 等），**一律強制維持原生英文**，嚴禁生硬直譯。
+4. **升級保護（Upgrade Inheritance）**：
+   * 執行 `sa-spec upgrade` 時，系統會**自動偵測並繼承現有專案語言**（讀取 `project/system-spec.md`），不會詢問或變更既有專案語言，確保升級零干擾。
 
 ## 完整範例：番茄時鐘
 
@@ -667,6 +691,12 @@ git push origin master
     - `sa-spec finalize --name login`：自動定號、重命名目錄、置換佔位符並重建索引。
     - `sa-spec reindex`：一鍵掃描並重新排序生成乾淨的 `project/index.md`。
   - **分析前防護**：`spec:analyze` 執行前確保取得 master/遠端最新規格，避免分支規格落後導致漏檢衝突。
+- **5 國語言與國際化支援（i18n）**：
+  - **支援語系**：繁體中文 (`zh-TW`)、英文 (`en`)、簡體中文 (`zh-CN`)、日文 (`ja`)、韓文 (`ko`)。
+  - **初始化強制鎖定**：`sa-spec init [--lang <lang>]` 或在 AI 對話中輸入 `spec:init`，未指定時主動彈出選單詢問使用者選擇，選定後寫入 `system-spec.md`。
+  - **專案語言單一純粹**：全專案規格產出 100% 統一該語言。
+  - **技術專有名詞保留原生英文**：非英語系模式下強制保留標準英文術語（如 REST API, Webhook, JWT），嚴禁生硬直譯。
+  - **升級保護**：`sa-spec upgrade` 自動偵測並繼承現有專案語言，不變更設定。
 
 ### v0.1.3
 - **支援指令簡寫別名（同時保留完整指令）**：
