@@ -102,18 +102,18 @@ sa-spec --version
 
 ```mermaid
 flowchart TD
-    A["提出需求: sa-spec new --name cart --branch"] --> B["建立并切换至 feat/cart 分支<br/>创建草稿目录 project/cart/"]
+    A["提出需求: scp 或 sa-spec new --branch"] --> B["建立并切换至 feat/cart 分支<br/>创建草稿目录 project/cart/"]
     B --> C["AI 分析与起草: sca<br/>内部使用 {{REQ_ID}} 占位<br/>自动同步 master 最新规格防冲突"]
     C --> D{"用户确认通过<br/>执行 scc 或 finalize"}
-    D --> E["向 master 查询最新可用序号 N"]
-    E --> F["重命名为 project/REQ-N+1-cart/<br/>批量替换 {{REQ_ID}} 为正式编号"]
-    F --> G["sa-spec reindex: 动态重构 index.md"]
-    G --> H["合并回 master: 零冲突、序号连续！"]
+    D --> E["自动向主分支查询最新可用序号 N"]
+    E --> F["自动定号为 project/REQ-N+1-cart/<br/>批量替换 {{REQ_ID}} 并建立提交"]
+    F --> G["自动合并至 master 主分支<br/>动态重新生成 project/index.md"]
+    G --> H["完成闭环：零冲突、序号永远连续！"]
 ```
 
-1. **草稿不抢号**：在分支开发时使用 `project/cart/` 与 `{{REQ_ID}}` 占位符。多人同时提出需求互不冲突。如果需求放弃，直接删除分支，**绝不遗留幽灵跳号**。
+1. **草稿不抢号**：在分支开发时使用 `scp` 或 `sa-spec new --branch`，建立 `project/cart/` 与 `{{REQ_ID}}` 占位符。多人同时提出需求互不冲突。如果需求放弃，直接删除分支，**绝不遗留幽灵跳号**。
 2. **基线同步防漏检**：执行 `spec:analyze` 前先确认同步远端 master 规格，确保以全系统最新状态进行冲突检查。
-3. **归档时原子定号**：执行 `sa-spec finalize` 或 `scc` 时向 master 申请下一个号（例如 `REQ-003`），批量替换并更新。
+3. **自动拿新号与自动合并**：执行 `scc`（或 `sa-spec finalize --name cart`）时，系统**自动向 master 申请下一个新号定号**、批量替换占位符、完成提交，并**自动切换回 master 并合并该 feature 分支**，随后自动重建 `project/index.md`。
 4. **动态重建索引**：`sa-spec reindex` 随时可由目录动态排序生成总表，消除 `index.md` 的 merge conflict。
 
 ---

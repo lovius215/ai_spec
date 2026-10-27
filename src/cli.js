@@ -309,10 +309,79 @@ function createReqTemplate(args, label = "new") {
   printResultList(label, results);
 }
 
+function detectMainBranch() {
+  const branches = ["main", "master"];
+  for (const b of branches) {
+    const res = spawnSync("git", ["rev-parse", "--verify", b], { cwd, encoding: "utf8" });
+    if (res.status === 0) return b;
+  }
+  return null;
+}
+
+function getCurrentBranch() {
+  const res = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd, encoding: "utf8" });
+  if (res.status === 0) {
+    const b = res.stdout.trim();
+    return b === "HEAD" ? null : b;
+  }
+  return null;
+}
+
+function getLatestMaxReqId(projectDir, mainBranch) {
+  let maxIdNum = 0;
+  // 1. 掃描本地工作目錄既有 REQ-xxx
+  if (fs.existsSync(projectDir)) {
+    const entries = fs.readdirSync(projectDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory() && entry.name.startsWith("REQ-")) {
+        const m = entry.name.match(/^REQ-(\d+)/i);
+        if (m) {
+          const num = parseInt(m[1], 10);
+          if (num > maxIdNum) maxIdNum = num;
+        }
+      }
+    }
+  }
+
+  // 2. 掃描主分支 (若在 Git 環境下)
+  if (mainBranch) {
+    const gitLs = spawnSync("git", ["ls-tree", `${mainBranch}:project`], { cwd, encoding: "utf8" });
+    if (gitLs.status === 0 && gitLs.stdout) {
+      for (const line of gitLs.stdout.split("\n")) {
+        const parts = line.split("\t");
+        if (parts.length > 1) {
+          const m = parts[1].trim().match(/^REQ-(\d+)/i);
+          if (m) {
+            const num = parseInt(m[1], 10);
+            if (num > maxIdNum) maxIdNum = num;
+          }
+        }
+      }
+    }
+
+    // 3. 掃描遠端主分支 (若有設定 remote)
+    const gitRemoteLs = spawnSync("git", ["ls-tree", `origin/${mainBranch}:project`], { cwd, encoding: "utf8" });
+    if (gitRemoteLs.status === 0 && gitRemoteLs.stdout) {
+      for (const line of gitRemoteLs.stdout.split("\n")) {
+        const parts = line.split("\t");
+        if (parts.length > 1) {
+          const m = parts[1].trim().match(/^REQ-(\d+)/i);
+          if (m) {
+            const num = parseInt(m[1], 10);
+            if (num > maxIdNum) maxIdNum = num;
+          }
+        }
+      }
+    }
+  }
+
+  return maxIdNum;
+}
+
 function finalizeReq(args) {
   const name = getOption(args, "--name") || getOption(args, "--draft") || args[0];
   if (!name) {
-    fail("Usage: sa-spec finalize --name <name-or-slug>");
+    fail("Usage: sa-spec finalize --name <name-or-slug> [--no-merge]");
     return;
   }
 
@@ -332,22 +401,10 @@ function finalizeReq(args) {
     }
   }
 
-  // 掃描既有最大 REQ 編號
-  let maxIdNum = 0;
-  if (fs.existsSync(projectDir)) {
-    const entries = fs.readdirSync(projectDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.isDirectory() && entry.name.startsWith("REQ-")) {
-        const m = entry.name.match(/^REQ-(\d+)/i);
-        if (m) {
-          const num = parseInt(m[1], 10);
-          if (num > maxIdNum) {
-            maxIdNum = num;
-          }
-        }
-      }
-    }
-  }
+  // 1. 自動向本地與主分支查詢最新已使用的最大 REQ 序號
+  const mainBranch = detectMainBranch();
+  const currentBranch = getCurrentBranch();
+  const maxIdNum = getLatestMaxReqId(projectDir, mainBranch);
 
   const nextIdNum = maxIdNum + 1;
   const nextId = `REQ-${String(nextIdNum).padStart(3, "0")}`;
@@ -360,7 +417,7 @@ function finalizeReq(args) {
     return;
   }
 
-  // 重命名目錄 (優先嘗試 git mv)
+  // 2. 重命名目錄 (優先嘗試 git mv)
   const gitMv = spawnSync("git", ["mv", draftRelDir, finalRelDir], { cwd, encoding: "utf8" });
   if (gitMv.status === 0) {
     console.log(`[Git] 已將目錄重命名為: ${finalRelDir}`);
@@ -369,7 +426,7 @@ function finalizeReq(args) {
     console.log(`已將目錄重命名為: ${finalRelDir}`);
   }
 
-  // 替換目錄內檔案的 {{REQ_ID}} 佔位符
+  // 3. 替換目錄內檔案的 {{REQ_ID}} 佔位符
   const files = listFilesRecursive(finalAbsDir);
   for (const filePath of files) {
     try {
@@ -383,13 +440,56 @@ function finalizeReq(args) {
     }
   }
 
-  // 自動重新整理 index.md
+  // 4. 自動重新整理 index.md
   reindexProject();
 
   console.log(`\n 需求已成功定號歸檔為: ${nextId} (${finalDirName})`);
-  console.log(`建議接下來執行：`);
-  console.log(`  git add project/`);
-  console.log(`  git commit -m "docs(${nextId}): ${name} - 規格確認歸檔"`);
+
+  // 5. 自動提交與自動合併回主分支 (Git-Flow 閉環)
+  const shouldAutoMerge = !args.includes("--no-merge");
+  if (currentBranch && mainBranch && currentBranch !== mainBranch) {
+    console.log(`[Git] 正在為分支 ${currentBranch} 建立歸檔 commit...`);
+    spawnSync("git", ["add", "project/"], { cwd, encoding: "utf8" });
+    const commitRes = spawnSync("git", ["commit", "-m", `docs(${nextId}): ${name} - 規格確認歸檔`], { cwd, encoding: "utf8" });
+    if (commitRes.status === 0) {
+      console.log(`[Git] 分支 ${currentBranch} 提交完成: docs(${nextId}): ${name} - 規格確認歸檔`);
+    }
+
+    if (shouldAutoMerge) {
+      console.log(`[Git] 自動切換至主分支 ${mainBranch} 並合併 ${currentBranch}...`);
+      const checkoutRes = spawnSync("git", ["checkout", mainBranch], { cwd, encoding: "utf8" });
+      if (checkoutRes.status !== 0) {
+        console.error(`[Git 警告] 切換至主分支 ${mainBranch} 失敗: ${(checkoutRes.stderr || "").trim()}`);
+        return;
+      }
+
+      const mergeRes = spawnSync("git", ["merge", currentBranch, "--no-edit"], { cwd, encoding: "utf8" });
+      if (mergeRes.status === 0) {
+        console.log(`[Git] 已成功將 ${currentBranch} 合併至 ${mainBranch}！`);
+        // 主分支重新整理索引確保排序與衝突檢查無誤
+        reindexProject();
+        const statusRes = spawnSync("git", ["status", "--porcelain", "project/index.md"], { cwd, encoding: "utf8" });
+        if (statusRes.stdout && statusRes.stdout.trim()) {
+          spawnSync("git", ["add", "project/index.md"], { cwd, encoding: "utf8" });
+          spawnSync("git", ["commit", "-m", `chore: update project/index.md for ${nextId}`], { cwd, encoding: "utf8" });
+        }
+        console.log(` 全部歸檔流程完成！已自動領取新號 ${nextId} 並自動合併回主分支 ${mainBranch}。`);
+      } else {
+        console.error(`[Git 警告] 合併至 ${mainBranch} 發生衝突，請手動確認衝突狀況：\n${(mergeRes.stderr || mergeRes.stdout || "").trim()}`);
+      }
+    } else {
+      console.log(`提示：已跳過自動合併 (--no-merge)。請在完成後手動執行：`);
+      console.log(`  git checkout ${mainBranch} && git merge ${currentBranch}`);
+    }
+  } else if (currentBranch && currentBranch === mainBranch) {
+    spawnSync("git", ["add", "project/"], { cwd, encoding: "utf8" });
+    spawnSync("git", ["commit", "-m", `docs(${nextId}): ${name} - 規格確認歸檔`], { cwd, encoding: "utf8" });
+    console.log(`[Git] 已直接於主分支 ${mainBranch} 建立提交完成。`);
+  } else {
+    console.log(`建議接下來執行：`);
+    console.log(`  git add project/`);
+    console.log(`  git commit -m "docs(${nextId}): ${name} - 規格確認歸檔"`);
+  }
 }
 
 function reindexProject() {
@@ -736,7 +836,7 @@ function showHelp() {
 Usage:
   sa-spec init [--full] [--lang zh-TW|en|zh-CN|ja|ko]
   sa-spec new [--id REQ-001] --name login [--branch]
-  sa-spec finalize --name login
+  sa-spec finalize --name login [--no-merge]
   sa-spec reindex
   sa-spec check
   sa-spec upgrade [--dry-run]

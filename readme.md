@@ -397,13 +397,13 @@ docs(REQ-001): 番茄時鐘 - 新增專注與休息計時需求
 
 ```mermaid
 flowchart TD
-    A["開新需求: sa-spec new --name cart --branch"] --> B["建立並切換至 feat/cart 分支<br/>以 project/cart/ 建立草稿目錄"]
+    A["開新需求: scp 或 sa-spec new --branch"] --> B["建立並切換至 feat/cart 分支<br/>以 project/cart/ 建立草稿目錄"]
     B --> C["AI 分析與起草: sca<br/>內部使用 {{REQ_ID}} 佔位<br/>自動同步 master 規格防護"]
     C --> D{"使用者確認通過<br/>執行 scc 或 finalize"}
-    D --> E["查詢 master 最新序號 N"]
-    E --> F["重命名為 project/REQ-N+1-cart/<br/>批次置換 {{REQ_ID}} 為正式號碼"]
-    F --> G["sa-spec reindex: 動態重構 index.md"]
-    G --> H["合併回 master: 零衝突、序號永遠連續！"]
+    D --> E["自動查詢主分支最新序號 N"]
+    E --> F["自動定號為 project/REQ-N+1-cart/<br/>批次置換 {{REQ_ID}} 並建立 commit"]
+    F --> G["自動合併至 master 主分支<br/>動態重新生成 project/index.md"]
+    G --> H["完成閉環：零衝突、序號永遠連續！"]
 ```
 
 ### 多人協作四步流程
@@ -425,18 +425,23 @@ flowchart TD
 #### 2. 分析與衝突檢查（規格基線同步）
 在分支上執行 `spec:analyze`（或 `sca`）前，工具會確認已取得 `master`（或 `origin/master`）的最新規格，確保是以全專案最新基準進行影響評估，避免因分支落後而漏檢權限、API 或資料表衝突。
 
-#### 3. 確認歸檔與延遲定號（Late-Binding）
-當需求規格確認無誤，準備歸檔時：
+#### 3. 確認歸檔與延遲定號（自動領號 + 自動合併回主分支）
+當需求規格經使用者確認無誤，準備歸檔時：
 
-```bash
-# 自動向 master 查詢最新可用序號（例如 REQ-006）
-sa-spec finalize --name cart-checkout
-```
-* **自動化執行**：
-  1. 取得最新序號（例如目前最大是 `REQ-005`，自動取得 `REQ-006`）。
-  2. 使用 `git mv` 將目錄重命名為 `project/REQ-006-cart-checkout`。
-  3. 自動掃描並將目錄內所有檔案的 `{{REQ_ID}}` 批次置換為 `REQ-006`。
-  4. 自動執行 `reindex` 重建需求總表。
+* **方式 A（純 AI 自動化，最推薦）**：在 AI 側邊欄直接輸入：
+  ```text
+  scc
+  ```
+  AI 收到後會自動完成全自動 Git-Flow 閉環作業：
+  1. **自動向主分支查詢並取得新號**：查詢 master/main 目前最大序號（例如最大是 `REQ-005`，自動領取最新號 `REQ-006`），避免號碼競爭。
+  2. **自動定名更名**：使用 `git mv` 將目錄重命名為 `project/REQ-006-cart-checkout`，並將目錄內所有檔案的 `{{REQ_ID}}` 批次置換為 `REQ-006`。
+  3. **自動建立本機提交**：在 feature 分支自動建立 commit `docs(REQ-006): cart-checkout - 規格確認歸檔`。
+  4. **自動合併至主分支**：自動切換至主分支（`git checkout master`），將 feature 分支自動合併回主分支（`git merge feat/cart-checkout`），並重新生成主分支的 `project/index.md`，保證主分支規格最新且永遠不衝突！
+* **方式 B（CLI 終端指令）**：
+  ```bash
+  sa-spec finalize --name cart-checkout
+  ```
+  CLI 同樣會自動查詢主分支最新序號定號、置換佔位符、完成提交並自動合併回 master！若想保留在當前分支手動處理，可加上 `--no-merge` 參數。
 
 #### 4. 消除索引合併衝突（`sa-spec reindex`）
 `project/index.md` 改為由目錄動態生成的「衍生清單」，不再依賴脆弱的手動 append：
@@ -718,6 +723,12 @@ git push origin master
 - 一次最多問 3 個待確認問題，優先詢問會影響範圍、資料、權限、API、DB 或驗收的問題。
 
 ## 更新紀錄
+
+### v0.2.3
+- **自動領號與自動合併至主分支（Git-Flow 自動化閉環）**：
+  - **自動從主分支取新號**：執行 `spec:commit`（`scc`）或 `sa-spec finalize` 時，自動向主分支（`master`/`main`）查詢最新已使用最大序號並定號（`REQ-xxx`），自動置換內部佔位符 `{{REQ_ID}}`，徹底防止多人協作時在 feature 分支發生的號碼撞車與落後問題。
+  - **自動合併回主分支**：完成 feature 分支 commit 後，自動切換至主分支（`git checkout master`）並將該 feature 分支自動合併回主分支（`git merge feat/<name>`），並在主分支自動重新整理 `project/index.md`，打造完全自動化的 Git-Flow 零衝突閉環。
+  - **CLI 自動化支援**：`sa-spec finalize --name <name>` 預設自動執行主分支序號運算、定號置換、提交與合併回主分支（支援 `--no-merge` 參數跳過自動合併）。
 
 ### v0.2.2
 - **npm 首頁與專案文件全多語系化（Multi-Language Documentation on npm）**：
