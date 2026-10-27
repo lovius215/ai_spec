@@ -728,6 +728,7 @@ git push origin master
 - **支援前端 UI 線框圖（PlantUML Salt Code-as-Wireframe）**：
   - **純文字代碼化線框圖**：在 `uml/` 目錄新增標準 `uml/wireframe.puml`，使用 PlantUML Salt 語法（`@startsalt ... @endsalt`）以純文字定義頁面排版、輸入欄位、選項與按鈕，可直接在 VS Code 渲染預覽，並可納入 Git 版本追蹤。
   - **AI 開發交接前後閉環**：`srs.md` 與 `handoff.md` 新增「UI / 畫面規格」區塊，前端需求直接引用 `uml/wireframe.puml`，供 OpenSpec / Claude Code 精準產出前端元件；純後端需求則標示「無 UI 介面需求」。
+  - **版本升級（`sa-spec upgrade`）既有需求防護**：升級時主動掃描既有需求，若偵測到前端介面描述且缺少 wireframe 則發出補齊提示；已標記無 UI 之純後端需求則略過，不盲目覆蓋既有規格。
 
 ### v0.2.4
 - **序號重複主動告警與重新定號自癒支援**：

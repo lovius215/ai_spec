@@ -848,15 +848,70 @@ function upgradeProject(args = []) {
         const handoffRelPath = path.join(reqRelDir, "handoff.md");
         const handoffAbsPath = path.join(cwd, handoffRelPath);
         if (fs.existsSync(handoffAbsPath)) {
-          const content = fs.readFileSync(handoffAbsPath, "utf8");
+          let content = fs.readFileSync(handoffAbsPath, "utf8");
+          let updatedHandoff = false;
           if (content.includes("uml.puml")) {
+            content = content.replace(/uml\.puml/g, "uml/");
+            updatedHandoff = true;
+          }
+          if (!content.includes("## UI") && !content.includes("畫面規格")) {
+            const uiSection = `\n## UI / 畫面規格\n待補充；若有前端介面需求，參照 \`uml/wireframe.puml\`；若無 UI 需求，明確標示「無 UI 介面需求」。\n`;
+            if (content.includes("## 驗收條件")) {
+              content = content.replace("## 驗收條件", `${uiSection}\n## 驗收條件`);
+            } else {
+              content = `${content.trimEnd()}\n${uiSection}`;
+            }
+            updatedHandoff = true;
+          }
+          if (updatedHandoff) {
             if (!dryRun) {
-              fs.writeFileSync(handoffAbsPath, content.replace(/uml\.puml/g, "uml/"), "utf8");
+              fs.writeFileSync(handoffAbsPath, content, "utf8");
             }
             results.push({
               action: "update",
               target: handoffRelPath,
-              message: "更新來源參照 uml.puml -> uml/"
+              message: "更新來源參照與補全 UI/畫面規格章節"
+            });
+          }
+        }
+
+        // 檢查既有需求是否需要 wireframe
+        const wireframeRelPath = path.join(newUmlRelDir, "wireframe.puml");
+        const wireframeAbsPath = path.join(cwd, wireframeRelPath);
+        const srsRelPath = path.join(reqRelDir, "srs.md");
+        const srsAbsPath = path.join(cwd, srsRelPath);
+
+        let explicitNoUi = false;
+        let likelyHasUi = false;
+
+        const inspectUiText = (text) => {
+          if (/無\s*UI/i.test(text) || /純後端/i.test(text) || /無介面/i.test(text)) {
+            explicitNoUi = true;
+          }
+          if (/畫面|介面|UI|前端|按鈕|表單|點擊|頁面|Page|Screen|View|Modal/i.test(text)) {
+            likelyHasUi = true;
+          }
+        };
+
+        if (fs.existsSync(handoffAbsPath)) {
+          inspectUiText(fs.readFileSync(handoffAbsPath, "utf8"));
+        }
+        if (fs.existsSync(srsAbsPath)) {
+          inspectUiText(fs.readFileSync(srsAbsPath, "utf8"));
+        }
+
+        if (!fs.existsSync(wireframeAbsPath)) {
+          if (explicitNoUi) {
+            results.push({
+              action: "skip",
+              target: wireframeRelPath,
+              message: "已標記為無 UI 需求，略過 wireframe"
+            });
+          } else if (likelyHasUi) {
+            results.push({
+              action: "warn",
+              target: wireframeRelPath,
+              message: "偵測到包含前端介面描述，建議透過 AI (sca) 補齊 PlantUML Salt 線框圖"
             });
           }
         }
