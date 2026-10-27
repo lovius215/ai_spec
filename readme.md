@@ -237,7 +237,9 @@ sa-spec init --full
 |---|---|
 | `sa-spec init` | 建立最小文件骨架。 |
 | `sa-spec init --full` | 建立文件骨架與完整規則文件。 |
-| `sa-spec new --id REQ-001 --name login` | 建立需求資料夾與空白文件模板，包含 SRS、UML、OpenAPI、DB Schema、handoff 與 history。 |
+| `sa-spec new [--id REQ-001] --name login [--branch]` | 建立需求資料夾與空白文件模板（未帶 `--id` 時啟用多人草稿模式，可選 `--branch` 自動建立並切換至 `feat/<name>` 分支）。 |
+| `sa-spec finalize --name login` | 將草稿需求定號歸檔為最新序號（自動計算最新號碼、重命名目錄、批次置換 `{{REQ_ID}}` 並重建索引）。 |
+| `sa-spec reindex` | 掃描 `project/REQ-*` 目錄，依序號重新生成乾淨無衝突的 `project/index.md`。 |
 | `sa-spec check` | 檢查基本文件是否存在。 |
 | `sa-spec status` | 顯示系統規格與需求索引狀態。 |
 | `sa-spec doctor` | 檢查必要檔案是否存在。 |
@@ -348,6 +350,64 @@ docs(REQ-001): 番茄時鐘 - 新增專注與休息計時需求
 ```
 
 只有在使用者明確要求推送 remote，或專案設定啟用 auto-push 時，才會執行 `git push`。如果 push 失敗，只回報認證或網路問題，不會回滾已完成的文件歸檔與本機 commit。
+
+## 多人協作解決方案（Git-Flow 與延遲綁定 ID）
+
+在單人開發時，循序流水號（`REQ-001`、`REQ-002`）簡單直覺；但在多人平行協作時，容易引發兩大痛點：
+1. **序號競爭撞車**：Alice 與 Bob 同時在各自的分支開發，雙方本機都取了 `REQ-003`，合併回主幹時發生目錄重名衝突。
+2. **中心化檔案衝突**：每次歸檔都要修改 `project/index.md`，導致頻繁的 Git merge conflict。
+
+`sa-spec v0.2.0` 引進 **「Feature Branch 隔離 + 延遲綁定序號（Late-Binding ID）」** 完整解決方案：
+
+```mermaid
+flowchart TD
+    A[開新需求: sa-spec new --name cart --branch] --> B[建立並切換至 feat/cart 分支<br/>以 project/cart/ 建立草稿目錄]
+    B --> C[AI 分析與起草: sca<br/>內部使用 {{REQ_ID}} 佔位<br/>自動同步 master 規格防護]
+    C --> D{使用者確認通過<br/>執行 scc 或 finalize}
+    D --> E[查詢 master 最新序號 N]
+    E --> F[重命名為 project/REQ-N+1-cart/<br/>批次置換 {{REQ_ID}} 為正式號碼]
+    F --> G[sa-spec reindex: 動態重構 index.md]
+    G --> H[合併回 master: 零衝突、序號永遠連續！]
+```
+
+### 多人協作四步流程
+
+#### 1. 提出需求（草稿與分支隔離）
+開需求時**不搶序號**，直接以語意名稱建立分支與草稿目錄：
+
+```bash
+# 自動建立並切換至 feat/cart-checkout 分支，建立 project/cart-checkout/ 草稿目錄
+sa-spec new --name cart-checkout --branch
+```
+在 VS Code 側邊欄輸入：
+```text
+scp 購物車結帳需求
+```
+* **特點**：目錄名稱為 `project/cart-checkout/`，內部所有檔案皆使用 `{{REQ_ID}}` 佔位符。多人同時提出需求互不干擾、零衝突。即使需求中途放棄，直接刪除分支即可，絕不留下幽靈跳號。
+
+#### 2. 分析與衝突檢查（規格基線同步）
+在分支上執行 `spec:analyze`（或 `sca`）前，工具會確認已取得 `master`（或 `origin/master`）的最新規格，確保是以全專案最新基準進行影響評估，避免因分支落後而漏檢權限、API 或資料表衝突。
+
+#### 3. 確認歸檔與延遲定號（Late-Binding）
+當需求規格確認無誤，準備歸檔時：
+
+```bash
+# 自動向 master 查詢最新可用序號（例如 REQ-006）
+sa-spec finalize --name cart-checkout
+```
+* **自動化執行**：
+  1. 取得最新序號（例如目前最大是 `REQ-005`，自動取得 `REQ-006`）。
+  2. 使用 `git mv` 將目錄重命名為 `project/REQ-006-cart-checkout`。
+  3. 自動掃描並將目錄內所有檔案的 `{{REQ_ID}}` 批次置換為 `REQ-006`。
+  4. 自動執行 `reindex` 重建需求總表。
+
+#### 4. 消除索引合併衝突（`sa-spec reindex`）
+`project/index.md` 改為由目錄動態生成的「衍生清單」，不再依賴脆弱的手動 append：
+
+```bash
+sa-spec reindex
+```
+* 任何時候若有 PR 合併產生 index 衝突，只要執行 `sa-spec reindex`，即可依序號重新排序生成乾淨的總表，無需人工手動解 conflict。
 
 ## 完整範例：番茄時鐘
 
@@ -596,6 +656,17 @@ git push origin master
 - 一次最多問 3 個待確認問題，優先詢問會影響範圍、資料、權限、API、DB 或驗收的問題。
 
 ## 更新紀錄
+
+### v0.2.0
+- **多人協作 Git-Flow 解決方案（延遲綁定序號與零衝突索引）**：
+  - **解決痛點**：多人平行開發時，傳統流水號（`REQ-001`）容易在各自分支撞車，且中心化的 `project/index.md` 容易造成 Git merge conflict。
+  - **延遲綁定序號（Late-Binding ID）**：開需求時不搶號，在 feature branch 上以語意名稱建立草稿需求（如 `project/cart`），內部使用 `{{REQ_ID}}` 佔位；只有在 `spec:commit` 最終歸檔時，才向 master/遠端確認最新可用序號並定號（如 `REQ-003`），自動批次置換佔位符，徹底避免幽靈跳號與序號競爭。
+  - **動態重建需求索引（`sa-spec reindex`）**：將 `project/index.md` 改為根據 `project/REQ-*` 目錄動態掃描並依序號排序生成，消除手動 append 造成的 Git 合併衝突。
+  - **CLI 指令升級**：
+    - `sa-spec new [--id REQ-001] --name login [--branch]`：支援草稿模式與自動切換 feature 分支。
+    - `sa-spec finalize --name login`：自動定號、重命名目錄、置換佔位符並重建索引。
+    - `sa-spec reindex`：一鍵掃描並重新排序生成乾淨的 `project/index.md`。
+  - **分析前防護**：`spec:analyze` 執行前確保取得 master/遠端最新規格，避免分支規格落後導致漏檢衝突。
 
 ### v0.1.3
 - **支援指令簡寫別名（同時保留完整指令）**：

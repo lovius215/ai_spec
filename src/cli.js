@@ -17,6 +17,12 @@ function main() {
     case "new":
       createReqTemplate(args.slice(1));
       return;
+    case "finalize":
+      finalizeReq(args.slice(1));
+      return;
+    case "reindex":
+      reindexProject();
+      return;
     case "check":
       runCheck();
       return;
@@ -220,12 +226,46 @@ function createReqTemplate(args, label = "new") {
   const id = getOption(args, "--id");
   const name = getOption(args, "--name");
 
-  if (!id || !name) {
-    fail("Usage: sa-spec template req --id REQ-001 --name login");
+  if (!name) {
+    fail("Usage: sa-spec new [--id REQ-001] --name login [--branch]");
     return;
   }
 
   const slug = slugify(name);
+
+  // 草稿模式（Git-Flow 多人協作）：未指定 id 時建立草稿目錄，以 {{REQ_ID}} 佔位
+  if (!id) {
+    if (args.includes("--branch")) {
+      const branchName = `feat/${slug}`;
+      const branchRes = spawnSync("git", ["checkout", "-b", branchName], { cwd, encoding: "utf8" });
+      if (branchRes.status === 0) {
+        console.log(`已建立並切換至分支: ${branchName}`);
+      } else {
+        console.log(`提示: 分支切換略過 (${(branchRes.stderr || "").trim() || "可能是已有同名分支或未在 git 目錄"})`);
+      }
+    }
+
+    const reqDir = path.join("project", slug);
+    const umlDir = path.join(reqDir, "uml");
+    const replacements = { REQ_ID: "{{REQ_ID}}", REQ_NAME: name };
+    const results = [
+      ensureDir(reqDir),
+      ensureDir(umlDir),
+      ensureFileFromTemplate(path.join("project", "req", "srs.md"), path.join(reqDir, "srs.md"), replacements),
+      ensureFileFromTemplate(path.join("project", "req", "uml", "main.puml"), path.join(umlDir, "main.puml"), replacements),
+      ensureFileFromTemplate(path.join("project", "req", "openapi.yaml"), path.join(reqDir, "openapi.yaml"), replacements),
+      ensureFileFromTemplate(path.join("project", "req", "db-schema.md"), path.join(reqDir, "db-schema.md"), replacements),
+      ensureFileFromTemplate(path.join("project", "req", "handoff.md"), path.join(reqDir, "handoff.md"), replacements),
+      ensureFileFromTemplate(path.join("project", "req", "history.md"), path.join(reqDir, "history.md"), replacements)
+    ];
+
+    printResultList(label, results);
+    console.log(`\n已建立草稿需求：${reqDir}（內部使用 {{REQ_ID}} 佔位符）`);
+    console.log(`分析確認後，可使用 sa-spec finalize --name ${slug} 定號歸檔。`);
+    return;
+  }
+
+  // 傳統模式：指定序號
   const reqDir = path.join("project", `${id}-${slug}`);
   const umlDir = path.join(reqDir, "uml");
   const replacements = { REQ_ID: id, REQ_NAME: name };
@@ -242,6 +282,166 @@ function createReqTemplate(args, label = "new") {
   ];
 
   printResultList(label, results);
+}
+
+function finalizeReq(args) {
+  const name = getOption(args, "--name") || getOption(args, "--draft") || args[0];
+  if (!name) {
+    fail("Usage: sa-spec finalize --name <name-or-slug>");
+    return;
+  }
+
+  const slug = slugify(name);
+  const projectDir = path.join(cwd, "project");
+  let draftRelDir = path.join("project", slug);
+  let draftAbsDir = path.join(cwd, draftRelDir);
+
+  if (!fs.existsSync(draftAbsDir)) {
+    const altRelDir = path.join("project", `draft-${slug}`);
+    if (fs.existsSync(path.join(cwd, altRelDir))) {
+      draftRelDir = altRelDir;
+      draftAbsDir = path.join(cwd, altRelDir);
+    } else {
+      fail(`找不到草稿需求目錄: ${draftRelDir}`);
+      return;
+    }
+  }
+
+  // 掃描既有最大 REQ 編號
+  let maxIdNum = 0;
+  if (fs.existsSync(projectDir)) {
+    const entries = fs.readdirSync(projectDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory() && entry.name.startsWith("REQ-")) {
+        const m = entry.name.match(/^REQ-(\d+)/i);
+        if (m) {
+          const num = parseInt(m[1], 10);
+          if (num > maxIdNum) {
+            maxIdNum = num;
+          }
+        }
+      }
+    }
+  }
+
+  const nextIdNum = maxIdNum + 1;
+  const nextId = `REQ-${String(nextIdNum).padStart(3, "0")}`;
+  const finalDirName = `${nextId}-${slug}`;
+  const finalRelDir = path.join("project", finalDirName);
+  const finalAbsDir = path.join(cwd, finalRelDir);
+
+  if (fs.existsSync(finalAbsDir)) {
+    fail(`目標目錄 ${finalRelDir} 已存在，請確認序號或目錄名稱。`);
+    return;
+  }
+
+  // 重命名目錄 (優先嘗試 git mv)
+  const gitMv = spawnSync("git", ["mv", draftRelDir, finalRelDir], { cwd, encoding: "utf8" });
+  if (gitMv.status === 0) {
+    console.log(`[Git] 已將目錄重命名為: ${finalRelDir}`);
+  } else {
+    fs.renameSync(draftAbsDir, finalAbsDir);
+    console.log(`已將目錄重命名為: ${finalRelDir}`);
+  }
+
+  // 替換目錄內檔案的 {{REQ_ID}} 佔位符
+  const files = listFilesRecursive(finalAbsDir);
+  for (const filePath of files) {
+    try {
+      const content = fs.readFileSync(filePath, "utf8");
+      if (content.includes("{{REQ_ID}}")) {
+        const updated = content.split("{{REQ_ID}}").join(nextId);
+        fs.writeFileSync(filePath, updated, "utf8");
+      }
+    } catch (_) {
+      // 略過無法以文字讀取之檔案
+    }
+  }
+
+  // 自動重新整理 index.md
+  reindexProject();
+
+  console.log(`\n 需求已成功定號歸檔為: ${nextId} (${finalDirName})`);
+  console.log(`建議接下來執行：`);
+  console.log(`  git add project/`);
+  console.log(`  git commit -m "docs(${nextId}): ${name} - 規格確認歸檔"`);
+}
+
+function reindexProject() {
+  const projectDir = path.join(cwd, "project");
+  const indexPath = path.join(projectDir, "index.md");
+  if (!fs.existsSync(projectDir)) {
+    fail("project/ directory not found.");
+    return;
+  }
+
+  // 讀取現有索引
+  const existingMap = new Map();
+  if (fs.existsSync(indexPath)) {
+    const existingRows = parseIndexRows(fs.readFileSync(indexPath, "utf8"));
+    for (const row of existingRows) {
+      existingMap.set(row.id, row);
+    }
+  }
+
+  const entries = fs.readdirSync(projectDir, { withFileTypes: true });
+  const reqDirs = entries.filter((e) => e.isDirectory() && e.name.startsWith("REQ-"));
+
+  const rows = [];
+  for (const entry of reqDirs) {
+    const dirName = entry.name;
+    const match = dirName.match(/^(REQ-\d+)(?:-(.*))?$/i);
+    if (!match) continue;
+    const id = match[1].toUpperCase();
+    const fallbackTitle = match[2] || dirName;
+
+    const reqDirPath = path.join(projectDir, dirName);
+    const srsPath = path.join(reqDirPath, "srs.md");
+
+    let title = fallbackTitle;
+    let description = "待補充";
+    let status = "待確認";
+    let createdAt = formatLocalDateTime(new Date());
+    let updatedAt = createdAt;
+
+    if (existingMap.has(id)) {
+      const prev = existingMap.get(id);
+      title = prev.title || title;
+      description = prev.description || description;
+      status = prev.status || status;
+      createdAt = prev.createdAt || createdAt;
+      updatedAt = prev.updatedAt || updatedAt;
+    }
+
+    if (fs.existsSync(srsPath)) {
+      const srsContent = fs.readFileSync(srsPath, "utf8");
+      const titleMatch = srsContent.match(/^# 需求規格[：:]\s*(?:REQ-\d+\s*)?(.*)$/m);
+      if (titleMatch && titleMatch[1].trim()) {
+        title = titleMatch[1].trim();
+      }
+      const statusMatch = srsContent.match(/^-\s*狀態[：:]\s*(.+)$/m);
+      if (statusMatch && statusMatch[1].trim()) {
+        status = statusMatch[1].trim();
+      }
+    }
+
+    const numMatch = id.match(/\d+/);
+    const num = numMatch ? parseInt(numMatch[0], 10) : 0;
+
+    rows.push({ num, id, title, description, status, createdAt, updatedAt });
+  }
+
+  // 依數字循序排序
+  rows.sort((a, b) => a.num - b.num);
+
+  const header = `# 需求索引\n\n| 編號 | 標題 | 敘述 | 狀態 | 建立時間 | 更新時間 |\n|---|---|---|---|---|---|\n`;
+  const tableRows = rows
+    .map((r) => `| ${r.id} | ${r.title} | ${r.description} | ${r.status} | ${r.createdAt} | ${r.updatedAt} |`)
+    .join("\n");
+  const nextContent = rows.length > 0 ? `${header}${tableRows}\n` : `${header}\n`;
+
+  fs.writeFileSync(indexPath, nextContent, "utf8");
+  console.log(`sa-spec reindex: 已重新索引 ${rows.length} 個需求至 project/index.md`);
 }
 
 function ensureIndexRow(id, name) {
@@ -329,7 +529,10 @@ function parseIndexRows(content) {
     .map((parts) => ({
       id: parts[1],
       title: parts[2],
-      status: parts[4]
+      description: parts[3],
+      status: parts[4],
+      createdAt: parts[5],
+      updatedAt: parts[6]
     }));
 }
 
@@ -482,7 +685,9 @@ function showHelp() {
 
 Usage:
   sa-spec init [--full]
-  sa-spec new --id REQ-001 --name login
+  sa-spec new [--id REQ-001] --name login [--branch]
+  sa-spec finalize --name login
+  sa-spec reindex
   sa-spec check
   sa-spec upgrade [--dry-run]
   sa-spec --version
