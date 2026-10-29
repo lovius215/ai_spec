@@ -102,18 +102,18 @@ sa-spec --version
 
 ```mermaid
 flowchart TD
-    A["요구사항 제안: scp 또는 sa-spec new --branch"] --> B["feat/cart 브랜치 생성 및 전환<br/>초안 디렉토리: project/cart/"]
+    A["요구사항 제안: scp 또는 sa-spec new --branch"] --> B["feat/cart 브랜치 생성 및 전환<br/>remote가 있으면 브랜치 자동 push<br/>초안 디렉토리: project/cart/"]
     B --> C["AI 분석 및 초안: sca<br/>내부에서 {{REQ_ID}} 플레이스홀더 사용<br/>master 최신 사양 기반 충돌 검사"]
     C --> D{"사용자 승인 완료?<br/>scc 또는 finalize 실행"}
-    D --> E["master에서 최신 사용 가능 번호 N 자동 확인"]
+    D --> E["먼저 브랜치를 remote에 push 및 fetch 동기화<br/>그 후 master에서 최신 번호 N 자동 확인"]
     E --> F["project/REQ-N+1-cart/ 자동 채번 및 커밋<br/>{{REQ_ID}}를 공식 번호로 일괄 치환"]
-    F --> G["master 브랜치로 자동 머지<br/>project/index.md 동적 재생성"]
+    F --> G["master 브랜치로 자동 머지 및 remote push<br/>project/index.md 동적 재생성"]
     G --> H["자동 루프 완성: 충돌 제로, 연속된 번호 유지!"]
 ```
 
-1. **초안 단계 번호 미선점**: `scp` 또는 `sa-spec new --branch` 명령으로 독립 브랜치를 생성하고 `project/cart/`와 `{{REQ_ID}}` 플레이스홀더를 사용합니다. 요구사항이 중도 폐기되어도 브랜치만 삭제하면 되며, 결번(고스트 번호)이 발생하지 않습니다.
+1. **초안 단계 번호 미선점**: `scp` 또는 `sa-spec new --branch` 명령으로 독립 브랜치를 생성하고(Git remote가 설정되어 있으면 자동으로 remote에 push) `project/cart/`와 `{{REQ_ID}}` 플레이스홀더를 사용합니다. 요구사항이 중도 폐기되어도 브랜치만 삭제하면 되며, 결번(고스트 번호)이 발생하지 않습니다.
 2. **사양 기준선 동기화**: `spec:analyze` 실행 전 master의 최신 상태를 동기화하여 다른 팀원이 머지한 API나 테이블과의 충돌 누락을 방지합니다.
-3. **자동 신규 번호 채번 및 메인 브랜치 자동 머지**: `scc` 또는 `sa-spec finalize` 실행 시 **master에서 다음 번호를 자동 조회하여 채번·치환·커밋**하고, **master 브랜치로 자동 전환 후 자동 머지**를 수행하며 `project/index.md`를 최신 상태로 정렬 재생성합니다.
+3. **선행 push, 자동 신규 번호 채번 및 메인 브랜치 자동 머지**: `scc` 또는 `sa-spec finalize` 실행 시 remote가 있으면 **먼저 현재 브랜치를 remote에 push하고 최신 상태를 동기화**한 뒤, **master에서 다음 번호를 자동 조회하여 채번·치환·커밋**하고, **master 브랜치로 자동 전환 후 자동 머지 및 remote push**를 수행하며 `project/index.md`를 최신 상태로 정렬 재생성합니다.
 4. **인덱스 머지 충돌 제거**: `sa-spec reindex` 명령으로 디렉토리 상태에서 `project/index.md`를 언제든 완벽하게 재생성합니다.
 
 ---

@@ -385,7 +385,7 @@ commit (scc) -> 歸檔 -> 本機 Git commit
 docs(REQ-001): 番茄時鐘 - 新增專注與休息計時需求
 ```
 
-只有在使用者明確要求推送 remote，或專案設定啟用 auto-push 時，才會執行 `git push`。如果 push 失敗，只回報認證或網路問題，不會回滾已完成的文件歸檔與本機 commit。
+**鐵律**：只要 Git repository 有設定 remote（例如 `origin`），在 `scp` 建立分支與 `scc` 歸檔合併時，都會**自動執行 `git push` 推送至 remote**。如果 push 失敗，只回報認證或網路問題，不會回滾已完成的文件歸檔與本機 commit。
 
 ## 多人協作解決方案（Git-Flow 與延遲綁定 ID）
 
@@ -397,12 +397,12 @@ docs(REQ-001): 番茄時鐘 - 新增專注與休息計時需求
 
 ```mermaid
 flowchart TD
-    A["開新需求: scp 或 sa-spec new --branch"] --> B["建立並切換至 feat/cart 分支<br/>以 project/cart/ 建立草稿目錄"]
+    A["開新需求: scp 或 sa-spec new --branch"] --> B["建立並切換至 feat/cart 分支<br/>若有 remote 自動推分支至遠端<br/>以 project/cart/ 建立草稿目錄"]
     B --> C["AI 分析與起草: sca<br/>內部使用 {{REQ_ID}} 佔位<br/>自動同步 master 規格防護"]
     C --> D{"使用者確認通過<br/>執行 scc 或 finalize"}
-    D --> E["自動查詢主分支最新序號 N"]
+    D --> E["先推分支至 remote 並同步遠端狀態<br/>再查詢主分支最新序號 N"]
     E --> F["自動定號為 project/REQ-N+1-cart/<br/>批次置換 {{REQ_ID}} 並建立 commit"]
-    F --> G["自動合併至 master 主分支<br/>動態重新生成 project/index.md"]
+    F --> G["自動合併至 master 主分支並推上 remote<br/>動態重新生成 project/index.md"]
     G --> H["完成閉環：零衝突、序號永遠連續！"]
 ```
 
@@ -415,7 +415,7 @@ flowchart TD
   ```text
   scp 購物車結帳需求
   ```
-  AI 收到後，會**自動在背景執行 `git checkout -b feat/cart-checkout` 建立並切換分支**，並在 `project/cart-checkout/` 建立草稿目錄！
+  AI 收到後，會**自動在背景執行 `git checkout -b feat/cart-checkout` 建立並切換分支**，檢查若有設定 Git remote 則自動將分支推上遠端（`git push -u origin feat/cart-checkout`），並在 `project/cart-checkout/` 建立草稿目錄！
 * **方式 B（CLI 終端指令）**：
   ```bash
   sa-spec new --name cart-checkout --branch
@@ -425,7 +425,7 @@ flowchart TD
 #### 2. 分析與衝突檢查（規格基線同步）
 在分支上執行 `spec:analyze`（或 `sca`）前，工具會確認已取得 `master`（或 `origin/master`）的最新規格，確保是以全專案最新基準進行影響評估，避免因分支落後而漏檢權限、API 或資料表衝突。
 
-#### 3. 確認歸檔與延遲定號（自動領號 + 自動合併回主分支）
+#### 3. 確認歸檔與延遲定號（先推分支 + 自動領號 + 自動合併並推上 Remote）
 當需求規格經使用者確認無誤，準備歸檔時：
 
 * **方式 A（純 AI 自動化，最推薦）**：在 AI 側邊欄直接輸入：
@@ -433,15 +433,16 @@ flowchart TD
   scc
   ```
   AI 收到後會自動完成全自動 Git-Flow 閉環作業：
-  1. **自動向主分支查詢並取得新號**：查詢 master/main 目前最大序號（例如最大是 `REQ-005`，自動領取最新號 `REQ-006`），避免號碼競爭。
-  2. **自動定名更名**：使用 `git mv` 將目錄重命名為 `project/REQ-006-cart-checkout`，並將目錄內所有檔案的 `{{REQ_ID}}` 批次置換為 `REQ-006`。
-  3. **自動建立本機提交**：在 feature 分支自動建立 commit `docs(REQ-006): cart-checkout - 規格確認歸檔`。
-  4. **自動合併至主分支**：自動切換至主分支（`git checkout master`），將 feature 分支自動合併回主分支（`git merge feat/cart-checkout`），並重新生成主分支的 `project/index.md`，保證主分支規格最新且永遠不衝突！
+  1. **先推分支至 Remote 並同步遠端**：若 Git 有設定 remote，先將目前分支推送至遠端並執行 `git fetch` 同步最新狀態。
+  2. **自動向主分支查詢並取得新號**：查詢 master/main（含遠端主分支）目前最大序號（例如最大是 `REQ-005`，自動領取最新號 `REQ-006`），避免號碼競爭。
+  3. **自動定名更名**：使用 `git mv` 將目錄重命名為 `project/REQ-006-cart-checkout`，並將目錄內所有檔案的 `{{REQ_ID}}` 批次置換為 `REQ-006`。
+  4. **自動建立提交並推送分支**：在 feature 分支自動建立 commit `docs(REQ-006): cart-checkout - 規格確認歸檔`，若有 remote 則同步推送至遠端。
+  5. **自動合併至主分支並推送至 Remote**：自動切換至主分支（`git checkout master`），將 feature 分支自動合併回主分支（`git merge feat/cart-checkout`），重新生成主分支的 `project/index.md`，若有 remote 則自動將主分支推送至遠端（`git push origin master`），保證主分支規格最新且永遠不衝突！
 * **方式 B（CLI 終端指令）**：
   ```bash
   sa-spec finalize --name cart-checkout
   ```
-  CLI 同樣會自動查詢主分支最新序號定號、置換佔位符、完成提交並自動合併回 master！若想保留在當前分支手動處理，可加上 `--no-merge` 參數。
+  CLI 同樣會先推分支至 remote、查詢主分支最新序號定號、置換佔位符、完成提交、自動合併回 master 並推送至 remote！若想保留在當前分支手動處理，可加上 `--no-merge` 參數。
 
 #### 4. 消除索引合併衝突（`sa-spec reindex`）
 `project/index.md` 改為由目錄動態生成的「衍生清單」，不再依賴脆弱的手動 append：
@@ -702,7 +703,7 @@ git status
 git log -1 --oneline
 ```
 
-若要推送到 remote，需要明確要求 AI 執行 push，或自行執行：
+若 Git 有設定 remote，AI 與 CLI 會在建立分支與歸檔合併時自動執行 `git push` 推送至遠端；若當時尚未設定 remote，事後也可手動執行：
 
 ```bash
 git push origin main
@@ -719,10 +720,15 @@ git push origin master
 - 未經使用者確認，不得標示為 `已審核`。
 - `spec:analyze` 發現衝突時不得產出最終文件，也不得修改既有需求文件。
 - `project/system-spec.md` 只能在 `spec:commit` 依使用者確認內容更新。
-- `spec:commit` 會自動建立本機 Git commit；remote push 需使用者明確要求或啟用 auto-push。
+- **鐵律**：只要 Git 有設定 remote，`scp` 與 `scc` 都會自動將分支與主分支推送至 remote。
 - 一次最多問 3 個待確認問題，優先詢問會影響範圍、資料、權限、API、DB 或驗收的問題。
 
 ## 更新紀錄
+
+### v0.2.6
+- **Git Remote 自動推送鐵律（Remote Auto-Push）**：
+  - **`scp` 建立分支自動推上遠端**：執行 `spec:propose`（`scp`）或 `sa-spec new --branch` 建立 feature 分支後，自動偵測是否有設定 Git remote；若有則立即將新分支推送至遠端（`git push -u <remote> feat/<name>`）。
+  - **`scc` 先推分支再領號與主分支自動推送**：執行 `spec:commit`（`scc`）或 `sa-spec finalize` 時，若有設定 Git remote，會**先將目前分支推送至 remote 並同步遠端狀態**，接著才查詢主分支（`master`/`main`）最新可用序號定號，完成 feature 分支提交與推送、自動合併回主分支後，**自動將主分支推送至 remote**。
 
 ### v0.2.5
 - **支援前端 UI 線框圖（PlantUML Salt Code-as-Wireframe）**：

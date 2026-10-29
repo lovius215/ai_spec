@@ -102,18 +102,18 @@ sa-spec --version
 
 ```mermaid
 flowchart TD
-    A["要件提案: scp または sa-spec new --branch"] --> B["feat/cart ブランチを作成して切替<br/>ドラフトディレクトリ: project/cart/"]
+    A["要件提案: scp または sa-spec new --branch"] --> B["feat/cart ブランチを作成して切替<br/>remote があればブランチを自動 push<br/>ドラフトディレクトリ: project/cart/"]
     B --> C["AI による分析: sca<br/>内部で {{REQ_ID}} プレースホルダー使用<br/>master の最新仕様との競合予防チェック"]
     C --> D{"ユーザー承認?<br/>scc または finalize を実行"}
-    D --> E["master から最新の利用可能番号 N を自動取得"]
+    D --> E["先にブランチを remote へ push & fetch<br/>その後 master から最新番号 N を自動取得"]
     E --> F["project/REQ-N+1-cart/ に自動正式採番<br/>{{REQ_ID}} を置換してコミット"]
-    F --> G["master ブランチへ自動マージ<br/>project/index.md を動的に再生成"]
+    F --> G["master ブランチへ自動マージ＆remote へ push<br/>project/index.md を動的に再生成"]
     G --> H["自動閉ループ：競合ゼロ、連番維持！"]
 ```
 
-1. **ドラフト時は番号を奪い合わない**: `scp` または `sa-spec new --branch` でブランチを切り、`project/cart/` と `{{REQ_ID}}` を使って作業します。途中で要件を破棄する場合も、ブランチを削除するだけで済み、欠番（ゴーストID）を残しません。
+1. **ドラフト時は番号を奪い合わない**: `scp` または `sa-spec new --branch` でブランチを切り（Git remote が設定されていれば自動的に remote へ push）、`project/cart/` と `{{REQ_ID}}` を使って作業します。途中で要件を破棄する場合も、ブランチを削除するだけで済み、欠番（ゴーストID）を残しません。
 2. **基線同期で競合見落としを防止**: `spec:analyze` の実行前に master の最新状態を取得し、他メンバーがマージした最新の API やテーブル変更を反映して競合チェックを行います。
-3. **自動採番と主ブランチへの自動マージ**: `scc` または `sa-spec finalize` を実行すると、**master から次の番号を自動取得して採番・置換・コミット**し、**master ブランチへ自動切り替え＆自動マージ**を行い、`project/index.md` を最新状態に再生成します。
+3. **先行 push・自動採番・主ブランチ自動マージ**: `scc` または `sa-spec finalize` を実行すると、remote が存在する場合は**まずブランチを remote に push して同期**した後、**master から次の番号を自動取得して採番・置換・コミット**し、**master ブランチへ自動切り替え＆自動マージ・`project/index.md` 再生成・remote への自動 push** までを一気通貫で行います。
 4. **インデックスのコンフリクト解消**: `sa-spec reindex` でディレクトリから常に決定論的に `project/index.md` を再構築します。
 
 ---

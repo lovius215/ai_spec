@@ -306,6 +306,12 @@ function createReqTemplate(args, label = "new") {
       } else {
         console.log(`提示: 分支切換略過 (${(branchRes.stderr || "").trim() || "可能是已有同名分支或未在 git 目錄"})`);
       }
+
+      const remote = getDefaultRemote();
+      const activeBranch = getCurrentBranch() || branchName;
+      if (remote && activeBranch) {
+        pushBranchToRemote(remote, activeBranch);
+      }
     }
 
     const reqDir = path.join("project", slug);
@@ -349,6 +355,32 @@ function createReqTemplate(args, label = "new") {
   printResultList(label, results);
 }
 
+function getDefaultRemote() {
+  const res = spawnSync("git", ["remote"], { cwd, encoding: "utf8" });
+  if (res.status === 0 && res.stdout) {
+    const remotes = res.stdout
+      .split("\n")
+      .map((r) => r.trim())
+      .filter(Boolean);
+    if (remotes.includes("origin")) return "origin";
+    if (remotes.length > 0) return remotes[0];
+  }
+  return null;
+}
+
+function pushBranchToRemote(remote, branch) {
+  if (!remote || !branch) return false;
+  console.log(`[Git] 偵測到遠端 (${remote})，正在將分支 ${branch} 推送至 ${remote}/${branch}...`);
+  const pushRes = spawnSync("git", ["push", "-u", remote, branch], { cwd, encoding: "utf8" });
+  if (pushRes.status === 0) {
+    console.log(`[Git] 已成功將分支 ${branch} 推送至 ${remote}/${branch}`);
+    return true;
+  } else {
+    console.warn(`[Git 警告] 推送分支 ${branch} 至 ${remote} 失敗: ${(pushRes.stderr || pushRes.stdout || "").trim()}`);
+    return false;
+  }
+}
+
 function detectMainBranch() {
   const branches = ["main", "master"];
   for (const b of branches) {
@@ -367,7 +399,7 @@ function getCurrentBranch() {
   return null;
 }
 
-function getLatestMaxReqId(projectDir, mainBranch) {
+function getLatestMaxReqId(projectDir, mainBranch, remoteName = "origin") {
   let maxIdNum = 0;
   // 1. 掃描本地工作目錄既有 REQ-xxx
   if (fs.existsSync(projectDir)) {
@@ -400,7 +432,8 @@ function getLatestMaxReqId(projectDir, mainBranch) {
     }
 
     // 3. 掃描遠端主分支 (若有設定 remote)
-    const gitRemoteLs = spawnSync("git", ["ls-tree", `origin/${mainBranch}:project`], { cwd, encoding: "utf8" });
+    const targetRemote = remoteName || "origin";
+    const gitRemoteLs = spawnSync("git", ["ls-tree", `${targetRemote}/${mainBranch}:project`], { cwd, encoding: "utf8" });
     if (gitRemoteLs.status === 0 && gitRemoteLs.stdout) {
       for (const line of gitRemoteLs.stdout.split("\n")) {
         const parts = line.split("\t");
@@ -464,10 +497,17 @@ function finalizeReq(args) {
     return;
   }
 
-  // 1. 自動向本地與主分支查詢最新已使用的最大 REQ 序號
+  // 1. 先檢查是否有 remote，若有則先將目前分支推上 remote 並同步遠端狀態，接著才查詢主分支最新 REQ 序號
+  const remote = getDefaultRemote();
   const mainBranch = detectMainBranch();
   const currentBranch = getCurrentBranch();
-  const maxIdNum = getLatestMaxReqId(projectDir, mainBranch);
+
+  if (remote && currentBranch) {
+    pushBranchToRemote(remote, currentBranch);
+    spawnSync("git", ["fetch", remote], { cwd, encoding: "utf8" });
+  }
+
+  const maxIdNum = getLatestMaxReqId(projectDir, mainBranch, remote);
 
   const nextIdNum = maxIdNum + 1;
   const nextId = `REQ-${String(nextIdNum).padStart(3, "0")}`;
@@ -518,14 +558,17 @@ function finalizeReq(args) {
 
   console.log(`\n 需求已成功定號歸檔為: ${nextId} (${finalDirName})`);
 
-  // 5. 自動提交與自動合併回主分支 (Git-Flow 閉環)
+  // 5. 自動提交、自動合併回主分支與自動推送至 remote (Git-Flow 閉環)
   const shouldAutoMerge = !args.includes("--no-merge");
   if (currentBranch && mainBranch && currentBranch !== mainBranch) {
     console.log(`[Git] 正在為分支 ${currentBranch} 建立歸檔 commit...`);
     spawnSync("git", ["add", "project/"], { cwd, encoding: "utf8" });
-    const commitRes = spawnSync("git", ["commit", "-m", `docs(${nextId}): ${name} - 規格確認歸檔`], { cwd, encoding: "utf8" });
+    const commitRes = spawnSync("git", ["commit", "-m", `docs(${nextId}): ${rawName} - 規格確認歸檔`], { cwd, encoding: "utf8" });
     if (commitRes.status === 0) {
-      console.log(`[Git] 分支 ${currentBranch} 提交完成: docs(${nextId}): ${name} - 規格確認歸檔`);
+      console.log(`[Git] 分支 ${currentBranch} 提交完成: docs(${nextId}): ${rawName} - 規格確認歸檔`);
+    }
+    if (remote) {
+      pushBranchToRemote(remote, currentBranch);
     }
 
     if (shouldAutoMerge) {
@@ -546,7 +589,10 @@ function finalizeReq(args) {
           spawnSync("git", ["add", "project/index.md"], { cwd, encoding: "utf8" });
           spawnSync("git", ["commit", "-m", `chore: update project/index.md for ${nextId}`], { cwd, encoding: "utf8" });
         }
-        console.log(` 全部歸檔流程完成！已自動領取新號 ${nextId} 並自動合併回主分支 ${mainBranch}。`);
+        if (remote) {
+          pushBranchToRemote(remote, mainBranch);
+        }
+        console.log(` 全部歸檔流程完成！已自動領取新號 ${nextId} 並自動合併回主分支 ${mainBranch}${remote ? ` 且推送至 ${remote}` : ""}。`);
       } else {
         console.error(`[Git 警告] 合併至 ${mainBranch} 發生衝突，請手動確認衝突狀況：\n${(mergeRes.stderr || mergeRes.stdout || "").trim()}`);
       }
@@ -556,12 +602,15 @@ function finalizeReq(args) {
     }
   } else if (currentBranch && currentBranch === mainBranch) {
     spawnSync("git", ["add", "project/"], { cwd, encoding: "utf8" });
-    spawnSync("git", ["commit", "-m", `docs(${nextId}): ${name} - 規格確認歸檔`], { cwd, encoding: "utf8" });
+    spawnSync("git", ["commit", "-m", `docs(${nextId}): ${rawName} - 規格確認歸檔`], { cwd, encoding: "utf8" });
     console.log(`[Git] 已直接於主分支 ${mainBranch} 建立提交完成。`);
+    if (remote) {
+      pushBranchToRemote(remote, mainBranch);
+    }
   } else {
     console.log(`建議接下來執行：`);
     console.log(`  git add project/`);
-    console.log(`  git commit -m "docs(${nextId}): ${name} - 規格確認歸檔"`);
+    console.log(`  git commit -m "docs(${nextId}): ${rawName} - 規格確認歸檔"`);
   }
 }
 

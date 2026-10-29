@@ -102,18 +102,18 @@ To solve sequential ID collisions and Git merge conflicts in team environments, 
 
 ```mermaid
 flowchart TD
-    A["New Requirement: scp or sa-spec new --branch"] --> B["Create & switch to feat/cart branch<br/>Draft directory: project/cart/"]
+    A["New Requirement: scp or sa-spec new --branch"] --> B["Create & switch to feat/cart branch<br/>Push branch to remote if configured<br/>Draft directory: project/cart/"]
     B --> C["AI Analysis: sca<br/>Uses {{REQ_ID}} placeholder<br/>Pre-check against master spec baseline"]
     C --> D{"User Approved?<br/>Execute scc or finalize"}
-    D --> E["Auto query latest sequential ID N from master"]
-    E --> F["Auto assign project/REQ-N+1-cart/<br/>Replace {{REQ_ID}} and commit on feature branch"]
-    F --> G["Auto merge into master branch<br/>Dynamically rebuild project/index.md"]
+    D --> E["Push branch to remote & fetch first<br/>Then query latest ID N from master"]
+    E --> F["Auto assign project/REQ-N+1-cart/<br/>Replace {{REQ_ID}}, commit & push branch"]
+    F --> G["Auto merge into master & push to remote<br/>Dynamically rebuild project/index.md"]
     G --> H["Closed Loop: Zero conflicts, Continuous IDs!"]
 ```
 
-1. **Draft Phase (No ID Contention)**: Run `sa-spec new --name checkout --branch` or prompt `scp checkout` in AI chat. It creates `feat/checkout` and `project/checkout/` using `{{REQ_ID}}`. Parallel branches never collide. If an idea is abandoned, deleting the branch leaves zero ghost IDs.
+1. **Draft Phase (No ID Contention)**: Run `sa-spec new --name checkout --branch` or prompt `scp checkout` in AI chat. It creates `feat/checkout` (and automatically pushes it to Git remote if configured) and `project/checkout/` using `{{REQ_ID}}`. Parallel branches never collide. If an idea is abandoned, deleting the branch leaves zero ghost IDs.
 2. **Baseline Protection**: `spec:analyze` fetches latest `master` before analyzing to prevent missing newly merged API or table changes.
-3. **Late-Binding Finalize & Auto-Merge**: Running `scc` in AI chat (or `sa-spec finalize --name checkout`) automatically inspects master's latest ID, assigns `REQ-xxx`, replaces placeholders, commits, and **automatically merges into master** (`git checkout master && git merge feat/checkout`), then updates `project/index.md`.
+3. **Late-Binding Finalize, Auto-Merge & Remote Push**: Running `scc` in AI chat (or `sa-spec finalize --name checkout`) first pushes the feature branch to remote (if a remote exists) and syncs remote refs, then inspects master's latest ID, assigns `REQ-xxx`, replaces placeholders, commits, **automatically merges into master** (`git checkout master && git merge feat/checkout`), updates `project/index.md`, and pushes `master` to remote.
 4. **Conflict-Free Reindex**: `sa-spec reindex` builds `project/index.md` on the fly from disk.
 
 ---

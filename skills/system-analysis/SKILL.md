@@ -21,9 +21,9 @@ description: 用 init、propose、analyze、commit 四段流程整理需求，�
 | 指令 | 簡寫 | 用途 | 執行規則 |
 |---|---|---|---|
 | `spec:init` | `sci` | 初始化 | 載入並遵守 `AGENTS.md`、本 skill 與必要規則，確認 `project/` 結構是否存在。 |
-| `spec:propose` | `scp` | 提出需求 | 使用者提出需求後，自動依需求名稱建立並切換至專屬 feature 分支（`feat/<name>`，若已在 feature branch 則沿用），建立草稿目錄（內部使用 `{{REQ_ID}}` 佔位），整理需求摘要、目標、初步流程與待確認事項；不歸檔、不修改既有需求。 |
+| `spec:propose` | `scp` | 提出需求 | 使用者提出需求後，自動依需求名稱建立並切換至專屬 feature 分支（`feat/<name>`，若已在 feature branch 則沿用），檢查是否有設定 Git remote，若有則自動將分支推上 remote（`git push -u <remote> feat/<name>`），並建立草稿目錄（內部使用 `{{REQ_ID}}` 佔位），整理需求摘要、目標、初步流程與待確認事項；不歸檔、不修改既有需求。 |
 | `spec:analyze` | `sca` | 分析與起草 | 先檢查新需求是否與 `project/` 內所有既有需求衝突；無衝突才產出 SRS、UML、OpenAPI、DB Schema 草稿；有衝突則只列出衝突與待釐清問題，待使用者釐清後再次執行 `spec:analyze`（或 `sca`）。 |
-| `spec:commit` | `scc` | 確認歸檔 | 只把使用者已確認的版本歸檔到該需求資料夾，自動向主分支確認最新可用序號定號（`REQ-xxx`）、替換佔位符，更新 `project/index.md`、`project/system-spec.md` 與 `history.md`，建立本機 Git commit 後，自動切換回主分支並完成合併。 |
+| `spec:commit` | `scc` | 確認歸檔 | 只把使用者已確認的版本歸檔到該需求資料夾；若有 Git remote 則先將目前分支推上 remote 並同步遠端狀態，接著才查詢主分支（`master`/`main`）最新可用序號定號（`REQ-xxx`）、替換佔位符，更新 `project/index.md`、`project/system-spec.md` 與 `history.md`，建立 Git commit（若有 remote 則推送分支），再自動切換回主分支完成合併並推送到 remote。 |
 
 ## 硬性限制
 
@@ -46,10 +46,14 @@ description: 用 init、propose、analyze、commit 四段流程整理需求，�
 - `spec:commit` 只能套用已由 `spec:analyze` 產出的、且使用者已確認的無衝突版本。
 - `handoff.md` 只能根據已確認的 SRS、UML、OpenAPI、DB Schema 與限制整理，不得新增未確認的開發假設。
 - 交給 OpenSpec 或其他 AI 開發工具時，必須指定它先閱讀 `handoff.md`，並以 `handoff.md` 作為開發入口與限制摘要；其他規格文件作為詳細來源。
+- **鐵律（Git Remote 自動推送強制規範）**：只要 Git repository 有設定 remote（例如 `origin`），所有分支建立與提交變更**都必須自動推送（`git push`）到 remote**，無需等待使用者額外指示；若 push 失敗時只回報認證或網路問題，不得回滾已完成的文件歸檔與本機 commit。
 - `spec:commit` 完成文件歸檔後，必須自動建立本機 Git commit；commit message 以需求編號與需求名稱為主，並加上簡短需求說明，格式為 `docs(REQ-001): 需求名稱 - 簡短需求說明`。
-- `spec:commit` 自動合併到主分支（Git-Flow 閉環）：完成 feature 分支 commit 後，若目前處於 feature 分支（`feat/<name>`），AI 必須自動切換回主分支（優先偵測 `main` 或 `master`），拉取/檢查最新狀態並自動合併該 feature 分支 (`git checkout master && git merge feat/<name>`)，隨後在主分支重新生成 `project/index.md` 索引，確保主分支規格清單完整且無衝突。
-- `spec:commit` 只有在使用者明確要求推送 remote，或專案設定啟用 auto-push 時，才可執行 `git push`；push 失敗時只回報認證或網路問題，不得回滾已完成的文件歸檔與本機 commit。
-- 多人協作與 Git-Flow 模式（延遲綁定序號與自動合併）：支援多人平行開發。執行 `spec:propose`（或 `scp`）時，若目前處於 master/main 分支，AI 必須自動依需求名稱建立並切換至專屬 feature branch（如 `feat/<name>`），並在 `project/<name>/` 建立草稿目錄，內部使用 `{{REQ_ID}}` 佔位，無需使用者手動敲 CLI；執行 `spec:analyze` 前應先確保取得 master 最新規格以防漏檢衝突；執行 `spec:commit` 歸檔時自動向 master 確認最新可用序號定號，自動將目錄定名為正式 `REQ-xxx`、替換內部佔位符、完成提交並自動合併回 master，避免多人合併時的序號競爭與索引衝突。
+- `spec:commit` 歸檔與自動合併閉環流程（含 Remote 同步順序）：
+  1. **先推分支至 Remote**：執行 `spec:commit`（或 `scc`）時，若檢查到 Git 有設定 remote，必須**先將目前分支推送至 remote**（`git push -u <remote> <branch>`）並同步遠端最新狀態（`git fetch <remote>`）。
+  2. **再查主分支最新版號**：接著才向主分支（`main` / `master` 及遠端主分支）查詢最新已使用序號，決定下一個可用序號（`REQ-xxx`）。
+  3. **定號歸檔與提交**：將草稿目錄重命名為正式 `project/REQ-xxx-<name>`、替換內部 `{{REQ_ID}}` 佔位符、更新索引與規格後，在 feature 分支建立 commit；若有 remote 則同步推送該 feature 分支至 remote。
+  4. **自動合併回主分支並推送**：若目前處於 feature 分支（`feat/<name>`），AI 必須自動切換回主分支（優先偵測 `main` 或 `master`），拉取/檢查最新狀態並自動合併該 feature 分支 (`git checkout master && git merge feat/<name>`)，隨後在主分支重新生成 `project/index.md` 索引；若有設定 remote，**必須自動將主分支推送至 remote**（`git push <remote> <mainBranch>`）。
+- 多人協作與 Git-Flow 模式（延遲綁定序號與自動合併）：支援多人平行開發。執行 `spec:propose`（或 `scp`）時，若目前處於 master/main 分支，AI 必須自動依需求名稱建立並切換至專屬 feature branch（如 `feat/<name>`），檢查若有設定 Git remote 則立即將新分支推上 remote（`git push -u <remote> feat/<name>`），並在 `project/<name>/` 建立草稿目錄，內部使用 `{{REQ_ID}}` 佔位，無需使用者手動敲 CLI；執行 `spec:analyze` 前應先確保取得 master 最新規格以防漏檢衝突；執行 `spec:commit` 歸檔時先推分支到 remote，再向 master 確認最新可用序號定號，自動將目錄定名為正式 `REQ-xxx`、替換內部佔位符、完成提交、自動合併回 master 並推上 remote，避免多人合併時的序號競爭與索引衝突。
 - 文件未經使用者確認，不得標示為 `已審核`。
 - `uml/` 內的 UML 圖不限單一 UML 圖型；`spec:analyze` 必須依需求選擇最能說明流程、互動、狀態、資料關係或介面佈局的圖表，例如活動圖、循序圖、使用案例圖、狀態圖、類別圖；**若需求涉及前端 UI 或使用者操作畫面，必須在 `uml/wireframe.puml` 產出線框圖（使用 PlantUML Salt 語法：`@startsalt ... @endsalt`）**；純後端需求則在 `handoff.md` 明確標記「無 UI 介面需求」。**嚴禁將多張圖混在同一個檔案中**，必須在需求資料夾下的 `uml/` 目錄拆分成獨立的 `.puml` 檔案（例如 `uml/main.puml`、`uml/sequence.puml`、`uml/wireframe.puml`），且每個檔案只能包含一組 `@start...` 與 `@end...`，以避免 PlantUML 渲染或預覽失敗。
 - 一次最多問 3 個待確認問題，優先詢問會影響範圍、資料、權限、API、DB 或驗收的問題。
@@ -137,15 +141,15 @@ project/
 docs(REQ-001): 需求名稱 - 簡短需求說明
 ```
 
-只有在使用者明確要求推送 remote，或專案設定啟用 auto-push 時，才可執行 `git push`。若 push 失敗，只回報認證或網路問題，不得回滾已完成的文件歸檔與本機 commit。
+只要 Git repository 有設定 remote（例如 `origin`），在 `spec:commit` 歸檔時必須先將目前分支推送至 remote 並同步遠端狀態，接著查詢主分支最新版號、完成定號歸檔與 commit、合併回主分支後，自動將主分支推送至 remote。若 push 失敗，只回報認證或網路問題，不得回滾已完成的文件歸檔與本機 commit。
 
 ## 狀態機
 
 ```text
-init (sci) -> propose (scp) -> analyze (sca)
+init (sci) -> propose (scp, 建分支並推至 remote) -> analyze (sca)
 
 analyze 無衝突 -> 產出待確認版本 -> commit (scc)
 analyze 有衝突 -> 釐清問題 -> analyze (sca)
 
-commit (scc) -> 自動拿新號定號 -> feature commit -> 自動合併至主分支 (master/main)
+commit (scc) -> 先推分支至 remote -> 查 master 最新版號定號 -> feature commit -> 自動合併至主分支並推至 remote
 ```

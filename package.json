@@ -1,6 +1,6 @@
 {
   "name": "@loviusc/sa-spec",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Personal system analysis documentation workspace CLI",
   "publishConfig": {
     "access": "public",
