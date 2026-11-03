@@ -1,6 +1,6 @@
 {
   "name": "@loviusc/sa-spec",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Personal system analysis documentation workspace CLI",
   "publishConfig": {
     "access": "public",
@@ -21,11 +21,17 @@
     "bin/",
     "src/",
     "templates/",
+    "install.sh",
+    "update.sh",
+    "uninstall.sh",
+    "install.bat",
+    "update.bat",
+    "uninstall.bat",
     "readme.md",
     "README*.md"
   ],
   "scripts": {
-    "check": "node --check src/cli.js && node --check bin/sa-spec.js"
+    "check": "node --check src/cli.js && node --check src/pdf.js && node --check bin/sa-spec.js"
   },
   "keywords": [
     "system-analysis",

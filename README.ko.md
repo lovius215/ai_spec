@@ -22,7 +22,7 @@
 
 OpenSpec, Claude Code, OpenAI Codex, Gemini CLI 등 코드 생성 AI 도구가 구현을 시작하기 전에, 요구사항의 범위, 경계, 데이터 모델, API 인터페이스, 권한 매트릭스, 인수 조건을 사전에 명확히 정의하여 후속 개발이 안전하고 명확한 경계 내에서 진행되도록 보장합니다.
 
-AI 워크플로는 4가지 표준 명령어(별칭 지원)를 기반으로 동작합니다:
+AI 워크플로는 5가지 표준 명령어(별칭 지원)를 기반으로 동작합니다:
 
 | 표준 명령어 | 별칭 | 단계 | 설명 |
 |---|---|---|---|
@@ -30,6 +30,7 @@ AI 워크플로는 4가지 표준 명령어(별칭 지원)를 기반으로 동�
 | `spec:propose` | `scp` | 요구사항 제안 | 기존 사양을 변경하지 않고 목표, 요약, 초기 흐름 및 미확인 사항을 정리합니다. |
 | `spec:analyze` | `sca` | 분석 및 초안 작성 | 기존 요구사항, API, DB와의 충돌 여부를 검사하고, 문제가 없을 때만 SRS, UML, OpenAPI, DB Schema 초안을 작성합니다. |
 | `spec:commit` | `scc` | 확인 및 보관 | 사용자가 승인한 버전을 정식 번호로 보관하고, 인덱스를 갱신하며 로컬 Git 커밋을 생성합니다. |
+| `spec:pdf` | `spd` | PDF 내보내기 | 지정한 `.md` 파일이나 요구사항 폴더(`REQ-001` 등)를 PDF 사양서로 변환합니다. |
 
 보관된 각 요구사항은 독립적이고 완전한 폴더로 구성됩니다:
 
@@ -66,6 +67,20 @@ sa-spec이 요구사항과 경계를 명확히 정의하고, AI 개발 도구가
 - npm
 - Git
 
+### 크로스 플랫폼 독립 스크립트 (`.sh` / `.bat`)
+
+```bash
+# macOS / Linux
+./install.sh          # 설치 (install)
+./update.sh           # 최신 버전 업데이트 (update)
+./uninstall.sh        # 제거 (uninstall)
+
+# Windows (더블클릭 또는 CMD / PowerShell 실행)
+install.bat
+update.bat
+uninstall.bat
+```
+
 ### npm 글로벌 설치
 
 ```bash
@@ -88,6 +103,7 @@ sa-spec --version
 | `sa-spec init [--full] [--lang <lang>]` | 워크스페이스 골격을 생성합니다 (`zh-TW`, `en`, `zh-CN`, `ja`, `ko` 지원, 기본값 `zh-TW`). |
 | `sa-spec new [--id REQ-001] --name login [--branch]` | 요구사항 템플릿 폴더를 생성합니다. `--id` 생략 시 다중 사용자 초안 브랜치(`feat/<name>`)로 생성됩니다. |
 | `sa-spec finalize --name login` | 초안 요구사항에 최신 연속 번호를 할당하고 폴더명 변경, `{{REQ_ID}}` 치환 및 인덱스를 자동 재구축합니다. |
+| `sa-spec pdf <target> [--split] [--output out.pdf]` | 지정한 `.md` 파일 또는 요구사항(`REQ-001`)을 통합 또는 개별 PDF로 변환합니다 (`--all` 전체 내보내기). |
 | `sa-spec reindex` | `project/REQ-*` 디렉토리를 스캔하여 번호순으로 정렬된 `project/index.md`를 동적으로 재생성합니다. |
 | `sa-spec check` | 필수 파일과 시스템 사양 상태를 검증합니다. |
 | `sa-spec status` | 요구사항 및 시스템 사양 현황을 확인합니다. |

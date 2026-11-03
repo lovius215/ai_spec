@@ -32,6 +32,7 @@ sa-spec init --full
 - `spec:propose` (`scp`) $\to$ **AI 自動建立 feature 分支與草稿目錄**（零手動指令）
 - `spec:analyze` (`sca`) $\to$ AI 衝突檢查並產出規格文件草稿
 - `spec:commit` (`scc`) $\to$ **AI 自動向主分支領取新號並自動合併回主分支！**
+- `spec:pdf` (`spd`) $\to$ **一鍵將單一 `.md` 或整個需求規格書轉為高品質 PDF！**
 
 👉 **Language Guides: [English](./README.en.md) | [繁體中文](./README.zh-TW.md) | [简体中文](./README.zh-CN.md) | [日本語](./README.ja.md) | [한국어](./README.ko.md)**
 
@@ -39,7 +40,7 @@ sa-spec init --full
 
 `sa-spec` 是一個輕量的系統分析文件工作台，用固定流程把需求想法整理成可確認、可歸檔、可檢查的文件。
 
-AI 工作流只使用四個指令，並支援簡寫別名（兩者等價）：
+AI 工作流使用五個指令，並支援簡寫別名（兩者等價）：
 
 | 標準指令 | 簡寫 | 說明 |
 |---|---|---|
@@ -47,6 +48,7 @@ AI 工作流只使用四個指令，並支援簡寫別名（兩者等價）：
 | `spec:propose` | `scp` | 提出需求並整理摘要 |
 | `spec:analyze` | `sca` | 衝突檢查與規格起草 |
 | `spec:commit` | `scc` | 確認歸檔並建立 Git commit |
+| `spec:pdf` | `spd` | 將指定 `.md` 或需求目錄匯出為 PDF |
 
 每個需求歸檔後固定包含：
 
@@ -94,6 +96,25 @@ sa-spec 先把需求說清楚，OpenSpec 再把需求做出來。
 node --version
 npm --version
 git --version
+```
+
+## 一鍵腳本管理（安裝 / 更新 / 解除安裝）
+
+專案內建獨立的跨平台腳本，直接執行對應檔案即可完成安裝、更新或解除安裝：
+
+### macOS / Linux (`.sh`)
+```bash
+./install.sh      # 安裝 sa-spec
+./update.sh       # 更新 sa-spec 至最新版本
+./uninstall.sh    # 解除安裝 sa-spec
+```
+
+### Windows (`.bat`)
+可直接雙擊執行，或在 CMD / PowerShell 輸入：
+```bat
+install.bat       &:: 安裝 sa-spec
+update.bat        &:: 更新 sa-spec 至最新版本
+uninstall.bat     &:: 解除安裝 sa-spec
 ```
 
 ## macOS 安裝
@@ -275,6 +296,7 @@ sa-spec init --full
 | `sa-spec init [--full] [--lang zh-TW|en|zh-CN|ja|ko]` | 建立文件骨架與規則文件（支援 5 種語言，預設 `zh-TW`）。 |
 | `sa-spec new [--id REQ-001] --name login [--branch]` | 建立需求資料夾與空白文件模板（未帶 `--id` 時啟用多人草稿模式，可選 `--branch` 自動建立並切換至 `feat/<name>` 分支）。 |
 | `sa-spec finalize --name login` | 將草稿需求定號歸檔為最新序號（自動計算最新號碼、重命名目錄、批次置換 `{{REQ_ID}}` 並重建索引）。 |
+| `sa-spec pdf <target> [--split] [--output out.pdf]` | 將指定 `.md` 轉為同名 `.pdf`，或將需求編號/目錄（如 `REQ-001`）整包合併匯出成一份完整規格書 PDF（加 `--split` 則各檔獨立轉出，`--all` 匯出全專案）。 |
 | `sa-spec reindex` | 掃描 `project/REQ-*` 目錄，依序號重新生成乾淨無衝突的 `project/index.md`。 |
 | `sa-spec check` | 檢查基本文件是否存在。 |
 | `sa-spec status` | 顯示系統規格與需求索引狀態。 |
@@ -324,6 +346,7 @@ Markdown、PlantUML、YAML、GitLens 這類套件可以提升閱讀與檢查體�
 | AI 工作流程 | `spec:propose` / `scp` | VS Code AI 對話側邊欄 | 整理使用者提出的需求。 |
 | AI 工作流程 | `spec:analyze` / `sca` | VS Code AI 對話側邊欄 | 檢查衝突並產出待確認草稿。 |
 | AI 工作流程 | `spec:commit` / `scc` | VS Code AI 對話側邊欄 | 歸檔已確認版本並建立本機 Git commit。 |
+| AI 工作流程 | `spec:pdf` / `spd` | VS Code AI 對話側邊欄 | 將指定 `.md` 或需求目錄匯出為 PDF 規格書。 |
 
 建議操作順序：
 
@@ -353,6 +376,7 @@ spec:commit  # 或簡寫 scc
 | `spec:propose` | `scp` | 使用者提出需求後，整理需求摘要、目標、初步流程與待確認事項。 |
 | `spec:analyze` | `sca` | 檢查是否與既有需求衝突；無衝突才產出 SRS、UML、OpenAPI、DB Schema 草稿。 |
 | `spec:commit` | `scc` | 使用者確認無衝突版本後，將版本歸檔到 `project/`，並建立本機 Git commit。 |
+| `spec:pdf` | `spd` | 將指定的 `.md` 檔或需求（如 `REQ-001`）匯出為高品質 PDF。 |
 
 狀態機：
 
@@ -724,6 +748,11 @@ git push origin master
 - 一次最多問 3 個待確認問題，優先詢問會影響範圍、資料、權限、API、DB 或驗收的問題。
 
 ## 更新紀錄
+
+### v0.2.7
+- **新增 Markdown 轉 PDF 指令（`spec:pdf` / `spd` / `sa-spec pdf`）與跨平台獨立安裝腳本**：
+  - **Markdown 轉 PDF 支援**：新增 AI 指令 `spec:pdf`（簡寫 `spd`）與 CLI 指令 `sa-spec pdf <target> [--split] [--output out.pdf]`（及 `--all`），支援單一 `.md` 轉換、需求目錄整包合併匯出成一份完整規格書 PDF，或加 `--split` 各檔獨立匯出。
+  - **跨平台獨立管理腳本**：新增 macOS / Linux（`install.sh`、`update.sh`、`uninstall.sh`）與 Windows（`install.bat`、`update.bat`、`uninstall.bat`）6 個獨立執行腳本，一鍵完成安裝、更新與解除安裝。
 
 ### v0.2.6
 - **Git Remote 自動推送鐵律（Remote Auto-Push）**：

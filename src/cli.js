@@ -1,6 +1,12 @@
 const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
+const {
+  buildHtmlDocument,
+  convertMarkdownFileToPdf,
+  buildMergedRequirementMarkdown,
+  renderHtmlToPdf
+} = require("./pdf");
 
 const cwd = process.cwd();
 const rootDir = path.resolve(__dirname, "..");
@@ -37,6 +43,9 @@ function main() {
       return;
     case "template":
       runTemplate(args.slice(1));
+      return;
+    case "pdf":
+      runPdf(args.slice(1));
       return;
     case "version":
     case "--version":
@@ -1021,6 +1030,171 @@ function printResultList(label, results) {
   }
 }
 
+function resolveReqTargetDir(target) {
+  const directAbs = path.resolve(cwd, target);
+  if (fs.existsSync(directAbs) && fs.statSync(directAbs).isDirectory()) {
+    return directAbs;
+  }
+
+  const projectDir = path.join(cwd, "project");
+  if (!fs.existsSync(projectDir)) return null;
+
+  const inProjectAbs = path.join(projectDir, target);
+  if (fs.existsSync(inProjectAbs) && fs.statSync(inProjectAbs).isDirectory()) {
+    return inProjectAbs;
+  }
+
+  const norm = target.toLowerCase().trim();
+  const entries = fs.readdirSync(projectDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const nameLower = entry.name.toLowerCase();
+    if (
+      nameLower === norm ||
+      nameLower.startsWith(`${norm}-`) ||
+      nameLower.endsWith(`-${slugify(target)}`)
+    ) {
+      return path.join(projectDir, entry.name);
+    }
+  }
+  return null;
+}
+
+function exportReqDirToPdf(reqAbsDir, options = {}) {
+  const { split = false, output = null, browser = null } = options;
+  const relDir = path.relative(cwd, reqAbsDir) || path.basename(reqAbsDir);
+  const results = [];
+
+  if (split) {
+    const entries = fs.readdirSync(reqAbsDir, { withFileTypes: true });
+    const mdFiles = entries
+      .filter((e) => e.isFile() && e.name.toLowerCase().endsWith(".md"))
+      .map((e) => path.join(reqAbsDir, e.name));
+
+    for (const mdFile of mdFiles) {
+      const res = convertMarkdownFileToPdf(mdFile, null, browser);
+      const relPdf = path.relative(cwd, mdFile.replace(/\.md$/i, ".pdf"));
+      if (res.ok) {
+        results.push({ action: "create", target: relPdf, message: `由 ${path.relative(cwd, mdFile)} 轉換 (${res.engine})` });
+      } else {
+        results.push({ action: "warn", target: relPdf, message: res.error });
+      }
+    }
+    return results;
+  }
+
+  const merged = buildMergedRequirementMarkdown(reqAbsDir);
+  if (!merged.markdown.trim()) {
+    results.push({ action: "warn", target: relDir, message: "目錄內無可匯出的規格文件內容" });
+    return results;
+  }
+
+  const defaultPdfPath = path.join(reqAbsDir, `${path.basename(reqAbsDir)}.pdf`);
+  const targetPdfPath = output ? path.resolve(cwd, output) : defaultPdfPath;
+  const html = buildHtmlDocument(merged.title, merged.markdown);
+  const res = renderHtmlToPdf(html, targetPdfPath, browser);
+  const relPdf = path.relative(cwd, targetPdfPath);
+
+  if (res.ok) {
+    results.push({
+      action: "create",
+      target: relPdf,
+      message: `已整包合併匯出完整需求規格書 PDF (${res.engine})`
+    });
+  } else {
+    results.push({ action: "warn", target: relPdf, message: res.error });
+  }
+  return results;
+}
+
+function runPdf(args = []) {
+  const split = args.includes("--split");
+  const all = args.includes("--all");
+  const output = getOption(args, "--output") || getOption(args, "-o");
+  const browser = getOption(args, "--browser");
+
+  const positional = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "--output" || a === "-o" || a === "--browser" || a === "--name" || a === "--target") {
+      i++;
+      continue;
+    }
+    if (a.startsWith("-")) continue;
+    positional.push(a);
+  }
+
+  const target = getOption(args, "--name") || getOption(args, "--target") || positional[0];
+
+  if (!target && !all) {
+    fail(
+      "Usage:\n  sa-spec pdf <file.md> [--output out.pdf]\n  sa-spec pdf <REQ-001|name|dir> [--split] [--output out.pdf]\n  sa-spec pdf --all [--split]"
+    );
+    return;
+  }
+
+  const results = [];
+
+  if (all) {
+    const projectDir = path.join(cwd, "project");
+    if (!fs.existsSync(projectDir)) {
+      fail("找不到 project/ 目錄。");
+      return;
+    }
+    for (const rootMd of ["system-spec.md", "index.md"]) {
+      const mdPath = path.join(projectDir, rootMd);
+      if (fs.existsSync(mdPath)) {
+        const res = convertMarkdownFileToPdf(mdPath, null, browser);
+        const relPdf = path.relative(cwd, mdPath.replace(/\.md$/i, ".pdf"));
+        results.push(
+          res.ok
+            ? { action: "create", target: relPdf, message: `已轉換 (${res.engine})` }
+            : { action: "warn", target: relPdf, message: res.error }
+        );
+      }
+    }
+    const entries = fs.readdirSync(projectDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const reqDir = path.join(projectDir, entry.name);
+        results.push(...exportReqDirToPdf(reqDir, { split, browser }));
+      }
+    }
+    printResultList("pdf", results);
+    return;
+  }
+
+  // 1. Check if target is a single .md file
+  const directFileAbs = path.resolve(cwd, target);
+  if (fs.existsSync(directFileAbs) && fs.statSync(directFileAbs).isFile()) {
+    const res = convertMarkdownFileToPdf(directFileAbs, output, browser);
+    const targetPdf = output
+      ? path.relative(cwd, path.resolve(cwd, output))
+      : path.relative(cwd, directFileAbs.replace(/\.[^.]+$/, ".pdf"));
+    if (res.ok) {
+      results.push({ action: "create", target: targetPdf, message: `單檔轉換完成 (${res.engine})` });
+    } else {
+      results.push({ action: "warn", target: targetPdf, message: res.error });
+      process.exitCode = 1;
+    }
+    printResultList("pdf", results);
+    return;
+  }
+
+  // 2. Check if target resolves to a requirement directory
+  const reqDirAbs = resolveReqTargetDir(target);
+  if (reqDirAbs) {
+    results.push(...exportReqDirToPdf(reqDirAbs, { split, output, browser }));
+    if (results.some((r) => r.action === "warn")) {
+      process.exitCode = 1;
+    }
+    printResultList("pdf", results);
+    return;
+  }
+
+  fail(`找不到指定的 Markdown 檔案或需求目錄: ${target}`);
+}
+
 function showHelp() {
   console.log(`sa-spec
 
@@ -1028,6 +1202,8 @@ Usage:
   sa-spec init [--full] [--lang zh-TW|en|zh-CN|ja|ko]
   sa-spec new [--id REQ-001] --name login [--branch]
   sa-spec finalize --name login [--no-merge]
+  sa-spec pdf <file.md|REQ-001|name> [--split] [--output out.pdf]
+  sa-spec pdf --all [--split]
   sa-spec reindex
   sa-spec check
   sa-spec upgrade [--dry-run]

@@ -22,7 +22,7 @@
 
 在 OpenSpec、Claude Code、OpenAI Codex、Gemini CLI 等代码生成工具介入之前，`sa-spec` 先行厘清需求边界、业务规则、数据模型、API 契约、权限矩阵与验收条件，避免 AI 编码时随心所欲破坏系统架构。
 
-AI 工作流使用四个标准指令（支持简写别名）：
+AI 工作流使用五个标准指令（支持简写别名）：
 
 | 标准指令 | 简写 | 阶段 | 说明 |
 |---|---|---|---|
@@ -30,6 +30,7 @@ AI 工作流使用四个标准指令（支持简写别名）：
 | `spec:propose` | `scp` | 提出需求 | 整理需求摘要、目标、初步流程与待确认事项，不修改已有规格。 |
 | `spec:analyze` | `sca` | 分析与起草 | 检查新需求是否与既有需求、API、DB 发生冲突；无冲突才产出 SRS、UML、OpenAPI 与 DB Schema 草案。 |
 | `spec:commit` | `scc` | 确认归档 | 用户确认后正式定号归档，更新索引与系统总表，并自动创建本地 Git commit。 |
+| `spec:pdf` | `spd` | 导出 PDF | 将指定的 `.md` 文件或需求目录（如 `REQ-001`）一键导出为 PDF 规格说明书。 |
 
 每个归档的需求固定包含一个独立完整的文件夹：
 
@@ -66,6 +67,20 @@ sa-spec 先把需求说清楚、定好边界；AI 代码工具再把需求实现
 - npm
 - Git
 
+### 跨平台独立脚本 (`.sh` / `.bat`)
+
+```bash
+# macOS / Linux
+./install.sh          # 安装 sa-spec
+./update.sh           # 更新 sa-spec 至最新版本
+./uninstall.sh        # 卸载 sa-spec
+
+# Windows（直接双击或在 CMD / PowerShell 执行）
+install.bat
+update.bat
+uninstall.bat
+```
+
 ### 全局安装
 
 ```bash
@@ -88,6 +103,7 @@ sa-spec --version
 | `sa-spec init [--full] [--lang <lang>]` | 初始化工作台骨架（支持 `zh-TW`、`en`、`zh-CN`、`ja`、`ko`，默认 `zh-TW`）。 |
 | `sa-spec new [--id REQ-001] --name login [--branch]` | 创建需求模板文件夹。省略 `--id` 时自动切入多人协作草稿分支（`feat/<name>`）。 |
 | `sa-spec finalize --name login` | 将草稿需求正式定号归档为最新序号，自动重命名目录、替换 `{{REQ_ID}}` 并重构索引。 |
+| `sa-spec pdf <target> [--split] [--output out.pdf]` | 将指定 `.md` 或需求（如 `REQ-001`）合并或拆分导出为 PDF（`--all` 导出全项目）。 |
 | `sa-spec reindex` | 扫描 `project/REQ-*` 目录，按序数字顺序动态重新生成 `project/index.md`。 |
 | `sa-spec check` | 检查项目必要文件与规格完整性。 |
 | `sa-spec status` | 查看系统规格与需求总览状态。 |

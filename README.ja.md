@@ -22,7 +22,7 @@
 
 OpenSpec、Claude Code、OpenAI Codex、Gemini CLI などの AI 開発ツールがコード実装を始める前に、要件のスコープ、境界線、データモデル、API 規約、権限マトリクス、受入条件を事前に明確化し、安全で堅牢な開発境界を定義します。
 
-AI ワークフローは 4 つの標準コマンド（エイリアス対応）で動作します：
+AI ワークフローは 5 つの標準コマンド（エイリアス対応）で動作します：
 
 | コマンド | エイリアス | 目的 | 説明 |
 |---|---|---|---|
@@ -30,6 +30,7 @@ AI ワークフローは 4 つの標準コマンド（エイリアス対応）�
 | `spec:propose` | `scp` | 要件提案 | 既存の仕様を変更せず、目的・概要・初期フロー・確認事項を整理します。 |
 | `spec:analyze` | `sca` | 分析と起草 | 既存の要件、API、DB スキーマとの競合をチェックし、問題がなければ SRS、UML、OpenAPI、DB スキーマのドラフトを作成します。 |
 | `spec:commit` | `scc` | 確認と保存 | ユーザーが承認したバージョンを正式に採番・保存し、インデックスを更新して Git コミットを作成します。 |
+| `spec:pdf` | `spd` | PDF 出力 | 指定した `.md` ファイルまたは要件ディレクトリ（`REQ-001` など）を PDF 仕様書として出力します。 |
 
 各要件フォルダーには以下の標準成果物が生成されます：
 
@@ -66,6 +67,20 @@ sa-spec が仕様と境界を明確にし、AI 開発ツールが正しく実装
 - npm
 - Git
 
+### クロスプラットフォーム独立スクリプト (`.sh` / `.bat`)
+
+```bash
+# macOS / Linux
+./install.sh          # インストール
+./update.sh           # 最新版へアップデート
+./uninstall.sh        # アンインストール
+
+# Windows（ダブルクリック、または CMD / PowerShell で実行）
+install.bat
+update.bat
+uninstall.bat
+```
+
 ### グローバルインストール
 
 ```bash
@@ -88,6 +103,7 @@ sa-spec --version
 | `sa-spec init [--full] [--lang <lang>]` | ワークスペースの骨格を初期化します（`zh-TW`、`en`、`zh-CN`、`ja`、`ko` に対応）。 |
 | `sa-spec new [--id REQ-001] --name login [--branch]` | 要件テンプレートを作成します。`--id` を省略すると、Git 分岐を活用したドラフトモード（`feat/<name>`）で開始します。 |
 | `sa-spec finalize --name login` | ドラフト要件に最新の連続番号を割り当て、フォルダー名を変更し、`{{REQ_ID}}` を置換してインデックスを再生成します。 |
+| `sa-spec pdf <target> [--split] [--output out.pdf]` | 指定した `.md` または要件（`REQ-001`）を統合または個別 PDF として出力します（`--all` で全件出力）。 |
 | `sa-spec reindex` | `project/REQ-*` ディレクトリをスキャンし、数値順にソートされた `project/index.md` を自動再構築します。 |
 | `sa-spec check` | 必須ファイルとシステム仕様の状態を検証します。 |
 | `sa-spec status` | 要件とシステム仕様の概要ステータスを表示します。 |

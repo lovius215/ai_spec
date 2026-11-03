@@ -22,7 +22,7 @@
 
 Before code-generation AI tools (OpenSpec, Claude Code, OpenAI Codex, Gemini CLI, Cursor) start implementation, `sa-spec` clarifies scopes, boundaries, data schemas, API contracts, permission matrices, and acceptance criteria to ensure that subsequent coding proceeds within safe, well-defined boundaries.
 
-The AI workflow operates on four standard commands (with shorthand aliases):
+The AI workflow operates on five standard commands (with shorthand aliases):
 
 | Command | Alias | Purpose | Description |
 |---|---|---|---|
@@ -30,6 +30,7 @@ The AI workflow operates on four standard commands (with shorthand aliases):
 | `spec:propose` | `scp` | Propose | Summarizes objectives, user stories, workflows, and open items without altering existing requirements. |
 | `spec:analyze` | `sca` | Analyze & Draft | Checks for conflicts against existing requirements, APIs, and DB schemas; drafts SRS, UML, OpenAPI, and DB schema. |
 | `spec:commit` | `scc` | Commit & Archive | Archives the user-verified version, assigns sequential ID, updates indexes, and generates a local Git commit. |
+| `spec:pdf` | `spd` | Export PDF | Exports a single `.md` file or an entire requirement folder (`REQ-001`) into a print-ready PDF specification. |
 
 Each finalized requirement produces a standardized, self-contained directory:
 
@@ -66,6 +67,20 @@ sa-spec defines what to build and its constraints; AI code tools build it right.
 - npm
 - Git
 
+### Cross-Platform Standalone Scripts (`.sh` / `.bat`)
+
+```bash
+# macOS / Linux
+./install.sh          # Install sa-spec
+./update.sh           # Update sa-spec to latest version
+./uninstall.sh        # Uninstall sa-spec
+
+# Windows (double-click or run via CMD / PowerShell)
+install.bat
+update.bat
+uninstall.bat
+```
+
 ### Global Installation via npm
 
 ```bash
@@ -88,6 +103,7 @@ sa-spec --version
 | `sa-spec init [--full] [--lang <lang>]` | Scaffolds the workspace skeleton (Supports `zh-TW`, `en`, `zh-CN`, `ja`, `ko`). |
 | `sa-spec new [--id REQ-001] --name login [--branch]` | Creates a requirement folder template. Omitting `--id` starts a draft in a feature branch (`feat/<name>`). |
 | `sa-spec finalize --name login` | Assigns the latest available sequential ID to a draft requirement, renames directory, substitutes `{{REQ_ID}}`, and regenerates index. |
+| `sa-spec pdf <target> [--split] [--output out.pdf]` | Converts a `.md` file or requirement (`REQ-001`) to a merged or split PDF (`--all` exports all). |
 | `sa-spec reindex` | Scans `project/REQ-*` directories and dynamically rebuilds `project/index.md` sorted by numerical ID. |
 | `sa-spec check` | Validates required project files and system spec status. |
 | `sa-spec status` | Displays overview status of requirements and specs. |
