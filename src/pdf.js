@@ -147,13 +147,13 @@ function parseInline(text) {
   processed = escapeHtml(processed);
   processed = processed.replace(/\x00BR\x00/g, "<br/>");
 
-  // Images: ![alt](src) - protect attributes before style formatting
-  processed = processed.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) => {
+  // Images: ![alt](src) - protect attributes before style formatting (supports balanced parens in URLs)
+  processed = processed.replace(/!\[([^\]]*)\]\(((?:[^()]|\([^()]*\))+)\)/g, (_, alt, src) => {
     return holdToken(`<img alt="${alt}" src="${sanitizeUrl(src)}" style="max-width:100%;" />`);
   });
 
-  // Links: [text](url) - format link text only, protect href from __ / * replacement
-  processed = processed.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) => {
+  // Links: [text](url) - format link text only, protect href from __ / * replacement (supports balanced parens in URLs)
+  processed = processed.replace(/\[([^\]]+)\]\(((?:[^()]|\([^()]*\))+)\)/g, (_, label, href) => {
     return holdToken(`<a href="${sanitizeUrl(href)}">${formatInlineStyles(label)}</a>`);
   });
 
@@ -190,6 +190,35 @@ function getTableAlignments(sepLine) {
   });
 }
 
+function matchFenceOpen(line) {
+  const backtickMatch = line.match(/^ {0,3}(`{3,})([^`\n]*)$/);
+  if (backtickMatch) {
+    const infoTokens = backtickMatch[2].trim();
+    return {
+      fence: backtickMatch[1],
+      lang: infoTokens ? infoTokens.split(/\s+/)[0] : ""
+    };
+  }
+  const tildeMatch = line.match(/^ {0,3}(~{3,})(.*)$/);
+  if (tildeMatch) {
+    const infoTokens = tildeMatch[2].trim();
+    return {
+      fence: tildeMatch[1],
+      lang: infoTokens ? infoTokens.split(/\s+/)[0] : ""
+    };
+  }
+  return null;
+}
+
+function pushAfterCommentParagraph(out, closingLine) {
+  const afterComment = closingLine.slice(closingLine.indexOf("-->") + 3).trim();
+  if (!afterComment) return;
+  const renderedAfter = parseInline(afterComment);
+  if (renderedAfter.trim()) {
+    out.push(`<p>${renderedAfter}</p>`);
+  }
+}
+
 function markdownToHtmlBody(markdown, options = {}) {
   const lines = String(markdown).replace(/\r\n/g, "\n").split("\n");
   const out = [];
@@ -208,10 +237,7 @@ function markdownToHtmlBody(markdown, options = {}) {
     // Single or multi-line HTML comment (excluding pagebreak handled above)
     if (line.trim().startsWith("<!--")) {
       if (line.includes("-->")) {
-        const afterComment = line.slice(line.indexOf("-->") + 3).trim();
-        if (afterComment) {
-          out.push(`<p>${parseInline(afterComment)}</p>`);
-        }
+        pushAfterCommentParagraph(out, line);
         i++;
         continue;
       }
@@ -220,10 +246,7 @@ function markdownToHtmlBody(markdown, options = {}) {
         i++;
       }
       if (i < lines.length) {
-        const afterComment = lines[i].slice(lines[i].indexOf("-->") + 3).trim();
-        if (afterComment) {
-          out.push(`<p>${parseInline(afterComment)}</p>`);
-        }
+        pushAfterCommentParagraph(out, lines[i]);
         i++;
       }
       continue;
@@ -236,10 +259,9 @@ function markdownToHtmlBody(markdown, options = {}) {
     }
 
     // Fenced code block (``` or ````)
-    const fenceMatch = line.match(/^(`{3,}|~{3,})(\S*)\s*$/);
+    const fenceMatch = matchFenceOpen(line);
     if (fenceMatch) {
-      const fence = fenceMatch[1];
-      const lang = fenceMatch[2] || "";
+      const { fence, lang } = fenceMatch;
       const codeLines = [];
       const closeFenceRegex = new RegExp(`^\\s*${fence[0]}{${fence.length},}\\s*$`);
       i++;
@@ -409,7 +431,7 @@ function markdownToHtmlBody(markdown, options = {}) {
       i < lines.length &&
       lines[i].trim() &&
       !lines[i].match(/^(#{1,6})\s+/) &&
-      !lines[i].match(/^(`{3,}|~{3,})/) &&
+      !matchFenceOpen(lines[i]) &&
       !lines[i].trim().startsWith(">") &&
       !lines[i].match(/^(\s*)([-*+]|\d+\.)\s+/) &&
       !/^(?:-{3,}|\*{3,}|_{3,})\s*$/.test(lines[i].trim()) &&
@@ -750,8 +772,8 @@ function renderHtmlToPdf(htmlContent, outputPdfPath, customBrowserPath) {
 
 function convertMarkdownFileToPdf(mdFilePath, outputPdfPath, customBrowserPath, options = {}) {
   const absMdPath = path.resolve(mdFilePath);
-  if (!fs.existsSync(absMdPath)) {
-    return { ok: false, error: `找不到檔案: ${mdFilePath}` };
+  if (!fs.existsSync(absMdPath) || !fs.statSync(absMdPath).isFile()) {
+    return { ok: false, error: `找不到 Markdown 檔案: ${mdFilePath}` };
   }
   const content = fs.readFileSync(absMdPath, "utf8");
   const title = path.basename(absMdPath, path.extname(absMdPath));

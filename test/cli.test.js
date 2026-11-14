@@ -1236,3 +1236,145 @@ test("#23 regression checks: slug disambiguation, binary safety, underscore lang
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("#24 comprehensive edge cases: merge strategy word boundaries, AGENTS escaping, pdf fences/parens/comments/EISDIR, validator EISDIR, finalize & pdf ID resolution", () => {
+  const { extractMergeStrategy, buildLocalizedAgentsMarkdown } = require("../src/i18n");
+  const { convertMarkdownFileToPdf } = require("../src/pdf");
+
+  // 1. extractMergeStrategy word-boundary matching
+  assert.equal(extractMergeStrategy("- Merge Strategy: approve"), "auto-merge");
+  assert.equal(extractMergeStrategy("- 合併策略：production"), "auto-merge");
+  assert.equal(extractMergeStrategy("- Merge Strategy: auto-merge"), "auto-merge");
+  assert.equal(extractMergeStrategy("- Merge Strategy: pr"), "pr");
+  assert.equal(extractMergeStrategy("- 合併策略：走PR流程"), "pr");
+  assert.equal(extractMergeStrategy("- Merge Strategy: pull-request"), "pr");
+  assert.equal(extractMergeStrategy("- Merge Strategy: no-merge"), "pr");
+  assert.equal(extractMergeStrategy("- Merge Strategy: manual"), "pr");
+
+  // 2. AGENTS_LOCALIZED table pipe escaping & --no-uml-render flag alignment
+  for (const lang of ["zh-CN", "ja", "ko"]) {
+    const agentsText = buildLocalizedAgentsMarkdown(lang);
+    assert.match(agentsText, /\[--pr \\\| --no-merge\]/);
+    assert.match(agentsText, /\[--online-uml \\\| --no-uml-render\]/);
+  }
+
+  // 3. PDF inline URLs with balanced parens, inline triple backticks, indented fenced blocks, multi-comment lines
+  const htmlDoc = buildHtmlDocument(
+    "Edge Test",
+    [
+      "[Wiki](https://en.wikipedia.org/wiki/Markdown_(software))",
+      "![Img](https://example.com/diagram_(v2).png)",
+      "```inline``` still works here",
+      "",
+      "# Visible Heading",
+      "",
+      '  ```js title="app.js"',
+      "const ok = true;",
+      "  ```",
+      "",
+      "<!-- c1 --> <!-- c2 -->",
+      "After comment"
+    ].join("\n")
+  );
+  assert.match(htmlDoc, /href="https:\/\/en\.wikipedia\.org\/wiki\/Markdown_\(software\)"/);
+  assert.match(htmlDoc, /src="https:\/\/example\.com\/diagram_\(v2\)\.png"/);
+  assert.match(htmlDoc, /<code>inline<\/code> still works here/);
+  assert.match(htmlDoc, /<h1[^>]*>Visible Heading<\/h1>/);
+  assert.match(htmlDoc, /<code class="language-js">const ok = true;<\/code>/);
+  assert.doesNotMatch(htmlDoc, /<p>\s*<\/p>/);
+  assert.match(htmlDoc, /<p>After comment<\/p>/);
+
+  // 4. convertMarkdownFileToPdf rejects directory cleanly & validator check handles non-file deliverables cleanly
+  const dirCheck = makeTempDir("sa-spec-edge24-check-");
+  try {
+    assert.equal(runCli(dirCheck, ["init", "--lang", "zh-TW"]).status, 0);
+    assert.equal(runCli(dirCheck, ["new", "--name", "demo"]).status, 0);
+    assert.equal(runCli(dirCheck, ["finalize", "--name", "demo"]).status, 0);
+
+    // Directory passed to convertMarkdownFileToPdf must return { ok: false }, not throw EISDIR
+    const pdfDirResult = convertMarkdownFileToPdf(
+      path.join(dirCheck, "project", "REQ-001-demo"),
+      path.join(dirCheck, "out.pdf")
+    );
+    assert.equal(pdfDirResult.ok, false);
+
+    // Regular file at draft path must not match as draft dir
+    fs.writeFileSync(path.join(dirCheck, "project", "ghost"), "not a dir");
+    const ghostFinalize = runCli(dirCheck, ["finalize", "--name", "ghost"]);
+    assert.notEqual(ghostFinalize.status, 0);
+    assert.doesNotMatch(ghostFinalize.stderr, /ENOTDIR|EISDIR/);
+
+    // Partial non-REQ word "req" must NOT match REQ-001-demo in finalize or pdf
+    const reqWordFinalize = runCli(dirCheck, ["finalize", "--name", "req"]);
+    assert.notEqual(reqWordFinalize.status, 0);
+    const reqWordPdf = runCli(dirCheck, ["pdf", "req", "--no-uml-render", "--browser", process.execPath]);
+    assert.notEqual(reqWordPdf.status, 0);
+    assert.doesNotMatch(reqWordPdf.stdout + reqWordPdf.stderr, /REQ-001-demo\.pdf/);
+
+    // Non-zero-padded numeric ID "REQ-1" resolves REQ-001-demo cleanly
+    const pdfNumRes = runCli(dirCheck, ["pdf", "REQ-1", "--no-uml-render", "--browser", process.execPath]);
+    const pdfNumOut = (pdfNumRes.stdout + "\n" + pdfNumRes.stderr).replace(/\\/g, "/");
+    assert.match(pdfNumOut, /project\/REQ-001-demo\/REQ-001-demo\.pdf/);
+
+    // Replacing srs.md with a directory produces a clean validation error instead of EISDIR crash
+    const srsPath = path.join(dirCheck, "project", "REQ-001-demo", "srs.md");
+    fs.unlinkSync(srsPath);
+    fs.mkdirSync(srsPath);
+    const checkDirDeliverable = runCli(dirCheck, ["check"]);
+    assert.notEqual(checkDirDeliverable.status, 0);
+    assert.match(checkDirDeliverable.stdout + checkDirDeliverable.stderr, /srs\.md 必須為檔案而非目錄/);
+    assert.doesNotMatch(checkDirDeliverable.stderr, /EISDIR/);
+  } finally {
+    fs.rmSync(dirCheck, { recursive: true, force: true });
+  }
+
+  // 5. Bare REQ-001 renumber omits bogus "-req-001" suffix and uses sensible commit subjects
+  const dirGit = makeTempDir("sa-spec-edge24-git-");
+  try {
+    const git = (args) => {
+      const r = spawnSync("git", args, { cwd: dirGit, encoding: "utf8" });
+      assert.equal(r.status, 0, `git ${args.join(" ")} failed: ${r.stderr || r.stdout}`);
+      return (r.stdout || "").trim();
+    };
+    git(["init", "-b", "main"]);
+    git(["config", "user.name", "Tester"]);
+    git(["config", "user.email", "tester@example.com"]);
+
+    assert.equal(runCli(dirGit, ["init", "--lang", "zh-TW"]).status, 0);
+    git(["add", "."]);
+    git(["commit", "-m", "chore: init"]);
+    git(["branch", "feat/bare-req"]);
+    git(["branch", "feat/slug-req"]);
+
+    // Seed REQ-001-existing on main after branching side branches
+    assert.equal(runCli(dirGit, ["new", "--name", "existing"]).status, 0);
+    assert.equal(runCli(dirGit, ["finalize", "--name", "existing"]).status, 0);
+
+    // Case A: bare REQ-001 without slug renumbers to REQ-002 (NOT REQ-002-req-001) even on case-insensitive FS
+    git(["checkout", "feat/bare-req"]);
+    assert.equal(runCli(dirGit, ["new", "--name", "bare-temp"]).status, 0);
+    fs.renameSync(path.join(dirGit, "project", "bare-temp"), path.join(dirGit, "project", "REQ-001"));
+    git(["add", "."]);
+    git(["commit", "-m", "wip: bare REQ-001"]);
+
+    const bareFin = runCli(dirGit, ["finalize", "--name", "REQ-001", "--no-merge"]);
+    assert.equal(bareFin.status, 0, bareFin.stderr || bareFin.stdout);
+    assert.equal(fs.existsSync(path.join(dirGit, "project", "REQ-002")), true);
+    assert.equal(fs.existsSync(path.join(dirGit, "project", "REQ-002-req-001")), false);
+    assert.equal(git(["log", "-1", "--pretty=%s"]), "docs(REQ-002): REQ-002 - 規格確認歸檔");
+
+    // Case B: REQ-001-alpha finalized via --name REQ-001 uses "alpha" as commit subject (not redundant REQ-001)
+    git(["checkout", "feat/slug-req"]);
+    assert.equal(runCli(dirGit, ["new", "--name", "alpha"]).status, 0);
+    fs.renameSync(path.join(dirGit, "project", "alpha"), path.join(dirGit, "project", "REQ-001-alpha"));
+    git(["add", "."]);
+    git(["commit", "-m", "wip: REQ-001-alpha"]);
+
+    const alphaFin = runCli(dirGit, ["finalize", "--name", "REQ-001", "--no-merge"]);
+    assert.equal(alphaFin.status, 0, alphaFin.stderr || alphaFin.stdout);
+    assert.equal(fs.existsSync(path.join(dirGit, "project", "REQ-003-alpha")), true);
+    assert.equal(git(["log", "-1", "--pretty=%s"]), "docs(REQ-003): alpha - 規格確認歸檔");
+  } finally {
+    fs.rmSync(dirGit, { recursive: true, force: true });
+  }
+});

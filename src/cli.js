@@ -390,6 +390,15 @@ function createReqTemplate(args, label = "new") {
   printResultList(label, results);
 }
 
+function isExistingDir(targetPath) {
+  return fs.existsSync(targetPath) && fs.statSync(targetPath).isDirectory();
+}
+
+function parseReqIdNum(name) {
+  const match = String(name || "").trim().match(/^REQ-(\d+)(?:-|$)/i);
+  return match ? Number(match[1]) : null;
+}
+
 function finalizeReq(args) {
   const rawName = getOption(args, "--name");
   const explicitSlug = getOption(args, "--slug");
@@ -402,7 +411,7 @@ function finalizeReq(args) {
   if (!slug) return;
 
   const projectDir = path.join(cwd, "project");
-  if (!fs.existsSync(projectDir)) {
+  if (!isExistingDir(projectDir)) {
     fail("project/ 目錄不存在。");
     return;
   }
@@ -410,29 +419,47 @@ function finalizeReq(args) {
   let sourceDir = null;
   let cleanSlug = slug;
 
-  // 1. 優先尋找草稿目錄 (project/<slug> 或 project/draft-<slug>)
-  if (fs.existsSync(path.join(projectDir, slug))) {
-    sourceDir = path.join(projectDir, slug);
-  } else if (fs.existsSync(path.join(projectDir, `draft-${slug}`))) {
-    sourceDir = path.join(projectDir, `draft-${slug}`);
+  const entries = fs.readdirSync(projectDir, { withFileTypes: true });
+  const isReqNameQuery = parseReqIdNum(rawName) !== null;
+  const findDraftEntry = (draftName) =>
+    entries.find(
+      (e) =>
+        e.isDirectory() &&
+        parseReqIdNum(e.name) === null &&
+        e.name.toLowerCase() === draftName
+    );
+
+  // 1. 優先尋找草稿目錄 (project/<slug> 或 project/draft-<slug>)，避免大小寫不敏感檔案系統誤判 REQ-xxx
+  const draftMatch = !isReqNameQuery ? findDraftEntry(slug) || findDraftEntry(`draft-${slug}`) : null;
+  if (draftMatch) {
+    sourceDir = path.join(projectDir, draftMatch.name);
   } else {
     // 2. 支援對既有 REQ-xxx-<slug> 或 REQ-xxx 重新定號（若有多筆取最新編號）
-    const entries = fs.readdirSync(projectDir, { withFileTypes: true });
-    const reqMatches = entries
-      .filter(
-        (e) =>
-          e.isDirectory() &&
-          (e.name.toUpperCase() === rawName.toUpperCase() ||
-            e.name.toUpperCase().startsWith(`${rawName.toUpperCase()}-`) ||
-            (e.name.startsWith("REQ-") &&
-              Boolean(slug) &&
-              e.name.replace(/^REQ-\d+-?/i, "").toLowerCase() === slug))
-      )
-      .sort((a, b) => {
-        const na = parseInt((a.name.match(/^REQ-(\d+)/i) || [])[1] || "0", 10);
-        const nb = parseInt((b.name.match(/^REQ-(\d+)/i) || [])[1] || "0", 10);
-        return nb - na;
-      });
+    const reqNumQuery = rawName.trim().match(/^REQ-(\d+)$/i);
+    const targetReqNum = reqNumQuery ? Number(reqNumQuery[1]) : null;
+    const exactReqDir = entries.find(
+      (e) =>
+        e.isDirectory() &&
+        parseReqIdNum(e.name) !== null &&
+        e.name.toUpperCase() === rawName.trim().toUpperCase()
+    );
+    const reqMatches = exactReqDir
+      ? [exactReqDir]
+      : entries
+          .filter(
+            (e) =>
+              e.isDirectory() &&
+              (e.name.toUpperCase() === rawName.trim().toUpperCase() ||
+                (targetReqNum !== null && parseReqIdNum(e.name) === targetReqNum) ||
+                (/^REQ-\d+/i.test(e.name) &&
+                  Boolean(slug) &&
+                  e.name.replace(/^REQ-\d+-?/i, "").toLowerCase() === slug))
+          )
+          .sort((a, b) => {
+            const na = parseInt((a.name.match(/^REQ-(\d+)/i) || [])[1] || "0", 10);
+            const nb = parseInt((b.name.match(/^REQ-(\d+)/i) || [])[1] || "0", 10);
+            return nb - na;
+          });
     if (reqMatches.length > 1) {
       const topNum = parseInt((reqMatches[0].name.match(/^REQ-(\d+)/i) || [])[1] || "0", 10);
       const tiedMatches = reqMatches.filter(
@@ -449,7 +476,11 @@ function finalizeReq(args) {
     if (reqMatch) {
       sourceDir = path.join(projectDir, reqMatch.name);
       const stripped = reqMatch.name.replace(/^REQ-\d+-?/i, "");
-      cleanSlug = stripped || slug;
+      if (stripped) {
+        cleanSlug = explicitSlug ? slug : stripped;
+      } else if (!explicitSlug && /^REQ-\d+$/i.test(reqMatch.name)) {
+        cleanSlug = "";
+      }
     }
   }
 
@@ -484,7 +515,12 @@ function finalizeReq(args) {
     }
   }
 
-  const finalDirName = oldReqId && nextId === oldReqId ? oldDirName : `${nextId}-${cleanSlug}`;
+  const finalDirName =
+    oldReqId && nextId === oldReqId
+      ? oldDirName
+      : cleanSlug
+        ? `${nextId}-${cleanSlug}`
+        : nextId;
   const finalDir = path.join(projectDir, finalDirName);
 
   if (fs.existsSync(finalDir) && sourceDir !== finalDir) {
@@ -537,15 +573,16 @@ function finalizeReq(args) {
     : "auto-merge";
   const shouldAutoMerge = !args.includes("--no-merge") && !args.includes("--pr") && configMergeStrategy !== "pr";
 
+  const commitSubjectName = /^REQ-\d+$/i.test(rawName.trim()) ? cleanSlug || nextId : rawName;
   if (currentBranch && mainBranch && currentBranch !== mainBranch) {
     console.log(`[Git] 正在為分支 ${currentBranch} 建立歸檔 commit...`);
     stageFinalizePaths();
-    const commitRes = spawnSync("git", ["commit", "-m", `docs(${nextId}): ${rawName} - 規格確認歸檔`], {
+    const commitRes = spawnSync("git", ["commit", "-m", `docs(${nextId}): ${commitSubjectName} - 規格確認歸檔`], {
       cwd,
       encoding: "utf8"
     });
     if (commitRes.status === 0) {
-      console.log(`[Git] 分支 ${currentBranch} 提交完成: docs(${nextId}): ${rawName} - 規格確認歸檔`);
+      console.log(`[Git] 分支 ${currentBranch} 提交完成: docs(${nextId}): ${commitSubjectName} - 規格確認歸檔`);
     } else {
       const stagedCheck = spawnSync("git", ["diff", "--cached", "--name-only"], { cwd, encoding: "utf8" });
       if ((stagedCheck.stdout || "").trim()) {
@@ -660,7 +697,7 @@ function finalizeReq(args) {
     }
   } else if (currentBranch && currentBranch === mainBranch) {
     stageFinalizePaths();
-    const commitRes = spawnSync("git", ["commit", "-m", `docs(${nextId}): ${rawName} - 規格確認歸檔`], {
+    const commitRes = spawnSync("git", ["commit", "-m", `docs(${nextId}): ${commitSubjectName} - 規格確認歸檔`], {
       cwd,
       encoding: "utf8"
     });
@@ -1267,9 +1304,14 @@ function resolveReqTargetDir(target) {
   );
   if (exact) return path.join(projectDir, exact);
 
-  const byPrefix = dirs.find((name) => name.toUpperCase().startsWith(`${upper}-`));
-  if (byPrefix && /^REQ-\d+$/i.test(target)) {
-    return path.join(projectDir, byPrefix);
+  const reqNumQuery = target.trim().match(/^REQ-(\d+)$/i);
+  if (reqNumQuery) {
+    const targetReqNum = Number(reqNumQuery[1]);
+    const idMatches = dirs.filter((name) => parseReqIdNum(name) === targetReqNum);
+    if (idMatches.length > 0) {
+      const exactPrefixMatch = idMatches.find((name) => name.toUpperCase().startsWith(`${upper}-`));
+      return path.join(projectDir, exactPrefixMatch || idMatches[0]);
+    }
   }
 
   if (slug) {
@@ -1289,7 +1331,7 @@ function resolveReqTargetDir(target) {
     }
   }
 
-  return byPrefix ? path.join(projectDir, byPrefix) : null;
+  return null;
 }
 
 function exportReqDirToPdf(reqAbsDir, options = {}) {

@@ -134,6 +134,16 @@ function checkIndexSync(cwd) {
   return true;
 }
 
+function readDeliverableIfFile(reqAbsDir, fileName, issues) {
+  const fileAbs = path.join(reqAbsDir, fileName);
+  if (!fs.existsSync(fileAbs)) return null;
+  if (!fs.statSync(fileAbs).isFile()) {
+    issues.push(`${fileName} 必須為檔案而非目錄`);
+    return null;
+  }
+  return fs.readFileSync(fileAbs, "utf8");
+}
+
 function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
   const { isDraft = false } = options;
   const issues = [];
@@ -145,11 +155,12 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
   }
 
   // Check leftover {{REQ_ID}} placeholder (allowed in draft dirs before finalize)
+  const deliverableContents = new Map();
   const checkFiles = ["srs.md", "openapi.yaml", "db-schema.md", "handoff.md", "history.md"];
   for (const fileName of checkFiles) {
-    const fileAbs = path.join(reqAbsDir, fileName);
-    if (!fs.existsSync(fileAbs)) continue;
-    const text = fs.readFileSync(fileAbs, "utf8");
+    const text = readDeliverableIfFile(reqAbsDir, fileName, issues);
+    if (text === null) continue;
+    deliverableContents.set(fileName, text);
     if (!isDraft && text.includes("{{REQ_ID}}")) {
       issues.push(`${fileName} 仍殘留未替換的 {{REQ_ID}} 佔位符`);
     }
@@ -184,9 +195,8 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
   }
 
   // Validate srs.md status and required sections
-  const srsAbs = path.join(reqAbsDir, "srs.md");
-  if (fs.existsSync(srsAbs)) {
-    const srsText = fs.readFileSync(srsAbs, "utf8");
+  const srsText = deliverableContents.get("srs.md");
+  if (srsText !== undefined) {
     if (!extractStatusFromContent(srsText)) {
       issues.push("srs.md 缺少狀態欄位 (- 狀態：...)");
     }
@@ -199,9 +209,8 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
   }
 
   // Validate handoff.md key sections (multi-language aware)
-  const handoffAbs = path.join(reqAbsDir, "handoff.md");
-  if (fs.existsSync(handoffAbs)) {
-    const handoffText = fs.readFileSync(handoffAbs, "utf8");
+  const handoffText = deliverableContents.get("handoff.md");
+  if (handoffText !== undefined) {
     const hasApi = /##\s*.*(?:API)/i.test(handoffText);
     const hasDb = /##\s*.*(?:DB|資料庫|数据库|データベース|데이터베이스)/i.test(handoffText);
     const hasUi = /(?:##\s*.*(?:UI|畫面|界面|画面|화면)|無\s*UI|No UI|无\s*UI|UI 要件なし|UI 요구사항 없음)/i.test(handoffText);
@@ -213,9 +222,8 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
   }
 
   // Validate openapi.yaml basic contract structure
-  const openapiAbs = path.join(reqAbsDir, "openapi.yaml");
-  if (fs.existsSync(openapiAbs)) {
-    const openapiText = fs.readFileSync(openapiAbs, "utf8");
+  const openapiText = deliverableContents.get("openapi.yaml");
+  if (openapiText !== undefined) {
     const explicitNoApi = /(?:無\s*API|No API|無需\s*API|无\s*API|API\s*不要|API\s*불필요)/i.test(openapiText);
     if (!explicitNoApi && (!/^openapi\s*:/m.test(openapiText) || !/^paths\s*:/m.test(openapiText))) {
       issues.push("openapi.yaml 缺少 openapi: 或 paths: 宣告");
@@ -226,18 +234,16 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
   }
 
   // Validate db-schema.md basic section structure
-  const dbAbs = path.join(reqAbsDir, "db-schema.md");
-  if (fs.existsSync(dbAbs)) {
-    const dbText = fs.readFileSync(dbAbs, "utf8");
+  const dbText = deliverableContents.get("db-schema.md");
+  if (dbText !== undefined) {
     if (!/^##\s+/m.test(dbText)) {
       issues.push("db-schema.md 缺少資料表/規格章節標題 (## ...)");
     }
   }
 
   // Validate history.md contains Markdown table
-  const historyAbs = path.join(reqAbsDir, "history.md");
-  if (fs.existsSync(historyAbs)) {
-    const historyText = fs.readFileSync(historyAbs, "utf8");
+  const historyText = deliverableContents.get("history.md");
+  if (historyText !== undefined) {
     if (!/^\|.+\|$/m.test(historyText)) {
       issues.push("history.md 缺少版本歷程 Markdown 表格");
     }
