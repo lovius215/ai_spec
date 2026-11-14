@@ -14,6 +14,7 @@ const {
   extractStatusFromContent,
   extractMergeStrategy,
   stampSpecVersionInContent,
+  escapeIndexCell,
   parseIndexRows,
   buildIndexMarkdown,
   buildSystemSpecMarkdown,
@@ -393,21 +394,21 @@ function finalizeReq(args) {
     fetchRemote(cwd, remote);
   }
 
-  const maxId = getLatestMaxReqId(cwd, projectDir, mainBranch, remote);
+  const oldDirName = path.basename(sourceDir);
+  const oldIdMatch = oldDirName.match(/^(REQ-\d+)/i);
+  const oldReqId = oldIdMatch ? oldIdMatch[1].toUpperCase() : null;
+
+  const maxId = getLatestMaxReqId(cwd, projectDir, mainBranch, remote, oldReqId ? oldDirName : null);
   const nextNum = maxId + 1;
   const nextId = `REQ-${String(nextNum).padStart(3, "0")}`;
 
-  const oldDirName = path.basename(sourceDir);
-  const finalDirName = `${nextId}-${cleanSlug}`;
+  const finalDirName = oldReqId && nextId === oldReqId ? oldDirName : `${nextId}-${cleanSlug}`;
   const finalDir = path.join(projectDir, finalDirName);
 
   if (fs.existsSync(finalDir) && sourceDir !== finalDir) {
     fail(`目標目錄已存在，無法重命名: project/${finalDirName}`);
     return;
   }
-
-  const oldIdMatch = oldDirName.match(/^(REQ-\d+)/i);
-  const oldReqId = oldIdMatch ? oldIdMatch[1].toUpperCase() : null;
 
   if (sourceDir !== finalDir) {
     fs.renameSync(sourceDir, finalDir);
@@ -652,7 +653,7 @@ function ensureIndexRow(id, name, langCode = "zh-TW") {
 
   const t = getLangStrings(langCode);
   const now = formatLocalDateTime(new Date());
-  const row = `| ${id} | ${name} | ${t.tbd} | ${t.pending} | ${now} | ${now} |`;
+  const row = `| ${escapeIndexCell(id)} | ${escapeIndexCell(name)} | ${t.tbd} | ${t.pending} | ${now} | ${now} |`;
   const nextContent = content.endsWith("\n") ? `${content}${row}\n` : `${content}\n${row}\n`;
   fs.writeFileSync(indexPath, nextContent, "utf8");
   return { action: "update", target: path.join("project", "index.md") };
@@ -1014,14 +1015,6 @@ function updateFileWithContent(targetRelativePath, nextContent, dryRun = false) 
     fs.writeFileSync(targetAbsolutePath, resolvedContent, "utf8");
   }
   return { action: "update", target: targetRelativePath };
-}
-
-function updateFileFromTemplate(templateRelativePath, targetRelativePath, dryRun = false) {
-  const templateAbsolutePath = path.join(templatesDir, templateRelativePath);
-  if (!fs.existsSync(templateAbsolutePath)) {
-    return { action: "skip", target: targetRelativePath };
-  }
-  return updateFileWithContent(targetRelativePath, readTemplate(templateRelativePath), dryRun);
 }
 
 function printResultList(label, results) {

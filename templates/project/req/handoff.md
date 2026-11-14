@@ -1,8 +1,12 @@
-# {{REQ_ID}} {{REQ_NAME}} Handoff
+# {{REQ_ID}} {{REQ_NAME}} 開發交接摘要
 
 - 狀態：待確認
-- 來源文件：`srs.md`、`uml/`、`openapi.yaml`、`db-schema.md`
-- 目標讀者：OpenSpec、Codex、Claude、Gemini 或其他 AI 開發工具
+
+## 來源文件
+- `srs.md`
+- `uml/main.puml`
+- `openapi.yaml`
+- `db-schema.md`
 
 ## 要開發什麼
 待補充。
@@ -23,7 +27,7 @@
 待補充；若無 DB 需求，明確標示「無 DB 需求」。
 
 ## UI / 畫面規格
-待補充；若有前端介面需求，參照 `uml/wireframe.puml`（PlantUML Salt 線框圖）；若無 UI 需求，明確標示「無 UI 介面需求」。
+若有前端操作介面，實作時請參照 `uml/wireframe.puml`；若為純後端需求，請保留「無 UI 介面需求」。
 
 ## 驗收條件
 - 待補充。

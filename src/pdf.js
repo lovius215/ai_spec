@@ -39,6 +39,30 @@ function encodePlantUml(source) {
   return out;
 }
 
+function sanitizeSvg(svg) {
+  return String(svg || "")
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<script\b[^>]*\/>/gi, "")
+    .replace(/<foreignObject\b[^>]*>[\s\S]*?<\/foreignObject>/gi, "")
+    .replace(/<foreignObject\b[^>]*\/>/gi, "")
+    .replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/((?:xlink:)?href\s*=\s*)(["'])\s*(?:javascript|vbscript|data:text\/html)[\s\S]*?\2/gi, "$1$2#$2")
+    .replace(/((?:xlink:)?href\s*=\s*)(?:javascript|vbscript|data:text\/html)[^\s>]*/gi, '$1"#"');
+}
+
+function sanitizeUrl(rawUrl) {
+  const trimmed = String(rawUrl || "").trim();
+  const normalized = trimmed.replace(/[\u0000-\u0020]+/g, "").toLowerCase();
+  if (
+    normalized.startsWith("javascript:") ||
+    normalized.startsWith("vbscript:") ||
+    normalized.startsWith("data:text/html")
+  ) {
+    return "#";
+  }
+  return trimmed;
+}
+
 function renderPlantUmlToSvg(source, options = {}) {
   if (options.noUmlRender) return null;
 
@@ -53,7 +77,7 @@ function renderPlantUmlToSvg(source, options = {}) {
     });
     if (res.status === 0 && res.stdout && res.stdout.includes("<svg")) {
       const svgMatch = res.stdout.match(/<svg[\s\S]*<\/svg>/i);
-      if (svgMatch) return svgMatch[0];
+      if (svgMatch) return sanitizeSvg(svgMatch[0]);
     }
   }
 
@@ -74,7 +98,7 @@ function renderPlantUmlToSvg(source, options = {}) {
   });
   if (curlRes.status === 0 && curlRes.stdout && curlRes.stdout.includes("<svg")) {
     const svgMatch = curlRes.stdout.match(/<svg[\s\S]*<\/svg>/i);
-    if (svgMatch) return svgMatch[0];
+    if (svgMatch) return sanitizeSvg(svgMatch[0]);
   }
 
   return null;
@@ -103,12 +127,12 @@ function parseInline(text) {
 
   // Images: ![alt](src)
   processed = processed.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) => {
-    return `<img alt="${alt}" src="${src}" style="max-width:100%;" />`;
+    return `<img alt="${alt}" src="${sanitizeUrl(src)}" style="max-width:100%;" />`;
   });
 
   // Links: [text](url)
   processed = processed.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) => {
-    return `<a href="${href}">${label}</a>`;
+    return `<a href="${sanitizeUrl(href)}">${label}</a>`;
   });
 
   // Bold + Italic
@@ -127,8 +151,10 @@ function parseInline(text) {
 }
 
 function parseTableRow(line) {
-  const trimmed = line.trim().replace(/^\|/, "").replace(/\|$/, "");
-  return trimmed.split("|").map((cell) => cell.trim());
+  const placeholder = "\x00PIPE\x00";
+  const protectedLine = String(line).trim().replace(/\\\|/g, placeholder);
+  const trimmed = protectedLine.replace(/^\|/, "").replace(/\|$/, "");
+  return trimmed.split("|").map((cell) => cell.replace(/\x00PIPE\x00/g, "|").trim());
 }
 
 function isTableSeparator(line) {
@@ -744,5 +770,7 @@ module.exports = {
   buildMergedRequirementMarkdown,
   renderHtmlToPdf,
   encodePlantUml,
-  renderPlantUmlToSvg
+  renderPlantUmlToSvg,
+  sanitizeSvg,
+  sanitizeUrl
 };

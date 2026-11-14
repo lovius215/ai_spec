@@ -83,12 +83,13 @@ function getCurrentBranch(cwd) {
   return null;
 }
 
-function scanTreeDirsForMaxReqId(cwd, ref, currentMax) {
+function scanTreeDirsForMaxReqId(cwd, ref, currentMax, excludeDirName = null) {
   let maxIdNum = currentMax;
   const lsRes = spawnSync("git", ["ls-tree", "-d", "--name-only", ref, "project/"], { cwd, encoding: "utf8" });
   if (lsRes.status === 0 && lsRes.stdout) {
     for (const line of lsRes.stdout.split("\n")) {
       const base = path.basename(line.trim());
+      if (excludeDirName && base === excludeDirName) continue;
       if (base.startsWith("REQ-")) {
         const m = base.match(/^REQ-(\d+)/i);
         if (m) {
@@ -101,11 +102,12 @@ function scanTreeDirsForMaxReqId(cwd, ref, currentMax) {
   return maxIdNum;
 }
 
-function getLatestMaxReqId(cwd, projectDir, mainBranch, remoteName = "origin") {
+function getLatestMaxReqId(cwd, projectDir, mainBranch, remoteName = "origin", excludeDirName = null) {
   let maxIdNum = 0;
 
   if (fs.existsSync(projectDir)) {
     for (const entry of fs.readdirSync(projectDir, { withFileTypes: true })) {
+      if (excludeDirName && entry.name === excludeDirName) continue;
       if (entry.isDirectory() && entry.name.startsWith("REQ-")) {
         const m = entry.name.match(/^REQ-(\d+)/i);
         if (m) {
@@ -117,9 +119,9 @@ function getLatestMaxReqId(cwd, projectDir, mainBranch, remoteName = "origin") {
   }
 
   if (mainBranch) {
-    maxIdNum = scanTreeDirsForMaxReqId(cwd, mainBranch, maxIdNum);
+    maxIdNum = scanTreeDirsForMaxReqId(cwd, mainBranch, maxIdNum, excludeDirName);
     if (remoteName) {
-      maxIdNum = scanTreeDirsForMaxReqId(cwd, `${remoteName}/${mainBranch}`, maxIdNum);
+      maxIdNum = scanTreeDirsForMaxReqId(cwd, `${remoteName}/${mainBranch}`, maxIdNum, excludeDirName);
     }
   }
 
@@ -132,7 +134,7 @@ function getLatestMaxReqId(cwd, projectDir, mainBranch, remoteName = "origin") {
     for (const rawRef of refsRes.stdout.split("\n")) {
       const ref = rawRef.trim();
       if (!ref || (remoteName && ref === `${remoteName}/HEAD`)) continue;
-      maxIdNum = scanTreeDirsForMaxReqId(cwd, ref, maxIdNum);
+      maxIdNum = scanTreeDirsForMaxReqId(cwd, ref, maxIdNum, excludeDirName);
     }
   }
 

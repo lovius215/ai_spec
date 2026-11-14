@@ -543,3 +543,94 @@ test("#16 upgrade localizes injected UI handoff section, getOption validates mis
   assert.equal(eqTpl.status, 0, eqTpl.stderr);
   assert.match(eqTpl.stdout, /주요 시퀀스 다이어그램/);
 });
+
+test("#17 finalize preserves own ID on re-run without collision, tables escape pipes, PDF sanitizes SVG/URLs, handoff & READMEs stay aligned", (t) => {
+  const { sanitizeSvg, sanitizeUrl } = require("../src/pdf");
+
+  // 1. Re-running finalize after cleaning dirty working tree keeps REQ-001 (not REQ-002) and merges to master
+  const dir = makeTempDir();
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  execFileSync("git", ["init", "-b", "master"], { cwd: dir });
+  execFileSync("git", ["config", "user.email", "dev@example.com"], { cwd: dir });
+  execFileSync("git", ["config", "user.name", "Developer"], { cwd: dir });
+
+  assert.equal(runCli(dir, ["init"]).status, 0);
+  execFileSync("git", ["add", "."], { cwd: dir });
+  execFileSync("git", ["commit", "-m", "init"], { cwd: dir });
+
+  assert.equal(runCli(dir, ["new", "--name", "cart", "--branch"]).status, 0);
+  fs.appendFileSync(path.join(dir, "readme.md"), "\ndirty\n", "utf8");
+  const fin1 = runCli(dir, ["finalize", "--name", "cart"]);
+  assert.equal(fin1.status, 0, fin1.stderr);
+  assert.equal(fs.existsSync(path.join(dir, "project", "REQ-001-cart", "srs.md")), true);
+
+  execFileSync("git", ["checkout", "--", "readme.md"], { cwd: dir });
+  const fin2 = runCli(dir, ["finalize", "--name", "cart"]);
+  assert.equal(fin2.status, 0, fin2.stderr);
+  assert.equal(fs.existsSync(path.join(dir, "project", "REQ-001-cart", "srs.md")), true);
+  assert.equal(fs.existsSync(path.join(dir, "project", "REQ-002-cart")), false);
+  const headBranch = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: dir, encoding: "utf8" }).trim();
+  assert.equal(headBranch, "master");
+
+  // 2. Pipe characters in SRS summary and escaped pipes in Markdown tables do not shift columns
+  const srsPath = path.join(dir, "project", "REQ-001-cart", "srs.md");
+  fs.writeFileSync(
+    srsPath,
+    "# REQ-001 cart | checkout SRS\n\n- 狀態：已審核\n\n## 摘要\n支援 Credit | Debit | LinePay 付款。\n\n## 功能需求\n- OK\n\n## 驗收條件\n- OK\n",
+    "utf8"
+  );
+  assert.equal(runCli(dir, ["reindex"]).status, 0);
+  assert.equal(runCli(dir, ["reindex"]).status, 0);
+  const statusOut = runCli(dir, ["status"]);
+  assert.equal(statusOut.status, 0, statusOut.stderr);
+  assert.match(statusOut.stdout, /- REQ-001 cart \| checkout \[已審核\]/);
+
+  const tableHtml = buildHtmlDocument(
+    "Pipe Table",
+    "| Cmd | Flag | Note |\n|---|---|---|\n| `commit` | `--pr \\| --no-merge` | Safe |\n",
+    { noUmlRender: true, lang: "en" }
+  );
+  assert.match(tableHtml, /<th[^>]*>Note<\/th>/);
+  assert.match(tableHtml, /<td[^>]*><code>--pr \| --no-merge<\/code><\/td><td[^>]*>Safe<\/td>/);
+
+  // 3. SVG & dangerous URL sanitization in PDF export
+  const unsafeSvg =
+    '<svg onload="alert(1)"><script>alert(2)</script><foreignObject><body/></foreignObject><a xlink:href="javascript:evil()"><text onclick="x()">Safe</text></a></svg>';
+  const cleanedSvg = sanitizeSvg(unsafeSvg);
+  assert.doesNotMatch(cleanedSvg, /<script|foreignObject|onload=|onclick=|javascript:/i);
+  assert.match(cleanedSvg, /<text>Safe<\/text>/);
+  assert.equal(sanitizeUrl("javascript:alert(1)"), "#");
+  assert.equal(sanitizeUrl("  JaVa\nScRiPt:alert(1)"), "#");
+  assert.equal(sanitizeUrl("data:text/html,<script>1</script>"), "#");
+  assert.equal(sanitizeUrl("https://example.com"), "https://example.com");
+
+  const unsafeHtml = buildHtmlDocument(
+    "Security",
+    "[bad](javascript:alert(1)) ![x](data:text/html,<script>) [ok](https://example.com)",
+    { noUmlRender: true, lang: "en" }
+  );
+  assert.match(unsafeHtml, /<a href="#">bad<\/a>/);
+  assert.match(unsafeHtml, /<img alt="x" src="#"/);
+  assert.match(unsafeHtml, /<a href="https:\/\/example\.com">ok<\/a>/);
+
+  // 4. handoff.md dynamic & static templates have status, source docs list, and single-spaced heading
+  const { buildLocalizedReqFileContent } = require("../src/i18n");
+  const emptyNameHandoff = buildLocalizedReqFileContent("zh-TW", "handoff.md", { REQ_ID: "REQ-001" });
+  assert.match(emptyNameHandoff, /^# REQ-001 開發交接摘要$/m);
+  assert.doesNotMatch(emptyNameHandoff, /REQ-001\s{2,}/);
+  const tplHandoff = runCli(dir, ["templates", "handoff"]);
+  assert.equal(tplHandoff.status, 0, tplHandoff.stderr);
+  assert.match(tplHandoff.stdout, /^# \{\{REQ_ID\}\} \{\{REQ_NAME\}\} 開發交接摘要/m);
+  assert.match(tplHandoff.stdout, /- 狀態：待確認/);
+  assert.match(tplHandoff.stdout, /- `srs\.md`/);
+  const staticHandoff = fs.readFileSync(path.join(TEMPLATES_DIR, "project", "req", "handoff.md"), "utf8");
+  assert.match(staticHandoff, /- 狀態：待確認/);
+  assert.match(staticHandoff, /## 來源文件[\s\S]*- `srs\.md`/);
+
+  // 5. readme.md and README.zh-TW.md in package root stay identical
+  assert.equal(
+    fs.readFileSync(path.join(ROOT_DIR, "readme.md"), "utf8"),
+    fs.readFileSync(path.join(ROOT_DIR, "README.zh-TW.md"), "utf8")
+  );
+});

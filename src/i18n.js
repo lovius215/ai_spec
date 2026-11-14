@@ -456,22 +456,33 @@ function stampSpecVersionInContent(content, version) {
 
 const INDEX_HEADER_KEYWORDS = ["編號", "编号", "番号", "번호", "id"];
 
+function escapeIndexCell(value) {
+  return String(value ?? "").replace(/\|/g, "\\|");
+}
+
+function splitIndexCells(line) {
+  const placeholder = "\x00PIPE\x00";
+  return String(line)
+    .replace(/\\\|/g, placeholder)
+    .split("|")
+    .map((part) => part.replace(/\x00PIPE\x00/g, "|").trim());
+}
+
 function parseIndexRows(content) {
   return content
     .split("\n")
     .filter((line) => {
       if (!line.startsWith("|")) return false;
-      if (line.includes("---")) return false;
-      const cols = line
-        .split("|")
-        .map((c) => c.trim().toLowerCase())
+      if (/^\|(?:\s*:?-{2,}:?\s*\|)+\s*$/.test(line.trim())) return false;
+      const cols = splitIndexCells(line)
+        .map((c) => c.toLowerCase())
         .filter(Boolean);
       if (cols.length > 0 && INDEX_HEADER_KEYWORDS.some((kw) => cols[0] === kw.toLowerCase())) {
         return false;
       }
       return true;
     })
-    .map((line) => line.split("|").map((part) => part.trim()))
+    .map((line) => splitIndexCells(line))
     .filter((parts) => parts.length >= 7)
     .map((parts) => ({
       id: parts[1],
@@ -490,7 +501,10 @@ function buildIndexMarkdown(langCode, rows = []) {
     return `${header}\n`;
   }
   const body = rows
-    .map((r) => `| ${r.id} | ${r.title} | ${r.description} | ${r.status} | ${r.createdAt} | ${r.updatedAt} |`)
+    .map(
+      (r) =>
+        `| ${[r.id, r.title, r.description, r.status, r.createdAt, r.updatedAt].map(escapeIndexCell).join(" | ")} |`
+    )
     .join("\n");
   return `${header}${body}\n`;
 }
@@ -603,10 +617,22 @@ function buildLocalizedReqFileContent(langCode, relType, replacements = {}) {
         .trimEnd() + "\n";
     case "handoff.md":
       return [
-        `# ${reqId} ${reqName} ${t.handoffTitle}`,
+        `# ${reqId}${reqName ? ` ${reqName}` : ""} ${t.handoffTitle}`,
         "",
-        ...t.handoffSections.flatMap((h) => {
-          if (h === t.handoffSections[7]) {
+        `- ${t.statusLabel}：${t.pending}`,
+        "",
+        ...t.handoffSections.flatMap((h, idx) => {
+          if (idx === 0) {
+            return [
+              `## ${h}`,
+              "- `srs.md`",
+              "- `uml/main.puml`",
+              "- `openapi.yaml`",
+              "- `db-schema.md`",
+              ""
+            ];
+          }
+          if (idx === 7) {
             return [`## ${h}`, t.handoffUiNote, ""];
           }
           return [`## ${h}`, `${t.tbd}.`, ""];
@@ -993,6 +1019,7 @@ module.exports = {
   extractSpecVersion,
   extractMergeStrategy,
   stampSpecVersionInContent,
+  escapeIndexCell,
   parseIndexRows,
   buildIndexMarkdown,
   buildSystemSpecMarkdown,
