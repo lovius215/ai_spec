@@ -140,6 +140,7 @@ function parseInline(text) {
     return holdToken(`<code>${escapeHtml(cleaned)}</code>`);
   });
 
+  processed = processed.replace(/<!--[\s\S]*?-->/g, "");
   processed = processed.replace(/<br\s*\/?>/gi, "\x00BR\x00");
   processed = escapeHtml(processed);
   processed = processed.replace(/\x00BR\x00/g, "<br/>");
@@ -199,6 +200,30 @@ function markdownToHtmlBody(markdown, options = {}) {
     if (/^<!--\s*pagebreak\s*-->$/i.test(line.trim())) {
       out.push('<div class="page-break"></div>');
       i++;
+      continue;
+    }
+
+    // Single or multi-line HTML comment (excluding pagebreak handled above)
+    if (line.trim().startsWith("<!--")) {
+      if (line.includes("-->")) {
+        const afterComment = line.slice(line.indexOf("-->") + 3).trim();
+        if (afterComment) {
+          out.push(`<p>${parseInline(afterComment)}</p>`);
+        }
+        i++;
+        continue;
+      }
+      i++;
+      while (i < lines.length && !lines[i].includes("-->")) {
+        i++;
+      }
+      if (i < lines.length) {
+        const afterComment = lines[i].slice(lines[i].indexOf("-->") + 3).trim();
+        if (afterComment) {
+          out.push(`<p>${parseInline(afterComment)}</p>`);
+        }
+        i++;
+      }
       continue;
     }
 
@@ -378,6 +403,7 @@ function markdownToHtmlBody(markdown, options = {}) {
       !lines[i].trim().startsWith(">") &&
       !lines[i].match(/^(\s*)([-*+]|\d+\.)\s+/) &&
       !/^(?:-{3,}|\*{3,}|_{3,})\s*$/.test(lines[i].trim()) &&
+      !lines[i].trim().startsWith("<!--") &&
       !(lines[i].includes("|") && i + 1 < lines.length && isTableSeparator(lines[i + 1]))
     ) {
       paraLines.push(parseInline(lines[i].trim()));
@@ -686,9 +712,10 @@ function renderHtmlToPdf(htmlContent, outputPdfPath, customBrowserPath) {
     }
 
     // Fallback: wkhtmltopdf if available
-    const wkWhich = spawnSync("which", ["wkhtmltopdf"], { encoding: "utf8" });
+    const whichCmd = process.platform === "win32" ? "where" : "which";
+    const wkWhich = spawnSync(whichCmd, ["wkhtmltopdf"], { encoding: "utf8" });
     if (wkWhich.status === 0 && wkWhich.stdout.trim()) {
-      const wkBin = wkWhich.stdout.trim();
+      const wkBin = wkWhich.stdout.trim().split(/\r?\n/)[0].trim();
       const wkRes = spawnSync(wkBin, ["--enable-local-file-access", tmpHtmlPath, absPdfPath], {
         encoding: "utf8",
         timeout: 30000
@@ -733,6 +760,14 @@ const MERGED_PDF_LABELS = {
   ko: { openapi: "OpenAPI 인터페이스 사양", uml: "UML 다이어그램 사양" }
 };
 
+function wrapCodeFence(content, lang = "") {
+  const text = String(content || "");
+  const matches = text.match(/`+/g) || [];
+  const maxTicks = matches.reduce((max, run) => Math.max(max, run.length), 2);
+  const fence = "`".repeat(maxTicks + 1);
+  return `${fence}${lang}\n${text}\n${fence}`;
+}
+
 function buildMergedRequirementMarkdown(reqDir, options = {}) {
   const dirName = path.basename(reqDir);
   const langKey = String(options.lang || "zh-TW").toLowerCase().trim();
@@ -754,7 +789,7 @@ function buildMergedRequirementMarkdown(reqDir, options = {}) {
     if (!raw) continue;
 
     if (item.isYaml) {
-      sections.push(`# ${item.label} (\`${item.file}\`)\n\n\`\`\`yaml\n${raw}\n\`\`\``);
+      sections.push(`# ${item.label} (\`${item.file}\`)\n\n${wrapCodeFence(raw, "yaml")}`);
     } else {
       sections.push(raw);
     }
@@ -769,7 +804,7 @@ function buildMergedRequirementMarkdown(reqDir, options = {}) {
     if (pumlFiles.length > 0) {
       const umlBlocks = pumlFiles.map((f) => {
         const pumlContent = fs.readFileSync(path.join(umlDir, f), "utf8").trim();
-        return `## \`uml/${f}\`\n\n\`\`\`plantuml\n${pumlContent}\n\`\`\``;
+        return `## \`uml/${f}\`\n\n${wrapCodeFence(pumlContent, "plantuml")}`;
       });
       sections.push(`# ${labels.uml} (\`uml/\`)\n\n${umlBlocks.join("\n\n")}`);
     }

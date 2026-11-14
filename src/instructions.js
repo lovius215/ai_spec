@@ -532,7 +532,7 @@ function runTemplatesList({ cwd = process.cwd(), templatesDir, args = [], fail }
 
   let langConfig = detectProjectLanguage(cwd);
   if (langOverride) {
-    const normalizedLang = normalizeLangKey(langOverride);
+    const normalizedLang = String(langOverride).toLowerCase().trim().replace(/_/g, "-");
     if (!SUPPORTED_LANGS[normalizedLang]) {
       fail(`不支援的語言 "${langOverride}"。可用語言: ${Object.values(SUPPORTED_LANGS).map((l) => l.code).join(", ")}`);
       return;

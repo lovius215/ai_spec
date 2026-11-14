@@ -140,7 +140,7 @@ function initProject(args = []) {
   const langArg = getOption(args, "--lang");
   let langConfig = SUPPORTED_LANGS["zh-tw"];
   if (langArg) {
-    const key = langArg.toLowerCase();
+    const key = langArg.toLowerCase().trim().replace(/_/g, "-");
     if (SUPPORTED_LANGS[key]) {
       langConfig = SUPPORTED_LANGS[key];
     } else {
@@ -431,6 +431,18 @@ function finalizeReq(args) {
         const nb = parseInt((b.name.match(/^REQ-(\d+)/i) || [])[1] || "0", 10);
         return nb - na;
       });
+    if (reqMatches.length > 1) {
+      const topNum = parseInt((reqMatches[0].name.match(/^REQ-(\d+)/i) || [])[1] || "0", 10);
+      const tiedMatches = reqMatches.filter(
+        (e) => parseInt((e.name.match(/^REQ-(\d+)/i) || [])[1] || "0", 10) === topNum
+      );
+      if (tiedMatches.length > 1) {
+        fail(
+          `找到多個相同優先序號的需求目錄，請改用完整目錄名稱或 --slug 指定: ${tiedMatches.map((e) => e.name).join(", ")}`
+        );
+        return;
+      }
+    }
     const reqMatch = reqMatches[0];
     if (reqMatch) {
       sourceDir = path.join(projectDir, reqMatch.name);
@@ -530,6 +542,16 @@ function finalizeReq(args) {
     });
     if (commitRes.status === 0) {
       console.log(`[Git] 分支 ${currentBranch} 提交完成: docs(${nextId}): ${rawName} - 規格確認歸檔`);
+    } else {
+      const stagedCheck = spawnSync("git", ["diff", "--cached", "--name-only"], { cwd, encoding: "utf8" });
+      if ((stagedCheck.stdout || "").trim()) {
+        const errMsg = (commitRes.stderr || commitRes.stdout || "").trim();
+        console.warn(
+          `[Git 警告] 分支 ${currentBranch} 提交未建立（可能尚未設定 Git user.name / user.email 或被 hook 阻擋）${errMsg ? `: ${errMsg}` : "。"}`
+        );
+        return;
+      }
+      console.log(`[Git] 分支 ${currentBranch} 無新變更需要提交，繼續後續流程。`);
     }
     if (remote) {
       pushBranchToRemote(cwd, remote, currentBranch);
@@ -556,6 +578,7 @@ function finalizeReq(args) {
         const checkoutRes = spawnSync("git", ["checkout", mainBranch], { cwd, encoding: "utf8" });
         if (checkoutRes.status !== 0) {
           console.error(`[Git 警告] 切換至主分支 ${mainBranch} 失敗: ${(checkoutRes.stderr || "").trim()}`);
+          process.exitCode = 1;
           return;
         }
 
@@ -567,13 +590,50 @@ function finalizeReq(args) {
         }
 
         const mergeRes = spawnSync("git", ["merge", currentBranch, "--no-edit"], { cwd, encoding: "utf8" });
-        if (mergeRes.status === 0) {
-          console.log(`[Git] 已成功將 ${currentBranch} 合併至 ${mainBranch}！`);
-          reindexProject();
-          const statusRes = spawnSync("git", ["status", "--porcelain", "project/index.md"], { cwd, encoding: "utf8" });
-          if (statusRes.stdout && statusRes.stdout.trim()) {
+        let mergedCleanly = mergeRes.status === 0;
+        let autoResolvedIndex = false;
+        if (!mergedCleanly) {
+          const conflictedRes = spawnSync("git", ["diff", "--name-only", "--diff-filter=U"], {
+            cwd,
+            encoding: "utf8"
+          });
+          const conflictedFiles =
+            conflictedRes.status === 0
+              ? (conflictedRes.stdout || "")
+                  .split(/\r?\n/)
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+              : [];
+          if (conflictedFiles.length === 1 && conflictedFiles[0] === "project/index.md") {
+            reindexProject();
             spawnSync("git", ["add", "project/index.md"], { cwd, encoding: "utf8" });
-            spawnSync("git", ["commit", "-m", `chore: update project/index.md for ${nextId}`], { cwd, encoding: "utf8" });
+            const resolvedCommit = spawnSync("git", ["commit", "--no-edit"], { cwd, encoding: "utf8" });
+            if (resolvedCommit.status === 0) {
+              mergedCleanly = true;
+              autoResolvedIndex = true;
+            }
+          }
+        }
+
+        if (mergedCleanly) {
+          console.log(
+            autoResolvedIndex
+              ? `[Git] 已成功將 ${currentBranch} 合併至 ${mainBranch}（並自動重建 project/index.md 索引）！`
+              : `[Git] 已成功將 ${currentBranch} 合併至 ${mainBranch}！`
+          );
+          if (!autoResolvedIndex) {
+            reindexProject();
+            const statusRes = spawnSync("git", ["status", "--porcelain", "project/index.md"], {
+              cwd,
+              encoding: "utf8"
+            });
+            if (statusRes.stdout && statusRes.stdout.trim()) {
+              spawnSync("git", ["add", "project/index.md"], { cwd, encoding: "utf8" });
+              spawnSync("git", ["commit", "-m", `chore: update project/index.md for ${nextId}`], {
+                cwd,
+                encoding: "utf8"
+              });
+            }
           }
           if (remote) {
             pushBranchToRemote(cwd, remote, mainBranch);
@@ -585,6 +645,7 @@ function finalizeReq(args) {
           console.error(
             `[Git 警告] 合併至 ${mainBranch} 發生衝突，請手動確認衝突狀況：\n${(mergeRes.stderr || mergeRes.stdout || "").trim()}`
           );
+          process.exitCode = 1;
         }
       }
     } else {
@@ -1050,10 +1111,18 @@ function upgradeProject(args = []) {
         let likelyHasUi = false;
 
         const inspectUiText = (text) => {
-          if (/無\s*UI|純後端|無介面|No UI|UI 要件なし|UI 요구사항 없음/i.test(text)) {
+          if (
+            /無\s*UI|无\s*UI|純後端|纯后端|無介面|无界面|No UI|UI 要件なし|画面なし|バックエンド専用|UI 요구사항 없음|UI 없음|화면 없음|백엔드 전용/i.test(
+              text
+            )
+          ) {
             explicitNoUi = true;
           }
-          if (/畫面|介面|UI|前端|按鈕|表單|點擊|頁面|Page|Screen|View|Modal/i.test(text)) {
+          if (
+            /畫面|画面|화면|介面|界面|UI|前端|按鈕|按钮|ボタン|버튼|表單|表单|フォーム|폼|點擊|点击|頁面|页面|ページ|페이지|Page|Screen|View|Modal/i.test(
+              text
+            )
+          ) {
             likelyHasUi = true;
           }
         };
@@ -1328,8 +1397,8 @@ Usage:
   sa-spec rules [name|all] [--list] [--json]
   sa-spec templates [name] [--lang <code>] [--list] [--json]
   sa-spec template <system-spec|req> [options]
-  sa-spec pdf <file.md|REQ-001|name> [--split] [--output out.pdf] [--online-uml | --no-uml-render]
-  sa-spec pdf --all [--split] [--online-uml | --no-uml-render]
+  sa-spec pdf <file.md|REQ-001|name> [--split] [--output out.pdf] [--browser <path>] [--online-uml | --no-uml-render]
+  sa-spec pdf --all [--split] [--browser <path>] [--online-uml | --no-uml-render]
   sa-spec reindex
   sa-spec check [--strict]
   sa-spec doctor

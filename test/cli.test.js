@@ -5,7 +5,15 @@ const os = require("os");
 const path = require("path");
 const { spawnSync, execFileSync } = require("child_process");
 const { encodePlantUml, buildHtmlDocument, buildMergedRequirementMarkdown } = require("../src/pdf");
-const { parseIndexRows, formatLocalDate } = require("../src/i18n");
+const {
+  parseIndexRows,
+  formatLocalDate,
+  detectProjectLanguage,
+  extractStatusFromContent,
+  extractSpecVersion,
+  extractMergeStrategy,
+  extractSrsMetadata
+} = require("../src/i18n");
 const { getPositionalArgs } = require("../src/instructions");
 
 const ROOT_DIR = path.resolve(__dirname, "..");
@@ -171,6 +179,7 @@ test("#5 & #6 finalize respects --pr / --no-merge and guards against concurrent 
   assert.equal(finA2.status, 0, finA2.stderr);
   assert.equal(fs.existsSync(path.join(workA, "project", "REQ-003-auth")), true);
   assert.equal(fs.existsSync(path.join(workA, "project", "REQ-002-pay")), true);
+  assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd: workA, encoding: "utf8" }).trim(), "");
 });
 
 test("#8 upgrade removes legacy managed skills/rules, preserves custom files & claude-mem-context, and protects source repo", (t) => {
@@ -971,4 +980,140 @@ test("#21 finalize stages system-spec.md, safe renumber regex & --name REQ-xxx, 
   assert.equal(instJson.status, 0, instJson.stderr);
   const parsed = JSON.parse(instJson.stdout);
   assert.deepEqual(parsed.context.drafts, ["hist-only"]);
+});
+
+test("#22 templates --lang validation, i18n edge cases, finalize conflict/failure safety, zh-CN no-UI upgrade, PDF comments & dynamic fences", (t) => {
+  const dir = makeTempDir();
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  // 1. templates rejects unsupported --lang, accepts underscore variant zh_TW, init normalizes zh_TW, help lists [--browser <path>]
+  const badTplLang = runCli(dir, ["templates", "--lang", "fr"]);
+  assert.notEqual(badTplLang.status, 0);
+  assert.match(badTplLang.stderr, /不支援的語言/);
+
+  const okTplLang = runCli(dir, ["templates", "system-spec", "--lang", "zh_TW"]);
+  assert.equal(okTplLang.status, 0, okTplLang.stderr);
+
+  const helpRes = runCli(dir, ["--help"]);
+  assert.equal(helpRes.status, 0);
+  assert.match(helpRes.stdout, /sa-spec pdf .*\[--browser <path>\]/);
+
+  const initUnderscore = runCli(dir, ["init", "--lang", "zh_TW"]);
+  assert.equal(initUnderscore.status, 0, initUnderscore.stderr);
+  assert.doesNotMatch(initUnderscore.stdout, /警告: 不支援的語言代碼/);
+  assert.equal(detectProjectLanguage(dir).code, "zh-TW");
+
+  // 2. detectProjectLanguage avoids 2-letter substring false positives, extractors accept bullet/bold syntax, and SRS heading prefix strips leading SRS:
+  const sysSpecPath = path.join(dir, "project", "system-spec.md");
+  fs.writeFileSync(sysSpecPath, "# System\n\n* **Language:** Slovenian\n", "utf8");
+  assert.equal(detectProjectLanguage(dir).code, "custom");
+
+  const boldMeta = [
+    "* **狀態**：**已審核**",
+    "* **規範版本：** 0.2.8",
+    "- **Merge Strategy:** pr"
+  ].join("\n");
+  assert.equal(extractStatusFromContent(boldMeta), "已審核");
+  assert.equal(extractSpecVersion(boldMeta), "0.2.8");
+  assert.equal(extractMergeStrategy(boldMeta), "pr");
+  assert.equal(extractSrsMetadata("# SRS：REQ-001 Login Flow\n\n- Status: Confirmed\n").title, "Login Flow");
+
+  // 3. finalize rejects ambiguous REQ-xxx prefix matches tied at the same top number
+  const ambigDir = makeTempDir();
+  t.after(() => fs.rmSync(ambigDir, { recursive: true, force: true }));
+  assert.equal(runCli(ambigDir, ["init", "--lang", "en"]).status, 0);
+  assert.equal(runCli(ambigDir, ["new", "--id", "REQ-001", "--name", "alpha"]).status, 0);
+  assert.equal(runCli(ambigDir, ["new", "--id", "REQ-001", "--name", "beta"]).status, 0);
+  const ambigFin = runCli(ambigDir, ["finalize", "--name", "REQ-001"]);
+  assert.notEqual(ambigFin.status, 0);
+  assert.match(ambigFin.stderr, /找到多個相同優先序號的需求目錄/);
+
+  // 4. Feature-branch git commit failure warns cleanly without pushing stale state or dirty-tree false alarm
+  const featFailDir = makeTempDir();
+  t.after(() => fs.rmSync(featFailDir, { recursive: true, force: true }));
+  execFileSync("git", ["init", "-b", "master"], { cwd: featFailDir });
+  execFileSync("git", ["config", "user.name", "Test User"], { cwd: featFailDir });
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: featFailDir });
+  assert.equal(runCli(featFailDir, ["init", "--lang", "en"]).status, 0);
+  execFileSync("git", ["add", "-A"], { cwd: featFailDir });
+  execFileSync("git", ["commit", "-m", "init"], { cwd: featFailDir });
+  assert.equal(runCli(featFailDir, ["new", "--name", "wip", "--branch"]).status, 0);
+  execFileSync("git", ["config", "--unset", "user.name"], { cwd: featFailDir });
+  execFileSync("git", ["config", "--unset", "user.email"], { cwd: featFailDir });
+  execFileSync("git", ["config", "user.useConfigOnly", "true"], { cwd: featFailDir });
+  const featCommitFail = spawnSync(process.execPath, [CLI_PATH, "finalize", "--name", "wip"], {
+    cwd: featFailDir,
+    encoding: "utf8",
+    env: { ...process.env, SA_SPEC_NO_UML_NET: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" }
+  });
+  assert.equal(featCommitFail.status, 0);
+  assert.match(featCommitFail.stderr, /\[Git 警告\] 分支 feat\/wip 提交未建立/);
+  assert.doesNotMatch(featCommitFail.stderr, /工作區仍有未提交的變更/);
+
+  // 5. Auto-merge conflict during finalize exits non-zero with explicit warning
+  const conflictDir = makeTempDir();
+  t.after(() => fs.rmSync(conflictDir, { recursive: true, force: true }));
+  execFileSync("git", ["init", "-b", "master"], { cwd: conflictDir });
+  execFileSync("git", ["config", "user.name", "Test User"], { cwd: conflictDir });
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: conflictDir });
+  assert.equal(runCli(conflictDir, ["init", "--lang", "en"]).status, 0);
+  const conflictSysSpec = path.join(conflictDir, "project", "system-spec.md");
+  const baseSysSpec = fs.readFileSync(conflictSysSpec, "utf8");
+  execFileSync("git", ["add", "-A"], { cwd: conflictDir });
+  execFileSync("git", ["commit", "-m", "init"], { cwd: conflictDir });
+  assert.equal(runCli(conflictDir, ["new", "--name", "side", "--branch"]).status, 0);
+  fs.writeFileSync(conflictSysSpec, `${baseSysSpec}\n- Owner: Side Branch\n`, "utf8");
+  execFileSync("git", ["add", "-A"], { cwd: conflictDir });
+  execFileSync("git", ["commit", "-m", "side spec update"], { cwd: conflictDir });
+  execFileSync("git", ["checkout", "master"], { cwd: conflictDir });
+  fs.writeFileSync(conflictSysSpec, `${baseSysSpec}\n- Owner: Master Branch\n`, "utf8");
+  execFileSync("git", ["add", "-A"], { cwd: conflictDir });
+  execFileSync("git", ["commit", "-m", "master spec update"], { cwd: conflictDir });
+  execFileSync("git", ["checkout", "feat/side"], { cwd: conflictDir });
+  const mergeConflictRes = runCli(conflictDir, ["finalize", "--name", "side"]);
+  assert.equal(mergeConflictRes.status, 1);
+  assert.match(mergeConflictRes.stderr, /\[Git 警告\] 合併至 master 發生衝突/);
+
+  // 6. zh-CN upgrade avoids false wireframe warning when handoff declares 无 UI 界面需求
+  const zhCnDir = makeTempDir();
+  t.after(() => fs.rmSync(zhCnDir, { recursive: true, force: true }));
+  assert.equal(runCli(zhCnDir, ["init", "--lang", "zh-CN"]).status, 0);
+  assert.equal(runCli(zhCnDir, ["new", "--id", "REQ-001", "--name", "backend-api"]).status, 0);
+  const zhCnReqDir = path.join(zhCnDir, "project", "REQ-001-backend-api");
+  fs.rmSync(path.join(zhCnReqDir, "uml", "wireframe.puml"), { force: true });
+  fs.writeFileSync(path.join(zhCnReqDir, "srs.md"), "# REQ-001 后台接口\n\n## 目标\n- 供前端界面调用的 API。\n", "utf8");
+  fs.writeFileSync(path.join(zhCnReqDir, "handoff.md"), "# 交接摘要\n\n- UI 范围：无 UI 界面需求，纯后端接口。\n", "utf8");
+  const upZhCn = runCli(zhCnDir, ["upgrade"]);
+  assert.equal(upZhCn.status, 0, upZhCn.stderr);
+  assert.match(upZhCn.stdout, /SKIPPED project\/REQ-001-backend-api\/uml\/wireframe\.puml - 已標記為無 UI 需求/);
+  assert.doesNotMatch(upZhCn.stdout, /WARN/i);
+
+  // 7. PDF renderer strips HTML comments, keeps inline-code comments & pagebreak, and dynamically lengthens code fences
+  const commentMd = [
+    "<!-- single-line hidden -->",
+    "<!--",
+    "  multi-line hidden",
+    "-->",
+    "Visible <!-- inline hidden --> paragraph `<!-- code-kept -->`.",
+    "<!-- pagebreak -->",
+    "After pagebreak"
+  ].join("\n");
+  const commentHtml = buildHtmlDocument("Comments Test", commentMd, { noUmlRender: true, lang: "en" });
+  assert.doesNotMatch(commentHtml, /single-line hidden|multi-line hidden|inline hidden/);
+  assert.match(commentHtml, /<code>&lt;!-- code-kept --&gt;<\/code>/);
+  assert.match(commentHtml, /<div class="page-break"><\/div>/);
+  assert.match(commentHtml, /After pagebreak/);
+
+  const fenceReqDir = path.join(dir, "project", "REQ-099-fence-demo");
+  fs.mkdirSync(path.join(fenceReqDir, "uml"), { recursive: true });
+  fs.writeFileSync(
+    path.join(fenceReqDir, "openapi.yaml"),
+    "openapi: 3.0.3\ninfo:\n  description: |\n    ```json\n    {\"ok\": true}\n    ```\n",
+    "utf8"
+  );
+  const merged = buildMergedRequirementMarkdown(fenceReqDir, { lang: "en" });
+  assert.match(merged.markdown, /````yaml\nopenapi: 3\.0\.3[\s\S]*```json[\s\S]*\n````/);
+  const mergedHtml = buildHtmlDocument(merged.title, merged.markdown, { noUmlRender: true, lang: "en" });
+  assert.equal((mergedHtml.match(/<pre>/g) || []).length, 1);
+  assert.match(mergedHtml, /```json/);
 });

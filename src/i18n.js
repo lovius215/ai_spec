@@ -406,17 +406,22 @@ function detectProjectLanguage(cwd) {
   const systemSpecPath = path.join(cwd, "project", "system-spec.md");
   if (fs.existsSync(systemSpecPath)) {
     const content = fs.readFileSync(systemSpecPath, "utf8");
-    const match = content.match(/^-\s*(?:主要語言|主要语言|主要言語|주요 언어|語言|語言設定|Language)[：:]\s*(.+)$/im);
+    const match = content.match(
+      /^[-*]\s*\*{0,2}(?:主要語言|主要语言|主要言語|주요 언어|語言|語言設定|Language)\*{0,2}[：:]\*{0,2}\s*(.+)$/im
+    );
     if (match) {
-      const val = match[1].trim();
+      const val = match[1].trim().replace(/^\*{1,2}|\*{1,2}$/g, "").trim();
+      const valNormalized = val.toLowerCase().replace(/_/g, "-");
       for (const key of Object.keys(SUPPORTED_LANGS)) {
+        const cfg = SUPPORTED_LANGS[key];
+        const keyBoundary = new RegExp(`(?:^|[^a-z0-9-])${key}(?:$|[^a-z0-9-])`, "i");
         if (
-          val.toLowerCase().includes(key) ||
-          val.includes(SUPPORTED_LANGS[key].label) ||
-          val.includes(SUPPORTED_LANGS[key].name) ||
-          val.toLowerCase().includes(SUPPORTED_LANGS[key].code.toLowerCase())
+          valNormalized === key ||
+          val.includes(cfg.label) ||
+          val.includes(cfg.name) ||
+          keyBoundary.test(valNormalized)
         ) {
-          return SUPPORTED_LANGS[key];
+          return cfg;
         }
       }
       return { code: "custom", label: val, name: val };
@@ -427,21 +432,25 @@ function detectProjectLanguage(cwd) {
 
 function extractStatusFromContent(content) {
   if (!content) return null;
-  const match = content.match(/^-\s*(?:狀態|状态|ステータス|상태|Status)[：:]\s*(.+)$/im);
-  return match ? match[1].trim() : null;
+  const match = content.match(/^[-*]\s*\*{0,2}(?:狀態|状态|ステータス|상태|Status)\*{0,2}[：:]\*{0,2}\s*(.+)$/im);
+  return match ? match[1].trim().replace(/^\*{1,2}|\*{1,2}$/g, "").trim() : null;
 }
 
 function extractSpecVersion(content) {
   if (!content) return null;
-  const match = content.match(/^-\s*(?:規範版本|规范版本|仕様バージョン|사양 버전|Spec Version)[：:]\s*([0-9]+\.[0-9]+\.[0-9]+[^\s]*)$/im);
+  const match = content.match(
+    /^[-*]\s*\*{0,2}(?:規範版本|规范版本|仕様バージョン|사양 버전|Spec Version)\*{0,2}[：:]\*{0,2}\s*([0-9]+\.[0-9]+\.[0-9]+[^\s*]*)\*{0,2}\s*$/im
+  );
   return match ? match[1].trim() : null;
 }
 
 function extractMergeStrategy(content) {
   if (!content) return "auto-merge";
-  const match = content.match(/^-\s*(?:合併策略|合并策略|マージ戦略|병합 전략|Merge Strategy)[：:]\s*(.+)$/im);
+  const match = content.match(
+    /^[-*]\s*\*{0,2}(?:合併策略|合并策略|マージ戦略|병합 전략|Merge Strategy)\*{0,2}[：:]\*{0,2}\s*(.+)$/im
+  );
   if (!match) return "auto-merge";
-  const val = match[1].trim().toLowerCase();
+  const val = match[1].trim().replace(/^\*{1,2}|\*{1,2}$/g, "").trim().toLowerCase();
   if (val.includes("pr") || val.includes("no-merge") || val.includes("manual")) {
     return "pr";
   }
@@ -451,19 +460,17 @@ function extractMergeStrategy(content) {
 function stampSpecVersionInContent(content, version, langCode = "zh-TW") {
   const t = getLangStrings(langCode);
   const versionLine = `- ${t.specVersionLabel}：${version}`;
-  const versionLineRegex = /^-\s*(?:規範版本|规范版本|仕様バージョン|사양 버전|Spec Version)[：:].*$/im;
+  const versionLineRegex =
+    /^([-*]\s*\*{0,2}(?:規範版本|规范版本|仕様バージョン|사양 버전|Spec Version)\*{0,2}[：:]\*{0,2}\s*).*$/im;
   if (versionLineRegex.test(content)) {
-    return content.replace(versionLineRegex, (line) => {
-      const prefix = line.split(/[：:]/)[0];
-      const sep = line.includes("：") ? "：" : ": ";
-      return `${prefix}${sep}${version}`;
-    });
+    return content.replace(versionLineRegex, (_, prefix) => `${prefix}${version}`);
   }
-  const langLineRegex = /^-\s*(?:主要語言|主要语言|主要言語|주요 언어|語言|Language)[：:].*$/im;
+  const langLineRegex =
+    /^[-*]\s*\*{0,2}(?:主要語言|主要语言|主要言語|주요 언어|語言|語言設定|Language)\*{0,2}[：:].*$/im;
   if (langLineRegex.test(content)) {
     return content.replace(langLineRegex, (line) => `${line}\n${versionLine}`);
   }
-  const statusLineRegex = /^-\s*(?:狀態|状态|ステータス|상태|Status)[：:].*$/im;
+  const statusLineRegex = /^[-*]\s*\*{0,2}(?:狀態|状态|ステータス|상태|Status)\*{0,2}[：:].*$/im;
   if (statusLineRegex.test(content)) {
     return content.replace(statusLineRegex, (line) => `${line}\n${versionLine}`);
   }
@@ -1013,7 +1020,10 @@ function extractSrsMetadata(srsContent) {
   if (headingMatch) {
     let rawHeading = headingMatch[1].trim();
     rawHeading = rawHeading
-      .replace(/^(?:需求規格|需求规格|要件定義書?|要件仕様書?|요구사항\s*명세서?|Software Requirements Specification)\s*[：:]\s*/i, "")
+      .replace(
+        /^(?:需求規格|需求规格|要件定義書?|要件仕様書?|요구사항\s*명세서?|Software Requirements Specification(?:\s*\(SRS\))?|SRS)\s*[：:]\s*/i,
+        ""
+      )
       .replace(/^\[?\s*(?:REQ-\d+|\{\{REQ_ID\}\})\s*\]?\s*(?:[：:\-–—]\s*)?/i, "")
       .replace(/\s+(?:SRS|需求規格|需求规格|要件定義書?|요구사항\s*명세서?)$/i, "")
       .trim();
