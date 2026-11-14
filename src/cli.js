@@ -1413,6 +1413,10 @@ function runPdf(args = []) {
     fail("錯誤: --split 與 --output 不能同時使用（--split 會為每個 Markdown 檔案分別產生對應的 PDF）。");
     return;
   }
+  if (all && output) {
+    fail("錯誤: --all 與 --output 不能同時使用（--all 會為每個需求目錄分別產生對應的 PDF）。");
+    return;
+  }
   if (!all && !target) {
     fail(
       "Usage: sa-spec pdf <file.md|REQ-001|name> [--split] [--output out.pdf] [--browser <path>] [--online-uml | --no-uml-render]\n       sa-spec pdf --all [--split] [--online-uml | --no-uml-render]"

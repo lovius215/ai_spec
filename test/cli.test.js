@@ -1573,12 +1573,15 @@ test("#27 PDF renderHtmlToPdf path/status guards, --browser validation, and --sp
       process.env.PATH = origPath;
     }
 
-    // 4. CLI rejects --split combined with --output
+    // 4. CLI rejects --split or --all combined with --output
     assert.equal(runCli(pdfTmp, ["init", "--lang", "en"]).status, 0);
     assert.equal(runCli(pdfTmp, ["new", "--id", "REQ-001", "--name", "demo"]).status, 0);
     const splitOutRes = runCli(pdfTmp, ["pdf", "REQ-001", "--split", "--output", "out.pdf"]);
     assert.notEqual(splitOutRes.status, 0);
     assert.match(splitOutRes.stderr, /--split 與 --output 不能同時使用/);
+    const allOutRes = runCli(pdfTmp, ["pdf", "--all", "--output", "out.pdf"]);
+    assert.notEqual(allOutRes.status, 0);
+    assert.match(allOutRes.stderr, /--all 與 --output 不能同時使用/);
   } finally {
     fs.rmSync(pdfTmp, { recursive: true, force: true });
   }
