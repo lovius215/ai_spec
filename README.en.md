@@ -106,7 +106,7 @@ sa-spec --version
 | `sa-spec instructions [stage] [--with-rules] [--json]` | Prints live workspace context, workflow steps, language directive, and built-in `SKILL.md` guidance for a stage (`init`, `propose`, `analyze`, `commit`, `pdf`). |
 | `sa-spec rules [name\|all] [--list] [--json]` | Reads or lists built-in analysis rule documents bundled in the package. |
 | `sa-spec templates [name] [--lang <code>] [--list] [--json]` | Reads or lists built-in document and PlantUML templates localized for the workspace language or `--lang`. |
-| `sa-spec pdf <target> [--split] [--output out.pdf] [--online-uml \| --no-uml-render]` | Converts a `.md` file or requirement (`REQ-001`) to a merged or split PDF (privacy-safe by default: uses local `plantuml`, or `--online-uml` / `SA_SPEC_PLANTUML_SERVER` if explicitly requested). |
+| `sa-spec pdf <target> [--split] [--output out.pdf] [--browser <path>] [--online-uml \| --no-uml-render]` | Converts a `.md` file or requirement (`REQ-001`) to a merged or split PDF (privacy-safe by default: uses local `plantuml`, or `--online-uml` / `SA_SPEC_PLANTUML_SERVER` if explicitly requested). |
 | `sa-spec reindex` | Scans `project/REQ-*` directories and dynamically rebuilds `project/index.md` sorted by numerical ID with extracted SRS title and summary. |
 | `sa-spec check [--strict]` | Validates required files, duplicate IDs, deliverable integrity, and exits non-zero on errors (`--strict` also fails on spec version mismatch or legacy `skills/`/`rules/`). |
 | `sa-spec status` | Displays overview status of requirements and specs. |

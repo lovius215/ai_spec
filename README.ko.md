@@ -106,7 +106,7 @@ sa-spec --version
 | `sa-spec instructions [stage] [--with-rules] [--json]` | 현재 워크스페이스 상태, 언어 지시문 및 단계별 내장 분석 규범을 출력합니다. |
 | `sa-spec rules [name\|all] [--list] [--json]` | 패키지에 내장된 보조 규칙 문서를 조회하거나 목록을 출력합니다. |
 | `sa-spec templates [name] [--lang <code>] [--list] [--json]` | 프로젝트 언어 또는 `--lang`에 맞춰 현지화된 문서 및 PlantUML 템플릿을 조회합니다. |
-| `sa-spec pdf <target> [--split] [--output out.pdf] [--online-uml \| --no-uml-render]` | 지정한 `.md` 또는 요구사항(`REQ-001`)을 PDF로 변환합니다(기본값은 외부 서버 전송 없이 로컬 `plantuml`만 사용, 온라인 렌더링 시 `--online-uml` 지정). |
+| `sa-spec pdf <target> [--split] [--output out.pdf] [--browser <path>] [--online-uml \| --no-uml-render]` | 지정한 `.md` 또는 요구사항(`REQ-001`)을 PDF로 변환합니다(기본값은 외부 서버 전송 없이 로컬 `plantuml`만 사용, 온라인 렌더링 시 `--online-uml` 지정). |
 | `sa-spec reindex` | `project/REQ-*`를 스캔하고 SRS 제목·요약을 추출해 `project/index.md`를 동적으로 재구축합니다. |
 | `sa-spec check [--strict]` | 필수 파일, 중복 번호, 산출물 무결성을 검증하고 오류 시 exit code 1을 반환합니다(`--strict`는 버전 불일치 및 구버전 `skills/`·`rules/`도 실패 처리). |
 | `sa-spec status` | 요구사항 및 시스템 사양 현황을 확인합니다. |

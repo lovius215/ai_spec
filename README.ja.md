@@ -106,7 +106,7 @@ sa-spec --version
 | `sa-spec instructions [stage] [--with-rules] [--json]` | 現在のワークスペース状態、言語指示ディレクティブ、各段階の組み込み規範を出力します。 |
 | `sa-spec rules [name\|all] [--list] [--json]` | パッケージに組み込まれた補助ルールの一覧表示または内容参照を行います。 |
 | `sa-spec templates [name] [--lang <code>] [--list] [--json]` | プロジェクト言語または `--lang` に合わせてローカライズされたテンプレートを表示します。 |
-| `sa-spec pdf <target> [--split] [--output out.pdf] [--online-uml \| --no-uml-render]` | 指定した `.md` または要件（`REQ-001`）を PDF 出力します（デフォルトはローカル `plantuml` のみ使用し外部送信しません。オンライン描画時は `--online-uml` を指定）。 |
+| `sa-spec pdf <target> [--split] [--output out.pdf] [--browser <path>] [--online-uml \| --no-uml-render]` | 指定した `.md` または要件（`REQ-001`）を PDF 出力します（デフォルトはローカル `plantuml` のみ使用し外部送信しません。オンライン描画時は `--online-uml` を指定）。 |
 | `sa-spec reindex` | `project/REQ-*` をスキャンし、SRS のタイトル・概要を抽出して `project/index.md` を再構築します。 |
 | `sa-spec check [--strict]` | 必須ファイル・番号重複・成果物整合性を検証し失敗時は終了コード 1 を返します（`--strict` でバージョン不一致や旧 `skills/`・`rules/` もエラー扱い）。 |
 | `sa-spec status` | 要件とシステム仕様の概要ステータスを表示します。 |

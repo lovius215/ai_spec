@@ -106,7 +106,7 @@ sa-spec --version
 | `sa-spec instructions [stage] [--with-rules] [--json]` | 输出当前工作区上下文、语言强制规范、阶段步骤与内置完整分析规范（`init` / `propose` / `analyze` / `commit` / `pdf`）。 |
 | `sa-spec rules [name\|all] [--list] [--json]` | 读取或列出套件内置补充规则文档。 |
 | `sa-spec templates [name] [--lang <code>] [--list] [--json]` | 读取或列出按项目语言或 `--lang` 本地化的文档与 PlantUML 模板。 |
-| `sa-spec pdf <target> [--split] [--output out.pdf] [--online-uml \| --no-uml-render]` | 将指定 `.md` 或需求（`REQ-001`）合并或拆分导出为 PDF（默认不上传公开网络服务器，优先使用本机 `plantuml`，在线转绘请加 `--online-uml`）。 |
+| `sa-spec pdf <target> [--split] [--output out.pdf] [--browser <path>] [--online-uml \| --no-uml-render]` | 将指定 `.md` 或需求（`REQ-001`）合并或拆分导出为 PDF（默认不上传公开网络服务器，优先使用本机 `plantuml`，在线转绘请加 `--online-uml`）。 |
 | `sa-spec reindex` | 扫描 `project/REQ-*` 目录，按数字序号重新生成 `project/index.md` 并提取 SRS 标题与摘要。 |
 | `sa-spec check [--strict]` | 校验项目必要文件、编号唯一性与交付物完整度并回传非零退出码（`--strict` 同时严查规范版本与旧版 `skills/`/`rules/`）。 |
 | `sa-spec status` | 查看系统规格与需求总览状态。 |

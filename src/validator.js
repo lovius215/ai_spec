@@ -158,19 +158,27 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
   // Validate PlantUML single-diagram-per-file rule
   const umlDir = path.join(reqAbsDir, "uml");
   if (fs.existsSync(umlDir)) {
-    const pumlFiles = fs.readdirSync(umlDir).filter((f) => f.endsWith(".puml"));
-    if (pumlFiles.length === 0) {
-      issues.push("uml/ 目錄內沒有任何 .puml 檔案");
-    }
-    for (const f of pumlFiles) {
-      const pumlText = fs.readFileSync(path.join(umlDir, f), "utf8");
-      if (!isDraft && pumlText.includes("{{REQ_ID}}")) {
-        issues.push(`uml/${f} 仍殘留未替換的 {{REQ_ID}} 佔位符`);
+    if (!fs.statSync(umlDir).isDirectory()) {
+      issues.push("uml/ 必須為目錄而非檔案");
+    } else {
+      const pumlFiles = fs
+        .readdirSync(umlDir)
+        .filter((f) => f.toLowerCase().endsWith(".puml"));
+      if (pumlFiles.length === 0) {
+        issues.push("uml/ 目錄內沒有任何 .puml 檔案");
       }
-      const startCount = (pumlText.match(/@start\w+/gi) || []).length;
-      const endCount = (pumlText.match(/@end\w+/gi) || []).length;
-      if (startCount !== 1 || endCount !== 1) {
-        issues.push(`uml/${f} 違反單檔單圖原則 (@start=${startCount}, @end=${endCount})`);
+      for (const f of pumlFiles) {
+        const pumlAbs = path.join(umlDir, f);
+        if (!fs.statSync(pumlAbs).isFile()) continue;
+        const pumlText = fs.readFileSync(pumlAbs, "utf8");
+        if (!isDraft && pumlText.includes("{{REQ_ID}}")) {
+          issues.push(`uml/${f} 仍殘留未替換的 {{REQ_ID}} 佔位符`);
+        }
+        const startCount = (pumlText.match(/@start\w+/gi) || []).length;
+        const endCount = (pumlText.match(/@end\w+/gi) || []).length;
+        if (startCount !== 1 || endCount !== 1) {
+          issues.push(`uml/${f} 違反單檔單圖原則 (@start=${startCount}, @end=${endCount})`);
+        }
       }
     }
   }

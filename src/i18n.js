@@ -394,7 +394,7 @@ function formatLocalDate(date = new Date()) {
 
 function normalizeLangKey(langCode) {
   if (!langCode) return "zh-tw";
-  const key = String(langCode).toLowerCase().trim();
+  const key = String(langCode).toLowerCase().trim().replace(/_/g, "-");
   return SUPPORTED_LANGS[key] ? key : "zh-tw";
 }
 
@@ -410,7 +410,7 @@ function detectProjectLanguage(cwd) {
       /^[-*]\s*\*{0,2}(?:主要語言|主要语言|主要言語|주요 언어|語言|語言設定|Language)\*{0,2}[：:]\*{0,2}\s*(.+)$/im
     );
     if (match) {
-      const val = match[1].trim().replace(/^\*{1,2}|\*{1,2}$/g, "").trim();
+      const val = match[1].trim().replace(/^[`*]+|[`*]+$/g, "").trim();
       const valNormalized = val.toLowerCase().replace(/_/g, "-");
       for (const key of Object.keys(SUPPORTED_LANGS)) {
         const cfg = SUPPORTED_LANGS[key];
@@ -433,13 +433,13 @@ function detectProjectLanguage(cwd) {
 function extractStatusFromContent(content) {
   if (!content) return null;
   const match = content.match(/^[-*]\s*\*{0,2}(?:狀態|状态|ステータス|상태|Status)\*{0,2}[：:]\*{0,2}\s*(.+)$/im);
-  return match ? match[1].trim().replace(/^\*{1,2}|\*{1,2}$/g, "").trim() : null;
+  return match ? match[1].trim().replace(/^[`*]+|[`*]+$/g, "").trim() : null;
 }
 
 function extractSpecVersion(content) {
   if (!content) return null;
   const match = content.match(
-    /^[-*]\s*\*{0,2}(?:規範版本|规范版本|仕様バージョン|사양 버전|Spec Version)\*{0,2}[：:]\*{0,2}\s*([0-9]+\.[0-9]+\.[0-9]+[^\s*]*)\*{0,2}\s*$/im
+    /^[-*]\s*\*{0,2}(?:規範版本|规范版本|仕様バージョン|사양 버전|Spec Version)\*{0,2}[：:]\*{0,2}\s*`?([0-9]+\.[0-9]+\.[0-9]+[^\s*`]*)[`*]{0,2}\s*$/im
   );
   return match ? match[1].trim() : null;
 }
@@ -450,7 +450,7 @@ function extractMergeStrategy(content) {
     /^[-*]\s*\*{0,2}(?:合併策略|合并策略|マージ戦略|병합 전략|Merge Strategy)\*{0,2}[：:]\*{0,2}\s*(.+)$/im
   );
   if (!match) return "auto-merge";
-  const val = match[1].trim().replace(/^\*{1,2}|\*{1,2}$/g, "").trim().toLowerCase();
+  const val = match[1].trim().replace(/^[`*]+|[`*]+$/g, "").trim().toLowerCase();
   if (val.includes("pr") || val.includes("no-merge") || val.includes("manual")) {
     return "pr";
   }

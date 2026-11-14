@@ -1,6 +1,6 @@
 ---
 name: system-analysis
-description: 用 init、propose、analyze、commit 四段流程整理需求，並產出 SRS、UML、OpenAPI、DB Schema。
+description: 用 init、propose、analyze、commit、pdf 五個指令流程整理需求，並產出 SRS、UML、OpenAPI、DB Schema、PDF。
 ---
 
 # System Analysis Skill

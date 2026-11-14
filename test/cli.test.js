@@ -6,6 +6,7 @@ const path = require("path");
 const { spawnSync, execFileSync } = require("child_process");
 const { encodePlantUml, buildHtmlDocument, buildMergedRequirementMarkdown } = require("../src/pdf");
 const {
+  normalizeLangKey,
   parseIndexRows,
   formatLocalDate,
   detectProjectLanguage,
@@ -1116,4 +1117,122 @@ test("#22 templates --lang validation, i18n edge cases, finalize conflict/failur
   const mergedHtml = buildHtmlDocument(merged.title, merged.markdown, { noUmlRender: true, lang: "en" });
   assert.equal((mergedHtml.match(/<pre>/g) || []).length, 1);
   assert.match(mergedHtml, /```json/);
+});
+
+test("#23 regression checks: slug disambiguation, binary safety, underscore lang, uml file guard, and GFM rendering", () => {
+  // 1. Underscore lang normalization & backtick-wrapped metadata extraction
+  assert.equal(normalizeLangKey("zh_CN"), "zh-cn");
+  assert.equal(normalizeLangKey("zh_TW"), "zh-tw");
+  assert.equal(normalizeLangKey("EN"), "en");
+  assert.equal(extractStatusFromContent("- 狀態：`已審核`"), "已審核");
+  assert.equal(extractStatusFromContent("- Status: **`Approved`**"), "Approved");
+  assert.equal(extractSpecVersion("- 規範版本：`0.2.8`"), "0.2.8");
+  assert.equal(extractMergeStrategy("- 合併策略：`pr`"), "pr");
+
+  // 2. Math asterisks & pipe-less-outer GFM table rendering
+  const md = [
+    "Result: 2 * 3 * 4 = 24 and *italic* and *x*.",
+    "",
+    "Col A | Col B",
+    "--- | ---:|",
+    "V1 | V2",
+    "V3 | V4",
+    "# Heading | After Table"
+  ].join("\n");
+  const html = buildHtmlDocument("Formatting Regression", md, { noUmlRender: true, lang: "en" });
+  assert.match(html, /2 \* 3 \* 4 = 24/);
+  assert.match(html, /<em>italic<\/em>/);
+  assert.match(html, /<em>x<\/em>/);
+  assert.match(html, /<td[^>]*>V1<\/td>/);
+  assert.match(html, /<td[^>]*>V3<\/td>/);
+  assert.match(html, /<td[^>]*>V4<\/td><\/tr><\/tbody><\/table>/);
+  assert.match(html, /<h1>Heading \| After Table<\/h1>/);
+
+  // 3. Language detection with backticks/underscore & non-directory uml guard in check + pdf
+  const dir = makeTempDir("sa-spec-reg23-");
+  try {
+    let res = runCli(dir, ["init", "--lang", "en"]);
+    assert.equal(res.status, 0, res.stderr);
+
+    const langTempDir = path.join(dir, "tmp-zhcn");
+    fs.mkdirSync(path.join(langTempDir, "project"), { recursive: true });
+    fs.writeFileSync(path.join(langTempDir, "project", "system-spec.md"), "- 主要語言：`zh_CN`\n", "utf8");
+    assert.equal(detectProjectLanguage(langTempDir).code, "zh-CN");
+
+    res = runCli(dir, ["new", "--id", "REQ-001", "--name", "user-auth"]);
+    assert.equal(res.status, 0, res.stderr);
+    assert.ok(fs.existsSync(path.join(dir, "project", "REQ-001-user-auth")));
+
+    // Exact slug guard: "--name auth" must NOT match "REQ-001-user-auth"
+    const missFinalize = runCli(dir, ["finalize", "--name", "auth"]);
+    assert.notEqual(missFinalize.status, 0);
+    assert.ok(fs.existsSync(path.join(dir, "project", "REQ-001-user-auth")));
+
+    // Non-directory uml file in project/REQ-002-bad-uml must yield clean validation issue without ENOTDIR crash
+    const badUmlDir = path.join(dir, "project", "REQ-002-bad-uml");
+    fs.mkdirSync(badUmlDir, { recursive: true });
+    fs.writeFileSync(path.join(badUmlDir, "srs.md"), "# REQ-002 Bad UML\n\n- Status: Draft\n\n## Summary\nx\n\n## Functional Requirements\nx\n\n## Acceptance Criteria\nx\n", "utf8");
+    fs.writeFileSync(path.join(badUmlDir, "uml"), "not a directory", "utf8");
+
+    const mergedBadUml = buildMergedRequirementMarkdown(badUmlDir, { lang: "zh_CN" });
+    assert.doesNotMatch(mergedBadUml.markdown, /not a directory/);
+
+    const checkRes = runCli(dir, ["check"]);
+    assert.equal(checkRes.status, 1);
+    assert.match(checkRes.stdout + checkRes.stderr, /uml\/ 必須為目錄而非檔案/);
+
+    // Verify merge label localization when underscore lang ("zh_CN") is passed
+    fs.writeFileSync(path.join(badUmlDir, "openapi.yaml"), "openapi: 3.0.3\n", "utf8");
+    const mergedZhCn = buildMergedRequirementMarkdown(badUmlDir, { lang: "zh_CN" });
+    assert.match(mergedZhCn.markdown, /OpenAPI 接口规格/);
+
+    // Remove bad-uml before testing finalize + pdf disambiguation & binary safety
+    fs.rmSync(badUmlDir, { recursive: true, force: true });
+
+    res = runCli(dir, ["new", "--id", "REQ-002", "--name", "auth"]);
+    assert.equal(res.status, 0, res.stderr);
+    const req2Dir = path.join(dir, "project", "REQ-002-auth");
+    assert.ok(fs.existsSync(req2Dir));
+
+    // Put raw binary PDF payload containing invalid UTF-8 bytes & placeholder bytes inside REQ-002-auth
+    const binaryPdf = Buffer.concat([
+      Buffer.from("%PDF-1.4\n"),
+      Buffer.from([0x00, 0xff, 0xfe, 0x80, 0x99]),
+      Buffer.from("REQ-002 {{REQ_ID}} binary"),
+      Buffer.from([0xfe, 0xff, 0x00]),
+      Buffer.from("\n%%EOF\n")
+    ]);
+    fs.writeFileSync(path.join(req2Dir, "sample.pdf"), binaryPdf);
+
+    // sa-spec pdf "auth" must target REQ-002-auth rather than REQ-001-user-auth
+    const pdfSlugRes = runCli(dir, ["pdf", "auth", "--no-uml-render", "--browser", process.execPath]);
+    const pdfSlugOut = (pdfSlugRes.stdout + "\n" + pdfSlugRes.stderr).replace(/\\/g, "/");
+    assert.match(pdfSlugOut, /project\/REQ-002-auth\/REQ-002-auth\.pdf/);
+    assert.doesNotMatch(pdfSlugOut, /REQ-001-user-auth\.pdf/);
+
+    // sa-spec pdf extensionless file inside dot-containing parent dir keeps parent dir intact
+    const dottedDir = path.join(dir, "dir.v1");
+    fs.mkdirSync(dottedDir, { recursive: true });
+    fs.writeFileSync(path.join(dottedDir, "notes"), "# Notes\n", "utf8");
+    const pdfDotRes = runCli(dir, ["pdf", path.join("dir.v1", "notes"), "--no-uml-render", "--browser", process.execPath]);
+    const pdfDotOut = (pdfDotRes.stdout + "\n" + pdfDotRes.stderr).replace(/\\/g, "/");
+    assert.match(pdfDotOut, /dir\.v1\/notes\.pdf/);
+
+    // Inject a {{REQ_ID}} marker into REQ-002-auth/srs.md to confirm finalize processes REQ-002-auth while skipping sample.pdf
+    const srs2Path = path.join(req2Dir, "srs.md");
+    fs.writeFileSync(srs2Path, `${fs.readFileSync(srs2Path, "utf8")}\n<!-- marker:{{REQ_ID}} -->\n`, "utf8");
+
+    // Finalize "--name auth" targets REQ-002-auth (preserving own non-colliding ID), replaces text placeholders, and preserves sample.pdf bytes
+    const finAuth = runCli(dir, ["finalize", "--name", "auth"]);
+    assert.equal(finAuth.status, 0, finAuth.stderr + "\n" + finAuth.stdout);
+    assert.ok(fs.existsSync(req2Dir));
+    assert.ok(fs.existsSync(path.join(dir, "project", "REQ-001-user-auth")));
+    const srs2After = fs.readFileSync(srs2Path, "utf8");
+    assert.match(srs2After, /<!-- marker:REQ-002 -->/);
+    assert.doesNotMatch(srs2After, /\{\{REQ_ID\}\}/);
+    const preserved = fs.readFileSync(path.join(req2Dir, "sample.pdf"));
+    assert.equal(Buffer.compare(preserved, binaryPdf), 0);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

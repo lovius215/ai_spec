@@ -70,10 +70,12 @@ function renderPlantUmlToSvg(source, options = {}) {
   const whichCmd = process.platform === "win32" ? "where" : "which";
   const localBin = spawnSync(whichCmd, ["plantuml"], { encoding: "utf8" });
   if (localBin.status === 0 && localBin.stdout.trim()) {
-    const res = spawnSync("plantuml", ["-tsvg", "-pipe", "-charset", "UTF-8"], {
+    const plantumlBin = localBin.stdout.trim().split(/\r?\n/)[0].trim();
+    const res = spawnSync(plantumlBin, ["-tsvg", "-pipe", "-charset", "UTF-8"], {
       input: source,
       encoding: "utf8",
-      timeout: 10000
+      timeout: 10000,
+      shell: process.platform === "win32" && /\.(?:bat|cmd)$/i.test(plantumlBin)
     });
     if (res.status === 0 && res.stdout && res.stdout.includes("<svg")) {
       const svgMatch = res.stdout.match(/<svg[\s\S]*<\/svg>/i);
@@ -119,8 +121,8 @@ function formatInlineStyles(str) {
   // Bold
   processed = processed.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   processed = processed.replace(/__([^_]+)__/g, "<strong>$1</strong>");
-  // Italic
-  processed = processed.replace(/\*([^*\n]+)\*/g, "<em>$1</em>");
+  // Italic (avoid matching spaced math operators such as "2 * 3 * 4")
+  processed = processed.replace(/\*(?!\s|\*)([^*\n]*?[^\s*])\*/g, "<em>$1</em>");
   // Strikethrough
   processed = processed.replace(/~~([^~]+)~~/g, "<del>$1</del>");
   return processed;
@@ -287,7 +289,15 @@ function markdownToHtmlBody(markdown, options = {}) {
       const alignments = getTableAlignments(lines[i + 1]);
       i += 2;
       const rows = [];
-      while (i < lines.length && lines[i].trim().startsWith("|")) {
+      while (i < lines.length) {
+        const rowTrim = lines[i].trim();
+        if (
+          !rowTrim ||
+          !rowTrim.includes("|") ||
+          /^(?:#{1,6}\s|```|~~~|>|<!--|(?:[-*+]|\d+[.)])\s)/.test(rowTrim)
+        ) {
+          break;
+        }
         rows.push(parseTableRow(lines[i]));
         i++;
       }
@@ -770,7 +780,7 @@ function wrapCodeFence(content, lang = "") {
 
 function buildMergedRequirementMarkdown(reqDir, options = {}) {
   const dirName = path.basename(reqDir);
-  const langKey = String(options.lang || "zh-TW").toLowerCase().trim();
+  const langKey = String(options.lang || "zh-TW").toLowerCase().trim().replace(/_/g, "-");
   const labels = MERGED_PDF_LABELS[langKey] || MERGED_PDF_LABELS["zh-tw"];
   const sections = [];
 
@@ -784,7 +794,7 @@ function buildMergedRequirementMarkdown(reqDir, options = {}) {
 
   for (const item of mdOrder) {
     const filePath = path.join(reqDir, item.file);
-    if (!fs.existsSync(filePath)) continue;
+    if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) continue;
     const raw = fs.readFileSync(filePath, "utf8").trim();
     if (!raw) continue;
 
@@ -796,10 +806,13 @@ function buildMergedRequirementMarkdown(reqDir, options = {}) {
   }
 
   const umlDir = path.join(reqDir, "uml");
-  if (fs.existsSync(umlDir)) {
+  if (fs.existsSync(umlDir) && fs.statSync(umlDir).isDirectory()) {
     const pumlFiles = fs
       .readdirSync(umlDir)
-      .filter((f) => f.endsWith(".puml"))
+      .filter((f) => {
+        if (!f.toLowerCase().endsWith(".puml")) return false;
+        return fs.statSync(path.join(umlDir, f)).isFile();
+      })
       .sort();
     if (pumlFiles.length > 0) {
       const umlBlocks = pumlFiles.map((f) => {

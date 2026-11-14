@@ -284,7 +284,7 @@ sa-spec check
 | `sa-spec instructions [init\|propose\|analyze\|commit\|pdf] [--with-rules] [--json]` | 輸出目前工作區狀態、對應階段步驟與套件內建完整系統分析規範（供 AI 動態讀取）。 |
 | `sa-spec rules [name\|all] [--list] [--json]` | 讀取或列出套件內建補充規則（`spec`、`uml-style`、`wireframe`、`db-table`、`estimation`、`system-spec`、`file-style`、`history`、`review`）。 |
 | `sa-spec templates [name] [--lang <code>] [--list] [--json]` | 讀取或列出套件內建規格與圖表範本（依專案語言或 `--lang` 輸出對應語系的 `srs`、`db-schema`、`handoff`、`history`、`uml-main`、`uml-wireframe` 等）。 |
-| `sa-spec pdf <target> [--split] [--output out.pdf] [--online-uml \| --no-uml-render]` | 將指定 `.md` 或需求目錄匯出為 PDF（優先使用本機 `plantuml` 轉繪 SVG；預設不外傳至公開網路伺服器，需線上轉繪請加 `--online-uml` 或設定 `SA_SPEC_PLANTUML_SERVER`，無法轉繪時退回程式碼區塊）。 |
+| `sa-spec pdf <target> [--split] [--output out.pdf] [--browser <path>] [--online-uml \| --no-uml-render]` | 將指定 `.md` 或需求目錄匯出為 PDF（優先使用本機 `plantuml` 轉繪 SVG；預設不外傳至公開網路伺服器，需線上轉繪請加 `--online-uml` 或設定 `SA_SPEC_PLANTUML_SERVER`，無法轉繪時退回程式碼區塊）。 |
 | `sa-spec reindex` | 掃描 `project/REQ-*` 目錄，依專案鎖定語言與序號重新生成 `project/index.md`（自動從 `srs.md` 擷取標題與 `## 摘要`）。 |
 | `sa-spec check [--strict]` | 檢查核心檔案、規範版本鎖定、重複序號、以及已歸檔需求的交付物完整度（有錯誤時回傳 exit code `1`；加 `--strict` 時若規範版本不一致或殘留舊版 `skills/`/`rules/` 亦回傳 exit code `1`）。 |
 | `sa-spec status` | 顯示系統規格與需求索引狀態。 |
@@ -696,9 +696,9 @@ DB 變更：無 DB 需求。
 `history.md` 會記錄本次歸檔，例如：
 
 ```text
-| 時間 | 版本 | 類型 | 說明 | 來源 | 影響範圍 | 風險 | 狀態 |
-|---|---|---|---|---|---|---|---|
-| 2026-05-29 21:30 | v0.1 | 新增 | 建立番茄時鐘需求草稿 | 使用者確認 | SRS、UML、OpenAPI、DB Schema、Handoff | 低 | 待確認 |
+| 版本 | 日期 | 異動類型 | 異動摘要 | 影響範圍 | 狀態 |
+|---|---|---|---|---|---|
+| v0.1 | 2026-05-29 | 新增 | 建立番茄時鐘需求草稿與核心規格 | SRS、UML、OpenAPI、DB Schema、Handoff | 待確認 |
 ```
 
 ### 7. Git commit 與 remote push

@@ -424,7 +424,9 @@ function finalizeReq(args) {
           e.isDirectory() &&
           (e.name.toUpperCase() === rawName.toUpperCase() ||
             e.name.toUpperCase().startsWith(`${rawName.toUpperCase()}-`) ||
-            (e.name.startsWith("REQ-") && e.name.toLowerCase().endsWith(`-${slug}`)))
+            (e.name.startsWith("REQ-") &&
+              Boolean(slug) &&
+              e.name.replace(/^REQ-\d+-?/i, "").toLowerCase() === slug))
       )
       .sort((a, b) => {
         const na = parseInt((a.name.match(/^REQ-(\d+)/i) || [])[1] || "0", 10);
@@ -494,7 +496,9 @@ function finalizeReq(args) {
     fs.renameSync(sourceDir, finalDir);
   }
 
+  const TEXT_REPLACE_EXTS = /\.(?:md|markdown|yaml|yml|puml|plantuml|txt|json|csv|sql)$/i;
   for (const filePath of listFilesRecursive(finalDir)) {
+    if (!TEXT_REPLACE_EXTS.test(filePath)) continue;
     try {
       const content = fs.readFileSync(filePath, "utf8");
       let updated = content.split("{{REQ_ID}}").join(nextId);
@@ -1251,19 +1255,41 @@ function resolveReqTargetDir(target) {
     return projectSubAbs;
   }
 
-  const entries = fs.readdirSync(projectDir, { withFileTypes: true });
+  const dirs = fs
+    .readdirSync(projectDir, { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name);
   const upper = target.toUpperCase();
   const slug = slugify(target);
-  const found = entries.find((e) => {
-    if (!e.isDirectory()) return false;
-    const name = e.name;
-    if (name.toUpperCase() === upper) return true;
-    if (name.toUpperCase().startsWith(`${upper}-`)) return true;
-    if (slug && name.toLowerCase().endsWith(`-${slug}`)) return true;
-    return false;
-  });
 
-  return found ? path.join(projectDir, found.name) : null;
+  const exact = dirs.find(
+    (name) => name.toUpperCase() === upper || (slug && name.toLowerCase() === slug)
+  );
+  if (exact) return path.join(projectDir, exact);
+
+  const byPrefix = dirs.find((name) => name.toUpperCase().startsWith(`${upper}-`));
+  if (byPrefix && /^REQ-\d+$/i.test(target)) {
+    return path.join(projectDir, byPrefix);
+  }
+
+  if (slug) {
+    const reqSlugMatches = dirs
+      .filter(
+        (name) =>
+          /^REQ-\d+-/i.test(name) &&
+          name.replace(/^REQ-\d+-?/i, "").toLowerCase() === slug
+      )
+      .sort((a, b) => {
+        const na = parseInt((a.match(/^REQ-(\d+)/i) || [])[1] || "0", 10);
+        const nb = parseInt((b.match(/^REQ-(\d+)/i) || [])[1] || "0", 10);
+        return nb - na;
+      });
+    if (reqSlugMatches.length > 0) {
+      return path.join(projectDir, reqSlugMatches[0]);
+    }
+  }
+
+  return byPrefix ? path.join(projectDir, byPrefix) : null;
 }
 
 function exportReqDirToPdf(reqAbsDir, options = {}) {
@@ -1360,9 +1386,13 @@ function runPdf(args = []) {
   const directFileAbs = path.resolve(cwd, target);
   if (fs.existsSync(directFileAbs) && fs.statSync(directFileAbs).isFile()) {
     const res = convertMarkdownFileToPdf(directFileAbs, output, browser, pdfOptions);
+    const defaultPdfAbs = path.join(
+      path.dirname(directFileAbs),
+      `${path.basename(directFileAbs, path.extname(directFileAbs))}.pdf`
+    );
     const targetPdf = output
       ? path.relative(cwd, path.resolve(cwd, output))
-      : path.relative(cwd, directFileAbs.replace(/\.[^.]+$/, ".pdf"));
+      : path.relative(cwd, defaultPdfAbs);
     if (res.ok) {
       results.push({ action: "create", target: targetPdf, message: `單檔轉換完成 (${res.engine})` });
     } else {
