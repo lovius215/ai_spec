@@ -1490,3 +1490,52 @@ test("#25 third-pass audit: strict init --lang, SRS placeholder/heading metadata
     fs.rmSync(edgeDir, { recursive: true, force: true });
   }
 });
+
+test("#26 remaining fs.existsSync guards: init path-type conflicts, skills/rules files, upgrade uml/wireframe conflicts", () => {
+  // 1. init rejects directory at AGENTS.md and file at project/
+  const dirConflict = fs.mkdtempSync(path.join(os.tmpdir(), "sa-spec-26-init-"));
+  try {
+    fs.mkdirSync(path.join(dirConflict, "AGENTS.md"));
+    const initAgentsDir = runCli(dirConflict, ["init", "--lang", "en"]);
+    assert.notEqual(initAgentsDir.status, 0);
+    assert.match(initAgentsDir.stderr, /目錄而非檔案/);
+
+    fs.rmSync(path.join(dirConflict, "AGENTS.md"), { recursive: true, force: true });
+    fs.rmSync(path.join(dirConflict, "project"), { recursive: true, force: true });
+    fs.writeFileSync(path.join(dirConflict, "project"), "not a dir", "utf8");
+    const initProjFile = runCli(dirConflict, ["init", "--lang", "en"]);
+    assert.notEqual(initProjFile.status, 0);
+    assert.match(initProjFile.stderr, /檔案而非目錄/);
+  } finally {
+    fs.rmSync(dirConflict, { recursive: true, force: true });
+  }
+
+  // 2. check --strict & instructions ignore regular files named skills/rules; upgrade handles uml file & wireframe dir safely
+  const upgDir = fs.mkdtempSync(path.join(os.tmpdir(), "sa-spec-26-upg-"));
+  try {
+    assert.equal(runCli(upgDir, ["init", "--lang", "zh-TW"]).status, 0);
+    fs.writeFileSync(path.join(upgDir, "skills"), "not a legacy dir", "utf8");
+    fs.writeFileSync(path.join(upgDir, "rules"), "not a legacy dir", "utf8");
+
+    const strictRes = runCli(upgDir, ["check", "--strict"]);
+    assert.equal(strictRes.status, 0, strictRes.stdout + strictRes.stderr);
+    assert.doesNotMatch(strictRes.stdout, /舊版專案內置/);
+
+    const reqUmlFile = path.join(upgDir, "project", "REQ-001-legacy");
+    fs.mkdirSync(reqUmlFile, { recursive: true });
+    fs.writeFileSync(path.join(reqUmlFile, "uml.puml"), "@startuml\n@enduml\n", "utf8");
+    fs.writeFileSync(path.join(reqUmlFile, "uml"), "file blocking dir", "utf8");
+
+    const reqWireDir = path.join(upgDir, "project", "REQ-002-ui");
+    fs.mkdirSync(path.join(reqWireDir, "uml", "wireframe.puml"), { recursive: true });
+    fs.writeFileSync(path.join(reqWireDir, "srs.md"), "# 登入畫面\n\n點擊按鈕\n", "utf8");
+
+    const upgRes = runCli(upgDir, ["upgrade"]);
+    assert.equal(upgRes.status, 0, upgRes.stderr);
+    assert.doesNotMatch(upgRes.stderr, /ENOTDIR|EISDIR/);
+    assert.match(upgRes.stdout, /已存在但為檔案而非目錄/);
+    assert.match(upgRes.stdout, /線框圖/);
+  } finally {
+    fs.rmSync(upgDir, { recursive: true, force: true });
+  }
+});

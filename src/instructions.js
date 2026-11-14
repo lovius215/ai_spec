@@ -237,8 +237,8 @@ function collectWorkspaceContext(cwd, isSourceRepoFlag, packageVersion) {
   }
 
   const gitInside = isGitWorkingTree(cwd);
-  const hasSkills = !isSourceRepoFlag && fs.existsSync(path.join(cwd, "skills"));
-  const hasRules = !isSourceRepoFlag && fs.existsSync(path.join(cwd, "rules"));
+  const hasSkills = !isSourceRepoFlag && isExistingDir(path.join(cwd, "skills"));
+  const hasRules = !isSourceRepoFlag && isExistingDir(path.join(cwd, "rules"));
 
   return {
     cwd,

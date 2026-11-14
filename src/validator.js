@@ -336,8 +336,8 @@ function runCheck(cwd, isSourceRepoFlag, packageVersion, showStatusFn, args = []
     return;
   }
   const verRes = checkSpecVersion(cwd, packageVersion);
-  const hasLegacySkills = !isSourceRepoFlag && fs.existsSync(path.join(cwd, "skills"));
-  const hasLegacyRules = !isSourceRepoFlag && fs.existsSync(path.join(cwd, "rules"));
+  const hasLegacySkills = !isSourceRepoFlag && isExistingDir(path.join(cwd, "skills"));
+  const hasLegacyRules = !isSourceRepoFlag && isExistingDir(path.join(cwd, "rules"));
   if (hasLegacySkills || hasLegacyRules) {
     console.log("提示: 偵測到舊版專案內置 skills/ 或 rules/，建議執行 sa-spec upgrade 移除並改用套件內建規範。");
   }

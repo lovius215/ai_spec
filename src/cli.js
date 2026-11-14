@@ -552,7 +552,7 @@ function finalizeReq(args) {
   const oldRel = sourceDir !== finalDir ? path.posix.join("project", oldDirName) : null;
   const stageFinalizePaths = () => {
     const pathsToAdd = [finalRel, "project/index.md"];
-    if (fs.existsSync(path.join(cwd, "project", "system-spec.md"))) {
+    if (isExistingFile(path.join(cwd, "project", "system-spec.md"))) {
       pathsToAdd.push("project/system-spec.md");
     }
     spawnSync("git", ["add", "-A", "--", ...pathsToAdd], { cwd, encoding: "utf8" });
@@ -867,16 +867,29 @@ function formatLocalDateTime(date) {
 
 function ensureDir(relativeDir) {
   const targetDir = path.join(cwd, relativeDir);
-  if (fs.existsSync(targetDir)) {
+  if (isExistingDir(targetDir)) {
     return { action: "skip", target: relativeDir };
+  }
+  if (fs.existsSync(targetDir)) {
+    fail(`路徑已存在但為檔案而非目錄: ${relativeDir}`);
   }
   fs.mkdirSync(targetDir, { recursive: true });
   return { action: "create", target: relativeDir };
 }
 
+function shouldSkipExistingTargetFile(targetPath, targetRelativePath) {
+  if (isExistingFile(targetPath)) {
+    return true;
+  }
+  if (fs.existsSync(targetPath)) {
+    fail(`路徑已存在但為目錄而非檔案: ${targetRelativePath}`);
+  }
+  return false;
+}
+
 function ensureFileFromTemplate(templateRelativePath, targetRelativePath, replacements = {}) {
   const targetPath = path.join(cwd, targetRelativePath);
-  if (fs.existsSync(targetPath)) {
+  if (shouldSkipExistingTargetFile(targetPath, targetRelativePath)) {
     return { action: "skip", target: targetRelativePath };
   }
   const content = applyReplacements(readTemplate(templateRelativePath), replacements);
@@ -886,7 +899,7 @@ function ensureFileFromTemplate(templateRelativePath, targetRelativePath, replac
 
 function writeGeneratedFileIfMissing(targetRelativePath, content) {
   const targetPath = path.join(cwd, targetRelativePath);
-  if (fs.existsSync(targetPath)) {
+  if (shouldSkipExistingTargetFile(targetPath, targetRelativePath)) {
     return { action: "skip", target: targetRelativePath };
   }
   writeFileIfMissing(targetPath, content);
@@ -1084,7 +1097,13 @@ function upgradeProject(args = []) {
         const newMainUmlAbsPath = path.join(cwd, newMainUmlRelPath);
 
         if (isExistingFile(oldUmlAbsPath)) {
-          if (!fs.existsSync(newMainUmlAbsPath)) {
+          if (fs.existsSync(newUmlAbsDir) && !isExistingDir(newUmlAbsDir)) {
+            results.push({
+              action: "warn",
+              target: newUmlRelDir,
+              message: `目標目錄路徑 ${newUmlRelDir} 已存在但為檔案而非目錄，無法遷移 ${oldUmlRelPath}。`
+            });
+          } else if (!fs.existsSync(newMainUmlAbsPath)) {
             if (!dryRun) {
               if (!fs.existsSync(newUmlAbsDir)) {
                 fs.mkdirSync(newUmlAbsDir, { recursive: true });
@@ -1172,7 +1191,7 @@ function upgradeProject(args = []) {
           inspectUiText(fs.readFileSync(srsAbsPath, "utf8"));
         }
 
-        if (!fs.existsSync(wireframeAbsPath)) {
+        if (!isExistingFile(wireframeAbsPath)) {
           if (explicitNoUi) {
             results.push({
               action: "skip",
