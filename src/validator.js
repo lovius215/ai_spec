@@ -11,6 +11,25 @@ const REQUIRED_DELIVERABLES = [
   "history.md"
 ];
 
+function isExistingDir(targetPath) {
+  return fs.existsSync(targetPath) && fs.statSync(targetPath).isDirectory();
+}
+
+function isExistingFile(targetPath) {
+  return fs.existsSync(targetPath) && fs.statSync(targetPath).isFile();
+}
+
+function isReqDirName(dirName) {
+  return /^REQ-\d+(?:-|$)/i.test(String(dirName || ""));
+}
+
+function normalizeReqIdKey(rawId) {
+  const m = String(rawId || "").trim().match(/^REQ-(\d+)/i);
+  if (!m) return null;
+  const num = parseInt(m[1], 10);
+  return `REQ-${String(num).padStart(Math.max(3, String(num).length), "0")}`;
+}
+
 function checkRequiredPaths(cwd, heading) {
   const requiredPaths = [
     "AGENTS.md",
@@ -24,7 +43,7 @@ function checkRequiredPaths(cwd, heading) {
   }
 
   for (const relativePath of requiredPaths) {
-    const exists = fs.existsSync(path.join(cwd, relativePath));
+    const exists = isExistingFile(path.join(cwd, relativePath));
     console.log(`${exists ? "OK" : "MISSING"} ${relativePath}`);
     if (!exists) {
       hasMissing = true;
@@ -40,7 +59,7 @@ function checkRequiredPaths(cwd, heading) {
 
 function checkSpecVersion(cwd, packageVersion) {
   const systemSpecPath = path.join(cwd, "project", "system-spec.md");
-  if (!fs.existsSync(systemSpecPath)) {
+  if (!isExistingFile(systemSpecPath)) {
     return { status: "missing", recorded: null, current: packageVersion };
   }
   const content = fs.readFileSync(systemSpecPath, "utf8");
@@ -59,15 +78,14 @@ function checkSpecVersion(cwd, packageVersion) {
 
 function checkDuplicateReqIds(cwd) {
   const projectDir = path.join(cwd, "project");
-  if (!fs.existsSync(projectDir)) return true;
+  if (!isExistingDir(projectDir)) return true;
 
   const entries = fs.readdirSync(projectDir, { withFileTypes: true });
   const idDirsMap = new Map();
   for (const entry of entries) {
-    if (entry.isDirectory() && entry.name.startsWith("REQ-")) {
-      const m = entry.name.match(/^(REQ-\d+)/i);
-      if (m) {
-        const id = m[1].toUpperCase();
+    if (entry.isDirectory() && isReqDirName(entry.name)) {
+      const id = normalizeReqIdKey(entry.name);
+      if (id) {
         if (!idDirsMap.has(id)) idDirsMap.set(id, []);
         idDirsMap.get(id).push(entry.name);
       }
@@ -97,23 +115,27 @@ function checkDuplicateReqIds(cwd) {
 function checkIndexSync(cwd) {
   const projectDir = path.join(cwd, "project");
   const indexPath = path.join(projectDir, "index.md");
-  if (!fs.existsSync(projectDir) || !fs.existsSync(indexPath)) {
+  if (!isExistingDir(projectDir) || !isExistingFile(indexPath)) {
     return true;
   }
 
   const entries = fs.readdirSync(projectDir, { withFileTypes: true });
   const dirIds = new Set();
   for (const entry of entries) {
-    if (entry.isDirectory() && entry.name.startsWith("REQ-")) {
-      const m = entry.name.match(/^(REQ-\d+)/i);
-      if (m) {
-        dirIds.add(m[1].toUpperCase());
+    if (entry.isDirectory() && isReqDirName(entry.name)) {
+      const id = normalizeReqIdKey(entry.name);
+      if (id) {
+        dirIds.add(id);
       }
     }
   }
 
   const rows = parseIndexRows(fs.readFileSync(indexPath, "utf8"));
-  const indexedIds = new Set(rows.map((r) => String(r.id || "").trim().toUpperCase()).filter(Boolean));
+  const indexedIds = new Set(
+    rows
+      .map((r) => normalizeReqIdKey(r.id) || String(r.id || "").trim().toUpperCase())
+      .filter(Boolean)
+  );
 
   const missingInIndex = Array.from(dirIds).filter((id) => !indexedIds.has(id)).sort();
   const orphanInIndex = Array.from(indexedIds).filter((id) => !dirIds.has(id)).sort();
@@ -175,12 +197,14 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
       const pumlFiles = fs
         .readdirSync(umlDir)
         .filter((f) => f.toLowerCase().endsWith(".puml"));
-      if (pumlFiles.length === 0) {
-        issues.push("uml/ 目錄內沒有任何 .puml 檔案");
-      }
+      let validPumlCount = 0;
       for (const f of pumlFiles) {
         const pumlAbs = path.join(umlDir, f);
-        if (!fs.statSync(pumlAbs).isFile()) continue;
+        if (!fs.statSync(pumlAbs).isFile()) {
+          issues.push(`uml/${f} 必須為檔案而非目錄`);
+          continue;
+        }
+        validPumlCount += 1;
         const pumlText = fs.readFileSync(pumlAbs, "utf8");
         if (!isDraft && pumlText.includes("{{REQ_ID}}")) {
           issues.push(`uml/${f} 仍殘留未替換的 {{REQ_ID}} 佔位符`);
@@ -190,6 +214,9 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
         if (startCount !== 1 || endCount !== 1) {
           issues.push(`uml/${f} 違反單檔單圖原則 (@start=${startCount}, @end=${endCount})`);
         }
+      }
+      if (validPumlCount === 0) {
+        issues.push("uml/ 目錄內沒有任何 .puml 檔案");
       }
     }
   }
@@ -253,15 +280,15 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
 }
 
 function isDraftSpecDir(dirAbs, dirName) {
-  if (!dirName || dirName.startsWith("REQ-") || dirName === "req") return false;
+  if (!dirName || isReqDirName(dirName) || dirName === "req") return false;
   return ["srs.md", "handoff.md", "openapi.yaml", "db-schema.md", "history.md"].some((file) =>
-    fs.existsSync(path.join(dirAbs, file))
+    isExistingFile(path.join(dirAbs, file))
   );
 }
 
 function validateRequirementsContent(cwd) {
   const projectDir = path.join(cwd, "project");
-  if (!fs.existsSync(projectDir)) return [];
+  if (!isExistingDir(projectDir)) return [];
 
   const allIssues = [];
   const entries = fs.readdirSync(projectDir, { withFileTypes: true });
@@ -271,7 +298,7 @@ function validateRequirementsContent(cwd) {
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const dirAbs = path.join(projectDir, entry.name);
-    if (entry.name.startsWith("REQ-")) {
+    if (isReqDirName(entry.name)) {
       reqCount += 1;
       allIssues.push(...validateSingleRequirementDir(dirAbs, entry.name, { isDraft: false }));
     } else if (isDraftSpecDir(dirAbs, entry.name)) {
@@ -328,6 +355,10 @@ function runCheck(cwd, isSourceRepoFlag, packageVersion, showStatusFn, args = []
 }
 
 module.exports = {
+  isExistingDir,
+  isExistingFile,
+  isReqDirName,
+  normalizeReqIdKey,
   checkRequiredPaths,
   checkSpecVersion,
   checkDuplicateReqIds,

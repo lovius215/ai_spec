@@ -20,7 +20,7 @@ const {
   detectMainBranch,
   getDefaultRemote
 } = require("./git");
-const { isDraftSpecDir } = require("./validator");
+const { isDraftSpecDir, isExistingDir, isExistingFile } = require("./validator");
 
 const STAGE_ALIASES = {
   init: "init",
@@ -214,19 +214,19 @@ function collectWorkspaceContext(cwd, isSourceRepoFlag, packageVersion) {
   let systemSpecStatus = null;
   let recordedSpecVersion = null;
   let mergeStrategy = "auto-merge";
-  if (fs.existsSync(systemSpecPath)) {
+  if (isExistingFile(systemSpecPath)) {
     const content = fs.readFileSync(systemSpecPath, "utf8");
     systemSpecStatus = extractStatusFromContent(content) || "未標示";
     recordedSpecVersion = extractSpecVersion(content);
     mergeStrategy = extractMergeStrategy(content);
   }
 
-  const requirements = fs.existsSync(indexPath)
+  const requirements = isExistingFile(indexPath)
     ? parseIndexRows(fs.readFileSync(indexPath, "utf8"))
     : [];
 
   const drafts = [];
-  if (fs.existsSync(projectDir)) {
+  if (isExistingDir(projectDir)) {
     for (const entry of fs.readdirSync(projectDir, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       if (isDraftSpecDir(path.join(projectDir, entry.name), entry.name)) {
@@ -244,7 +244,7 @@ function collectWorkspaceContext(cwd, isSourceRepoFlag, packageVersion) {
     cwd,
     isSourceRepo: isSourceRepoFlag,
     cliVersion: packageVersion,
-    initialized: fs.existsSync(agentsPath) && fs.existsSync(indexPath) && fs.existsSync(systemSpecPath),
+    initialized: isExistingFile(agentsPath) && isExistingFile(indexPath) && isExistingFile(systemSpecPath),
     language: detectProjectLanguage(cwd),
     git: {
       isGitRepo: gitInside,
@@ -253,7 +253,7 @@ function collectWorkspaceContext(cwd, isSourceRepoFlag, packageVersion) {
       remote: gitInside ? getDefaultRemote(cwd) : null
     },
     systemSpec: {
-      exists: fs.existsSync(systemSpecPath),
+      exists: isExistingFile(systemSpecPath),
       status: systemSpecStatus,
       specVersion: recordedSpecVersion,
       versionMatch: !recordedSpecVersion || recordedSpecVersion === packageVersion,

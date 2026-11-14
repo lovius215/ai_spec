@@ -35,7 +35,7 @@ const {
   getLatestMaxReqId,
   remoteBranchHasReqId
 } = require("./git");
-const { runDoctor, runCheck, isDraftSpecDir } = require("./validator");
+const { runDoctor, runCheck, isDraftSpecDir, isExistingDir, isExistingFile, isReqDirName } = require("./validator");
 const { runInstructions, runRules, runTemplatesList, getOption, getPositionalArgs } = require("./instructions");
 
 const cwd = process.cwd();
@@ -144,7 +144,8 @@ function initProject(args = []) {
     if (SUPPORTED_LANGS[key]) {
       langConfig = SUPPORTED_LANGS[key];
     } else {
-      console.log(`警告: 不支援的語言代碼 "${langArg}"，支援語系: zh-TW, en, zh-CN, ja, ko。已預設使用繁體中文。`);
+      fail(`不支援的語言代碼 "${langArg}"，支援語系: zh-TW, en, zh-CN, ja, ko。`);
+      return;
     }
   }
 
@@ -179,7 +180,7 @@ function showStatus(showHeading = true) {
   const systemSpecPath = path.join(cwd, "project", "system-spec.md");
   const indexPath = path.join(cwd, "project", "index.md");
 
-  if (fs.existsSync(systemSpecPath)) {
+  if (isExistingFile(systemSpecPath)) {
     const content = fs.readFileSync(systemSpecPath, "utf8");
     const status = extractStatusFromContent(content);
     console.log(`系統規格書狀態: ${status || "未標示"}`);
@@ -188,7 +189,7 @@ function showStatus(showHeading = true) {
     process.exitCode = 1;
   }
 
-  if (!fs.existsSync(indexPath)) {
+  if (!isExistingFile(indexPath)) {
     console.log("需求索引: 缺少 project/index.md");
     process.exitCode = 1;
     return;
@@ -198,7 +199,7 @@ function showStatus(showHeading = true) {
   console.log(`需求總數: ${rows.length}`);
 
   const projectDir = path.join(cwd, "project");
-  const drafts = fs.existsSync(projectDir)
+  const drafts = isExistingDir(projectDir)
     ? fs
         .readdirSync(projectDir, { withFileTypes: true })
         .filter((e) => e.isDirectory() && isDraftSpecDir(path.join(projectDir, e.name), e.name))
@@ -390,10 +391,6 @@ function createReqTemplate(args, label = "new") {
   printResultList(label, results);
 }
 
-function isExistingDir(targetPath) {
-  return fs.existsSync(targetPath) && fs.statSync(targetPath).isDirectory();
-}
-
 function parseReqIdNum(name) {
   const match = String(name || "").trim().match(/^REQ-(\d+)(?:-|$)/i);
   return match ? Number(match[1]) : null;
@@ -568,7 +565,7 @@ function finalizeReq(args) {
   };
 
   const systemSpecPath = path.join(cwd, "project", "system-spec.md");
-  const configMergeStrategy = fs.existsSync(systemSpecPath)
+  const configMergeStrategy = isExistingFile(systemSpecPath)
     ? extractMergeStrategy(fs.readFileSync(systemSpecPath, "utf8"))
     : "auto-merge";
   const shouldAutoMerge = !args.includes("--no-merge") && !args.includes("--pr") && configMergeStrategy !== "pr";
@@ -602,7 +599,7 @@ function finalizeReq(args) {
       // Pre-merge collision guard against remote main branch
       if (remote && remoteBranchHasReqId(cwd, remote, mainBranch, nextId)) {
         console.error(
-          `[Git 衝突防護] 遠端 ${remote}/${mainBranch} 在定號期間已新增 ${nextId}！已停止自動合併，請先更新主分支後重新執行 sa-spec finalize --name ${cleanSlug} 重新領號。`
+          `[Git 衝突防護] 遠端 ${remote}/${mainBranch} 在定號期間已新增 ${nextId}！已停止自動合併，請先更新主分支後重新執行 sa-spec finalize --name ${cleanSlug || nextId} 重新領號。`
         );
         process.exitCode = 1;
         return;
@@ -715,7 +712,7 @@ function finalizeReq(args) {
   } else {
     console.log("建議接下來執行：");
     console.log(`  git add -A -- ${finalRel} project/index.md project/system-spec.md`);
-    console.log(`  git commit -m "docs(${nextId}): ${rawName} - 規格確認歸檔"`);
+    console.log(`  git commit -m "docs(${nextId}): ${commitSubjectName} - 規格確認歸檔"`);
   }
 }
 
@@ -723,7 +720,7 @@ function reindexProject(options = {}) {
   const { quiet = false } = options;
   const projectDir = path.join(cwd, "project");
   const indexPath = path.join(projectDir, "index.md");
-  if (!fs.existsSync(projectDir)) {
+  if (!isExistingDir(projectDir)) {
     fail("project/ directory not found.");
     return { count: 0, changed: false };
   }
@@ -732,14 +729,14 @@ function reindexProject(options = {}) {
   const t = getLangStrings(langConfig.code);
 
   const existingMap = new Map();
-  if (fs.existsSync(indexPath)) {
+  if (isExistingFile(indexPath)) {
     for (const row of parseIndexRows(fs.readFileSync(indexPath, "utf8"))) {
       existingMap.set(row.id, row);
     }
   }
 
   const entries = fs.readdirSync(projectDir, { withFileTypes: true });
-  const reqDirs = entries.filter((e) => e.isDirectory() && e.name.startsWith("REQ-"));
+  const reqDirs = entries.filter((e) => e.isDirectory() && isReqDirName(e.name));
 
   const rows = [];
   for (const entry of reqDirs) {
@@ -777,7 +774,7 @@ function reindexProject(options = {}) {
       updatedAt = prev.updatedAt || updatedAt;
     }
 
-    if (fs.existsSync(srsPath)) {
+    if (isExistingFile(srsPath)) {
       const srsContent = fs.readFileSync(srsPath, "utf8");
       const meta = extractSrsMetadata(srsContent);
       if (meta.title) {
@@ -821,7 +818,7 @@ function reindexProject(options = {}) {
     console.warn("  修復建議：請將衝突目錄之一改回草稿名稱後，重新執行 sa-spec finalize 或 scc 重新領號。\n");
   }
 
-  const prevContent = fs.existsSync(indexPath) ? fs.readFileSync(indexPath, "utf8") : "";
+  const prevContent = isExistingFile(indexPath) ? fs.readFileSync(indexPath, "utf8") : "";
   const nextContent = buildIndexMarkdown(langConfig.code, rows);
   fs.writeFileSync(indexPath, nextContent, "utf8");
   if (!quiet) {
@@ -833,7 +830,7 @@ function reindexProject(options = {}) {
 function ensureIndexRow(id, name, langCode = "zh-TW") {
   const indexRel = path.join("project", "index.md");
   const indexPath = path.join(cwd, indexRel);
-  if (!fs.existsSync(indexPath)) {
+  if (!isExistingFile(indexPath)) {
     return { action: "skip", target: indexRel };
   }
 
@@ -983,7 +980,7 @@ function pruneEmptyLegacyDirs(relDir, dryRun, managedSet, results) {
 }
 
 function removeLegacyManagedAssets(dryRun = false, keepLegacy = false) {
-  const legacyRoots = ["skills", "rules"].filter((dirName) => fs.existsSync(path.join(cwd, dirName)));
+  const legacyRoots = ["skills", "rules"].filter((dirName) => isExistingDir(path.join(cwd, dirName)));
   if (legacyRoots.length === 0) {
     return [];
   }
@@ -1004,7 +1001,7 @@ function removeLegacyManagedAssets(dryRun = false, keepLegacy = false) {
 
   for (const relPath of managedPaths) {
     const absPath = path.join(cwd, relPath);
-    if (fs.existsSync(absPath)) {
+    if (isExistingFile(absPath)) {
       if (!dryRun) {
         fs.unlinkSync(absPath);
       }
@@ -1018,7 +1015,7 @@ function removeLegacyManagedAssets(dryRun = false, keepLegacy = false) {
 
   for (const rootName of legacyRoots) {
     const absRoot = path.join(cwd, rootName);
-    if (!fs.existsSync(absRoot)) continue;
+    if (!isExistingDir(absRoot)) continue;
     for (const fileAbs of listFilesRecursive(absRoot)) {
       const relPath = toPosixPath(path.relative(cwd, fileAbs));
       if (path.basename(fileAbs) === ".DS_Store" || managedSet.has(relPath)) {
@@ -1057,7 +1054,7 @@ function upgradeProject(args = []) {
 
     const systemSpecRel = path.join("project", "system-spec.md");
     const systemSpecAbs = path.join(cwd, systemSpecRel);
-    if (fs.existsSync(systemSpecAbs)) {
+    if (isExistingFile(systemSpecAbs)) {
       const currentSpec = fs.readFileSync(systemSpecAbs, "utf8");
       const stamped = stampSpecVersionInContent(currentSpec, version, langConfig.code);
       if (stamped !== currentSpec) {
@@ -1074,10 +1071,10 @@ function upgradeProject(args = []) {
   }
 
   const projectDir = path.join(cwd, "project");
-  if (fs.existsSync(projectDir)) {
+  if (isExistingDir(projectDir)) {
     const entries = fs.readdirSync(projectDir, { withFileTypes: true });
     for (const entry of entries) {
-      if (entry.isDirectory() && entry.name.startsWith("REQ-")) {
+      if (entry.isDirectory() && isReqDirName(entry.name)) {
         const reqRelDir = path.join("project", entry.name);
         const oldUmlRelPath = path.join(reqRelDir, "uml.puml");
         const oldUmlAbsPath = path.join(cwd, oldUmlRelPath);
@@ -1086,7 +1083,7 @@ function upgradeProject(args = []) {
         const newMainUmlRelPath = path.join(newUmlRelDir, "main.puml");
         const newMainUmlAbsPath = path.join(cwd, newMainUmlRelPath);
 
-        if (fs.existsSync(oldUmlAbsPath)) {
+        if (isExistingFile(oldUmlAbsPath)) {
           if (!fs.existsSync(newMainUmlAbsPath)) {
             if (!dryRun) {
               if (!fs.existsSync(newUmlAbsDir)) {
@@ -1109,7 +1106,7 @@ function upgradeProject(args = []) {
 
         const handoffRelPath = path.join(reqRelDir, "handoff.md");
         const handoffAbsPath = path.join(cwd, handoffRelPath);
-        if (fs.existsSync(handoffAbsPath)) {
+        if (isExistingFile(handoffAbsPath)) {
           let content = fs.readFileSync(handoffAbsPath, "utf8");
           let updatedHandoff = false;
           if (content.includes("uml.puml")) {
@@ -1168,10 +1165,10 @@ function upgradeProject(args = []) {
           }
         };
 
-        if (fs.existsSync(handoffAbsPath)) {
+        if (isExistingFile(handoffAbsPath)) {
           inspectUiText(fs.readFileSync(handoffAbsPath, "utf8"));
         }
-        if (fs.existsSync(srsAbsPath)) {
+        if (isExistingFile(srsAbsPath)) {
           inspectUiText(fs.readFileSync(srsAbsPath, "utf8"));
         }
 
@@ -1196,7 +1193,7 @@ function upgradeProject(args = []) {
     if (!isSourceRepo()) {
       const indexRelPath = path.join("project", "index.md");
       const indexAbsPath = path.join(cwd, indexRelPath);
-      if (fs.existsSync(indexAbsPath)) {
+      if (isExistingFile(indexAbsPath)) {
         if (dryRun) {
           const prevContent = fs.readFileSync(indexAbsPath, "utf8");
           const hasLegacyFiveCol = prevContent.split("\n").some((line) => {
@@ -1237,6 +1234,9 @@ function updateFileWithContent(targetRelativePath, nextContent, dryRun = false) 
       writeFileIfMissing(targetAbsolutePath, resolvedContent);
     }
     return { action: "create", target: targetRelativePath };
+  }
+  if (!isExistingFile(targetAbsolutePath)) {
+    return { action: "warn", target: targetRelativePath, message: "目標路徑為目錄而非檔案，已略過覆寫" };
   }
 
   const currentContent = fs.readFileSync(targetAbsolutePath, "utf8");
@@ -1280,15 +1280,15 @@ function printResultList(label, results) {
 
 function resolveReqTargetDir(target) {
   const directAbs = path.resolve(cwd, target);
-  if (fs.existsSync(directAbs) && fs.statSync(directAbs).isDirectory()) {
+  if (isExistingDir(directAbs)) {
     return directAbs;
   }
 
   const projectDir = path.join(cwd, "project");
-  if (!fs.existsSync(projectDir)) return null;
+  if (!isExistingDir(projectDir)) return null;
 
   const projectSubAbs = path.join(projectDir, target);
-  if (fs.existsSync(projectSubAbs) && fs.statSync(projectSubAbs).isDirectory()) {
+  if (isExistingDir(projectSubAbs)) {
     return projectSubAbs;
   }
 
@@ -1399,13 +1399,13 @@ function runPdf(args = []) {
 
   if (all) {
     const projectDir = path.join(cwd, "project");
-    if (!fs.existsSync(projectDir)) {
+    if (!isExistingDir(projectDir)) {
       fail("找不到 project/ 目錄。");
       return;
     }
     const entries = fs.readdirSync(projectDir, { withFileTypes: true });
     const reqDirs = entries
-      .filter((e) => e.isDirectory() && e.name.startsWith("REQ-"))
+      .filter((e) => e.isDirectory() && isReqDirName(e.name))
       .sort((a, b) => a.name.localeCompare(b.name));
 
     if (reqDirs.length === 0) {

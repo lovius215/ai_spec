@@ -90,12 +90,10 @@ function scanTreeDirsForMaxReqId(cwd, ref, currentMax, excludeDirName = null) {
     for (const line of lsRes.stdout.split("\n")) {
       const base = path.basename(line.trim());
       if (excludeDirName && base === excludeDirName) continue;
-      if (base.startsWith("REQ-")) {
-        const m = base.match(/^REQ-(\d+)/i);
-        if (m) {
-          const num = parseInt(m[1], 10);
-          if (num > maxIdNum) maxIdNum = num;
-        }
+      const m = base.match(/^REQ-(\d+)(?:-|$)/i);
+      if (m) {
+        const num = parseInt(m[1], 10);
+        if (num > maxIdNum) maxIdNum = num;
       }
     }
   }
@@ -105,11 +103,11 @@ function scanTreeDirsForMaxReqId(cwd, ref, currentMax, excludeDirName = null) {
 function getLatestMaxReqId(cwd, projectDir, mainBranch, remoteName = "origin", excludeDirName = null) {
   let maxIdNum = 0;
 
-  if (fs.existsSync(projectDir)) {
+  if (fs.existsSync(projectDir) && fs.statSync(projectDir).isDirectory()) {
     for (const entry of fs.readdirSync(projectDir, { withFileTypes: true })) {
       if (excludeDirName && entry.name === excludeDirName) continue;
-      if (entry.isDirectory() && entry.name.startsWith("REQ-")) {
-        const m = entry.name.match(/^REQ-(\d+)/i);
+      if (entry.isDirectory()) {
+        const m = entry.name.match(/^REQ-(\d+)(?:-|$)/i);
         if (m) {
           const num = parseInt(m[1], 10);
           if (num > maxIdNum) maxIdNum = num;
@@ -149,10 +147,18 @@ function remoteBranchHasReqId(cwd, remote, mainBranch, reqId) {
     encoding: "utf8"
   });
   if (lsRes.status !== 0 || !lsRes.stdout) return false;
+  const targetMatch = String(reqId).trim().match(/^REQ-(\d+)$/i);
+  const targetNum = targetMatch ? parseInt(targetMatch[1], 10) : null;
   const prefix = `${reqId.toUpperCase()}-`;
   return lsRes.stdout.split("\n").some((line) => {
-    const base = path.basename(line.trim()).toUpperCase();
-    return base === reqId.toUpperCase() || base.startsWith(prefix);
+    const base = path.basename(line.trim());
+    const upperBase = base.toUpperCase();
+    if (upperBase === reqId.toUpperCase() || upperBase.startsWith(prefix)) return true;
+    if (targetNum !== null) {
+      const baseMatch = base.match(/^REQ-(\d+)(?:-|$)/i);
+      return Boolean(baseMatch && parseInt(baseMatch[1], 10) === targetNum);
+    }
+    return false;
   });
 }
 

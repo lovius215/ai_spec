@@ -404,7 +404,7 @@ function getLangStrings(langCode) {
 
 function detectProjectLanguage(cwd) {
   const systemSpecPath = path.join(cwd, "project", "system-spec.md");
-  if (fs.existsSync(systemSpecPath)) {
+  if (fs.existsSync(systemSpecPath) && fs.statSync(systemSpecPath).isFile()) {
     const content = fs.readFileSync(systemSpecPath, "utf8");
     const match = content.match(
       /^[-*]\s*\*{0,2}(?:主要語言|主要语言|主要言語|주요 언어|語言|語言設定|Language)\*{0,2}[：:]\*{0,2}\s*(.+)$/im
@@ -1025,7 +1025,7 @@ function extractSrsMetadata(srsContent) {
         ""
       )
       .replace(/^\[?\s*(?:REQ-\d+|\{\{REQ_ID\}\})\s*\]?\s*(?:[：:\-–—]\s*)?/i, "")
-      .replace(/\s+(?:SRS|需求規格|需求规格|要件定義書?|요구사항\s*명세서?)$/i, "")
+      .replace(/(?:^|\s+)(?:SRS|需求規格|需求规格|要件定義書?|요구사항\s*명세서?)$/i, "")
       .trim();
     if (rawHeading && !/^\{\{.+\}\}$/.test(rawHeading)) {
       title = rawHeading;
@@ -1033,7 +1033,9 @@ function extractSrsMetadata(srsContent) {
   }
 
   let description = "";
-  const summaryMatch = content.match(/^##\s+(?:摘要|Summary|概要|요약)(?=$|[\s：:])[^\n]*\n([\s\S]*?)(?=^##\s|(?![\s\S]))/im);
+  const summaryMatch = content.match(
+    /^##\s+(?:[\d.]+\s+)?(?:摘要|Summary|概要|요약)(?=$|[\s：:])[^\n]*\n([\s\S]*?)(?=^##\s|(?![\s\S]))/im
+  );
   if (summaryMatch) {
     const lines = summaryMatch[1].split(/\r?\n/);
     for (const rawLine of lines) {
@@ -1041,7 +1043,11 @@ function extractSrsMetadata(srsContent) {
       if (!line || line.startsWith("<!--") || line.startsWith("---")) continue;
       line = line.replace(/^[-*>]\s+/, "").replace(/^\|+\s*/, "").replace(/\s*\|+$/, "").trim();
       if (!line || /^[\s|:\-]+$/.test(line)) continue;
-      if (/^(?:\{\{.+\}\}|\[(?:TBD|TODO)\]|TBD|TODO|[(（<](?:尚未填寫|待補充|待补充|未記入|작성 전|請填寫|请填写)[)）>])$/i.test(line)) {
+      if (
+        /^(?:\{\{.+\}\}|[(（<\[]?(?:TBD|TODO|尚未填寫|待補充|待补充|未記入|未定|미정|작성 전|請填寫|请填写)[)）>\]]?)[.。]?$/i.test(
+          line
+        )
+      ) {
         continue;
       }
       description = line.replace(/\s+/g, " ");

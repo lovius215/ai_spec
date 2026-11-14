@@ -1378,3 +1378,115 @@ test("#24 comprehensive edge cases: merge strategy word boundaries, AGENTS escap
     fs.rmSync(dirGit, { recursive: true, force: true });
   }
 });
+
+test("#25 third-pass audit: strict init --lang, SRS placeholder/heading metadata, PDF inline/table edge cases, case-insensitive REQ-* & EISDIR guards", () => {
+  const { extractSrsMetadata } = require("../src/i18n");
+
+  // 1. init rejects unsupported --lang before writing any workspace files
+  const badInitDir = makeTempDir("sa-spec-badlang25-");
+  try {
+    const res = runCli(badInitDir, ["init", "--lang", "fr"]);
+    assert.notEqual(res.status, 0);
+    assert.match(res.stderr, /不支援的語言代碼/);
+    assert.equal(fs.existsSync(path.join(badInitDir, "AGENTS.md")), false);
+    assert.equal(fs.existsSync(path.join(badInitDir, "project")), false);
+  } finally {
+    fs.rmSync(badInitDir, { recursive: true, force: true });
+  }
+
+  // 2. extractSrsMetadata supports numbered headings, strips bare "SRS" title, and skips all 5 language TBD placeholders
+  const bareTitleMeta = extractSrsMetadata("# REQ-001 SRS\n\n- 狀態：待確認\n\n## 1. 摘要\n待補充。\n真實摘要說明");
+  assert.equal(bareTitleMeta.title, "");
+  assert.equal(bareTitleMeta.description, "真實摘要說明");
+
+  for (const ph of ["待補充。", "待補充.", "TBD.", "待补充.", "未定.", "미정."]) {
+    const meta = extractSrsMetadata(`# REQ-001 Demo\n\n## Summary\n${ph}\n`);
+    assert.equal(meta.description, "", `Expected empty description for placeholder ${ph}`);
+  }
+
+  // 3. PDF inline bold with underscores/asterisks & table row starting with inline code backticks
+  const html = buildHtmlDocument(
+    "Audit 25 PDF",
+    [
+      "Bold __user_id__ and intraword foo__bar__baz and **a * b**",
+      "",
+      "| Syntax | Purpose |",
+      "|---|---|",
+      "| `id` | Identifier |",
+      "```code``` | Inline backtick cell should stay in table",
+      "```js",
+      "const fencedAfterTable = 1;",
+      "```"
+    ].join("\n")
+  );
+  assert.match(html, /<strong>user_id<\/strong>/);
+  assert.match(html, /foo__bar__baz/);
+  assert.match(html, /<strong>a \* b<\/strong>/);
+  assert.match(html, /<tbody>[\s\S]*<code>code<\/code>[\s\S]*<\/tbody><\/table>/);
+  assert.match(html, /<code class="language-js">const fencedAfterTable = 1;<\/code>/);
+
+  // 4. Duplicate normalized IDs (REQ-1-a vs REQ-001-b), lowercase req-002-c, uml/*.puml dir guard, & EISDIR safety across commands
+  const edgeDir = makeTempDir("sa-spec-edge25-");
+  try {
+    assert.equal(runCli(edgeDir, ["init", "--lang", "en"]).status, 0);
+    assert.equal(runCli(edgeDir, ["new", "--id", "REQ-001", "--name", "alpha"]).status, 0);
+    assert.equal(runCli(edgeDir, ["new", "--id", "REQ-002", "--name", "beta"]).status, 0);
+    assert.equal(runCli(edgeDir, ["new", "--id", "REQ-003", "--name", "gamma"]).status, 0);
+
+    // Case-insensitive directory + non-zero-padded numeric collision check
+    fs.renameSync(path.join(edgeDir, "project", "REQ-002-beta"), path.join(edgeDir, "project", "REQ-1-beta"));
+    fs.renameSync(path.join(edgeDir, "project", "REQ-003-gamma"), path.join(edgeDir, "project", "req-002-gamma"));
+
+    const dupCheck = runCli(edgeDir, ["check"]);
+    assert.notEqual(dupCheck.status, 0);
+    assert.match(dupCheck.stdout, /REQ-001 重複出現在:.*REQ-1-beta/);
+
+    // Next draft finalized must see lowercase req-002-gamma too and get REQ-003 (not colliding REQ-002)
+    assert.equal(runCli(edgeDir, ["new", "--name", "next-feature"]).status, 0);
+    const finNext = runCli(edgeDir, ["finalize", "--name", "next-feature"]);
+    assert.equal(finNext.status, 0, finNext.stderr || finNext.stdout);
+    assert.equal(fs.existsSync(path.join(edgeDir, "project", "REQ-003-next-feature")), true);
+
+    // Replace uml/main.puml with a directory -> check reports both file type error and no valid .puml
+    const mainPumlPath = path.join(edgeDir, "project", "REQ-003-next-feature", "uml", "main.puml");
+    fs.unlinkSync(mainPumlPath);
+    fs.mkdirSync(mainPumlPath);
+    fs.unlinkSync(path.join(edgeDir, "project", "REQ-003-next-feature", "uml", "wireframe.puml"));
+    const pumlDirCheck = runCli(edgeDir, ["check"]);
+    assert.notEqual(pumlDirCheck.status, 0);
+    assert.match(pumlDirCheck.stdout, /uml\/main\.puml 必須為檔案而非目錄/);
+    assert.match(pumlDirCheck.stdout, /uml\/ 目錄內沒有任何 \.puml 檔案/);
+
+    // Replace srs.md with a directory -> reindex and upgrade survive cleanly without EISDIR crash
+    const srsDirPath = path.join(edgeDir, "project", "REQ-003-next-feature", "srs.md");
+    fs.unlinkSync(srsDirPath);
+    fs.mkdirSync(srsDirPath);
+    const reindexRes = runCli(edgeDir, ["reindex"]);
+    assert.equal(reindexRes.status, 0, reindexRes.stderr);
+    const upgradeRes = runCli(edgeDir, ["upgrade", "--dry-run"]);
+    assert.equal(upgradeRes.status, 0, upgradeRes.stderr);
+
+    // Replace project/index.md and project/system-spec.md with dirs -> status/doctor/instructions do not throw EISDIR
+    const idxPath = path.join(edgeDir, "project", "index.md");
+    const specPath = path.join(edgeDir, "project", "system-spec.md");
+    fs.unlinkSync(idxPath);
+    fs.mkdirSync(idxPath);
+    fs.unlinkSync(specPath);
+    fs.mkdirSync(specPath);
+
+    const statusRes = runCli(edgeDir, ["status"]);
+    assert.notEqual(statusRes.status, 0);
+    assert.doesNotMatch(statusRes.stderr, /EISDIR|ENOTDIR/);
+
+    const doctorRes = runCli(edgeDir, ["doctor"]);
+    assert.notEqual(doctorRes.status, 0);
+    assert.doesNotMatch(doctorRes.stderr, /EISDIR|ENOTDIR/);
+
+    const instRes = runCli(edgeDir, ["instructions", "--json"]);
+    assert.equal(instRes.status, 0, instRes.stderr);
+    const instParsed = JSON.parse(instRes.stdout);
+    assert.equal(instParsed.context.initialized, false);
+  } finally {
+    fs.rmSync(edgeDir, { recursive: true, force: true });
+  }
+});

@@ -117,10 +117,10 @@ function escapeHtml(str) {
 function formatInlineStyles(str) {
   let processed = String(str);
   // Bold + Italic
-  processed = processed.replace(/\*\*\*([^*]+)\*\*\*/g, "<strong><em>$1</em></strong>");
-  // Bold
-  processed = processed.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-  processed = processed.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+  processed = processed.replace(/\*\*\*((?:(?!\*\*\*).)+?)\*\*\*/g, "<strong><em>$1</em></strong>");
+  // Bold (allow single '*' inside **...**, and single '_' inside __...__ without intraword triggers)
+  processed = processed.replace(/\*\*((?:(?!\*\*).)+?)\*\*/g, "<strong>$1</strong>");
+  processed = processed.replace(/(^|[^\w])__((?:(?!__).)+?)__(?=[^\w]|$)/g, "$1<strong>$2</strong>");
   // Italic (avoid matching spaced math operators such as "2 * 3 * 4")
   processed = processed.replace(/\*(?!\s|\*)([^*\n]*?[^\s*])\*/g, "<em>$1</em>");
   // Strikethrough
@@ -316,7 +316,8 @@ function markdownToHtmlBody(markdown, options = {}) {
         if (
           !rowTrim ||
           !rowTrim.includes("|") ||
-          /^(?:#{1,6}\s|```|~~~|>|<!--|(?:[-*+]|\d+[.)])\s)/.test(rowTrim)
+          /^(?:#{1,6}\s|>|<!--|(?:[-*+]|\d+[.)])\s)/.test(rowTrim) ||
+          Boolean(matchFenceOpen(lines[i]))
         ) {
           break;
         }
