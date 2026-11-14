@@ -5,6 +5,8 @@ const os = require("os");
 const path = require("path");
 const { spawnSync, execFileSync } = require("child_process");
 const { encodePlantUml, buildHtmlDocument, buildMergedRequirementMarkdown } = require("../src/pdf");
+const { parseIndexRows } = require("../src/i18n");
+const { getPositionalArgs } = require("../src/instructions");
 
 const ROOT_DIR = path.resolve(__dirname, "..");
 const CLI_PATH = path.join(ROOT_DIR, "bin", "sa-spec.js");
@@ -701,4 +703,127 @@ test("#18 URL inline formatting guard, legacy spec version stamping, existing br
   assert.match(brokenDraftCheck.stdout, /\[login\].*未加引號的冒號/);
   assert.match(brokenDraftCheck.stdout, /\[login\] db-schema\.md 缺少/);
   assert.match(brokenDraftCheck.stdout, /\[login\] history\.md 缺少/);
+});
+
+test("#19 legacy 5-column index migration, nested code fences, AGENTS --lang docs, getPositionalArgs, and main-branch commit check", (t) => {
+  const dir = makeTempDir();
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  assert.equal(runCli(dir, ["init", "--lang", "zh-TW"]).status, 0);
+  assert.equal(runCli(dir, ["new", "--id", "REQ-001", "--name", "legacy-item"]).status, 0);
+
+  // Rewrite project/index.md into legacy 5-column format and verify parsing & upgrade migration
+  const indexPath = path.join(dir, "project", "index.md");
+  fs.writeFileSync(
+    indexPath,
+    [
+      "# 需求索引",
+      "",
+      "| 編號 | 標題 | 狀態 | 建立時間 | 更新時間 |",
+      "|---|---|---|---|---|",
+      "| REQ-001 | legacy \\| item | 已審核 | 2025-01-01 09:00:00 | 2025-01-02 10:00:00 |",
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+
+  const parsedLegacy = parseIndexRows(fs.readFileSync(indexPath, "utf8"));
+  assert.equal(parsedLegacy.length, 1);
+  assert.deepEqual(parsedLegacy[0], {
+    id: "REQ-001",
+    title: "legacy | item",
+    description: "",
+    status: "已審核",
+    createdAt: "2025-01-01 09:00:00",
+    updatedAt: "2025-01-02 10:00:00"
+  });
+
+  const statusRes = runCli(dir, ["status"]);
+  assert.equal(statusRes.status, 0);
+  assert.match(statusRes.stdout, /需求總數: 1/);
+  assert.match(statusRes.stdout, /REQ-001 legacy \| item \[已審核\]/);
+
+  const upgDry = runCli(dir, ["upgrade", "--dry-run"]);
+  assert.equal(upgDry.status, 0);
+  assert.match(upgDry.stdout, /UPDATED project\/index\.md.*5 欄索引/);
+
+  const upgRes = runCli(dir, ["upgrade"]);
+  assert.equal(upgRes.status, 0, upgRes.stderr);
+  assert.match(upgRes.stdout, /UPDATED project\/index\.md/);
+
+  const parsedMigrated = parseIndexRows(fs.readFileSync(indexPath, "utf8"));
+  assert.equal(parsedMigrated.length, 1);
+  assert.equal(parsedMigrated[0].id, "REQ-001");
+  assert.equal(parsedMigrated[0].createdAt, "2025-01-01 09:00:00");
+  const indexHeaderLine = fs.readFileSync(indexPath, "utf8").split("\n")[2];
+  assert.match(indexHeaderLine, /敘述/);
+
+  // 2. CommonMark closing fence matching in HTML/PDF builder
+  const mdWithNestedFence = [
+    "```markdown",
+    "# Outer",
+    "```yaml",
+    "openapi: 3.0.3",
+    "```",
+    "````markdown",
+    "```json",
+    "{}",
+    "```",
+    "````"
+  ].join("\n");
+  const html = buildHtmlDocument("Fence Test", mdWithNestedFence, { noUmlRender: true, lang: "en" });
+  const preBlocks = html.match(/<pre>[\s\S]*?<\/pre>/g) || [];
+  assert.equal(preBlocks.length, 2, "Nested inner fences should not prematurely split outer blocks");
+  assert.match(preBlocks[0], /```yaml/);
+  assert.match(preBlocks[1], /```json/);
+
+  const outerMarkdownWithYaml = buildHtmlDocument(
+    "Outer Markdown",
+    "```markdown\nExample:\n```yaml\nkey: value\n```",
+    { noUmlRender: true, lang: "en" }
+  );
+  const singlePreCount = (outerMarkdownWithYaml.match(/<pre>/g) || []).length;
+  assert.equal(singlePreCount, 1);
+  assert.match(outerMarkdownWithYaml, /```yaml/);
+
+  // 3. AGENTS.md & localized templates include [--lang <code>] for sa-spec templates
+  for (const lang of ["zh-TW", "en", "zh-CN", "ja", "ko"]) {
+    const res = runCli(dir, ["templates", "AGENTS", "--lang", lang]);
+    assert.equal(res.status, 0, res.stderr);
+    assert.match(res.stdout, /sa-spec templates \[name\] \[--lang <code>\] \[--list\] \[--json\]/);
+  }
+  const rootAgents = fs.readFileSync(path.join(ROOT_DIR, "AGENTS.md"), "utf8");
+  assert.match(rootAgents, /sa-spec templates \[name\] \[--lang <code>\] \[--list\] \[--json\]/);
+  const instRes = runCli(dir, ["instructions"]);
+  assert.equal(instRes.status, 0);
+  assert.match(instRes.stdout, /sa-spec templates \[.*\] \[--lang <code>\] \[--list\] \[--json\]/);
+
+  // 4. getPositionalArgs skips both value flags and --flag=value options
+  assert.deepEqual(
+    getPositionalArgs(["REQ-001", "--output", "out.pdf", "--browser=/bin/chrome", "--split"], ["--output", "--browser"]),
+    ["REQ-001"]
+  );
+
+  // 5. Finalize directly on main/master reports warning if git commit fails
+  const gitDir = makeTempDir("sa-spec-git-fail-");
+  t.after(() => fs.rmSync(gitDir, { recursive: true, force: true }));
+  execFileSync("git", ["init"], { cwd: gitDir });
+  execFileSync("git", ["config", "user.name", "Test User"], { cwd: gitDir });
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: gitDir });
+  assert.equal(runCli(gitDir, ["init", "--lang", "en"]).status, 0);
+  execFileSync("git", ["add", "-A"], { cwd: gitDir });
+  execFileSync("git", ["commit", "-m", "init"], { cwd: gitDir });
+
+  assert.equal(runCli(gitDir, ["new", "--name", "main-direct"]).status, 0);
+  execFileSync("git", ["config", "--unset", "user.name"], { cwd: gitDir });
+  execFileSync("git", ["config", "--unset", "user.email"], { cwd: gitDir });
+  execFileSync("git", ["config", "user.useConfigOnly", "true"], { cwd: gitDir });
+  const finFail = spawnSync(process.execPath, [CLI_PATH, "finalize", "--name", "main-direct"], {
+    cwd: gitDir,
+    encoding: "utf8",
+    env: { ...process.env, SA_SPEC_NO_UML_NET: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" }
+  });
+  assert.equal(finFail.status, 0);
+  assert.doesNotMatch(finFail.stdout, /已直接於主分支 .* 建立提交完成/);
+  assert.match(finFail.stderr, /\[Git 警告\] 主分支 .* 提交未建立/);
 });

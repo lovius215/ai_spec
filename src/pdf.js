@@ -207,8 +207,9 @@ function markdownToHtmlBody(markdown, options = {}) {
       const fence = fenceMatch[1];
       const lang = fenceMatch[2] || "";
       const codeLines = [];
+      const closeFenceRegex = new RegExp(`^\\s*${fence[0]}{${fence.length},}\\s*$`);
       i++;
-      while (i < lines.length && !lines[i].startsWith(fence)) {
+      while (i < lines.length && !closeFenceRegex.test(lines[i])) {
         codeLines.push(lines[i]);
         i++;
       }

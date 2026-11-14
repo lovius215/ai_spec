@@ -15,6 +15,7 @@ const {
   extractMergeStrategy,
   stampSpecVersionInContent,
   escapeIndexCell,
+  splitIndexCells,
   parseIndexRows,
   buildIndexMarkdown,
   buildSystemSpecMarkdown,
@@ -34,7 +35,7 @@ const {
   remoteBranchHasReqId
 } = require("./git");
 const { runDoctor, runCheck } = require("./validator");
-const { runInstructions, runRules, runTemplatesList, getOption } = require("./instructions");
+const { runInstructions, runRules, runTemplatesList, getOption, getPositionalArgs } = require("./instructions");
 
 const cwd = process.cwd();
 const rootDir = path.resolve(__dirname, "..");
@@ -558,10 +559,20 @@ function finalizeReq(args) {
     }
   } else if (currentBranch && currentBranch === mainBranch) {
     stageFinalizePaths();
-    spawnSync("git", ["commit", "-m", `docs(${nextId}): ${rawName} - 規格確認歸檔`], { cwd, encoding: "utf8" });
-    console.log(`[Git] 已直接於主分支 ${mainBranch} 建立提交完成。`);
-    if (remote) {
-      pushBranchToRemote(cwd, remote, mainBranch);
+    const commitRes = spawnSync("git", ["commit", "-m", `docs(${nextId}): ${rawName} - 規格確認歸檔`], {
+      cwd,
+      encoding: "utf8"
+    });
+    if (commitRes.status === 0) {
+      console.log(`[Git] 已直接於主分支 ${mainBranch} 建立提交完成。`);
+      if (remote) {
+        pushBranchToRemote(cwd, remote, mainBranch);
+      }
+    } else {
+      const errMsg = (commitRes.stderr || commitRes.stdout || "").trim();
+      console.warn(
+        `[Git 警告] 主分支 ${mainBranch} 提交未建立（可能無變更或尚未設定 Git user.name / user.email）${errMsg ? `: ${errMsg}` : "。"}`
+      );
     }
   } else {
     console.log("建議接下來執行：");
@@ -570,12 +581,13 @@ function finalizeReq(args) {
   }
 }
 
-function reindexProject() {
+function reindexProject(options = {}) {
+  const { quiet = false } = options;
   const projectDir = path.join(cwd, "project");
   const indexPath = path.join(projectDir, "index.md");
   if (!fs.existsSync(projectDir)) {
     fail("project/ directory not found.");
-    return;
+    return { count: 0, changed: false };
   }
 
   const langConfig = detectProjectLanguage(cwd);
@@ -671,9 +683,13 @@ function reindexProject() {
     console.warn("  修復建議：請將衝突目錄之一改回草稿名稱後，重新執行 sa-spec finalize 或 scc 重新領號。\n");
   }
 
+  const prevContent = fs.existsSync(indexPath) ? fs.readFileSync(indexPath, "utf8") : "";
   const nextContent = buildIndexMarkdown(langConfig.code, rows);
   fs.writeFileSync(indexPath, nextContent, "utf8");
-  console.log(`sa-spec reindex: 已重新索引 ${rows.length} 個需求至 project/index.md`);
+  if (!quiet) {
+    console.log(`sa-spec reindex: 已重新索引 ${rows.length} 個需求至 project/index.md`);
+  }
+  return { count: rows.length, changed: prevContent !== nextContent };
 }
 
 function ensureIndexRow(id, name, langCode = "zh-TW") {
@@ -1020,6 +1036,38 @@ function upgradeProject(args = []) {
         }
       }
     }
+
+    if (!isSourceRepo()) {
+      const indexRelPath = path.join("project", "index.md");
+      const indexAbsPath = path.join(cwd, indexRelPath);
+      if (fs.existsSync(indexAbsPath)) {
+        if (dryRun) {
+          const prevContent = fs.readFileSync(indexAbsPath, "utf8");
+          const hasLegacyFiveCol = prevContent.split("\n").some((line) => {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("|")) return false;
+            if (/^\|(?:\s*:?-{2,}:?\s*\|)+\s*$/.test(trimmed)) return false;
+            return splitIndexCells(trimmed).length === 5;
+          });
+          if (hasLegacyFiveCol) {
+            results.push({
+              action: "update",
+              target: indexRelPath,
+              message: "偵測到舊版 5 欄索引格式，將升級為 6 欄格式"
+            });
+          }
+        } else {
+          const { changed, count } = reindexProject({ quiet: true });
+          if (changed) {
+            results.push({
+              action: "update",
+              target: indexRelPath,
+              message: `重新索引 ${count} 個需求並更新為最新索引格式`
+            });
+          }
+        }
+      }
+    }
   }
 
   printResultList(dryRun ? "upgrade (dry-run)" : "upgrade", results);
@@ -1155,18 +1203,7 @@ function runPdf(args = []) {
   const langConfig = detectProjectLanguage(cwd);
   const pdfOptions = { noUmlRender, onlineUml, lang: langConfig.code };
 
-  const positional = [];
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === "--output" || arg === "--browser") {
-      i++;
-      continue;
-    }
-    if (!arg.startsWith("-")) {
-      positional.push(arg);
-    }
-  }
-
+  const positional = getPositionalArgs(args, ["--output", "--browser"]);
   const target = positional[0];
   if (!all && !target) {
     fail(

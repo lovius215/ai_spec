@@ -472,19 +472,22 @@ function escapeIndexCell(value) {
 
 function splitIndexCells(line) {
   const placeholder = "\x00PIPE\x00";
-  return String(line)
+  const protectedLine = String(line)
+    .trim()
     .replace(/\\\|/g, placeholder)
-    .split("|")
-    .map((part) => part.replace(/\x00PIPE\x00/g, "|").trim());
+    .replace(/^\|/, "")
+    .replace(/\|$/, "");
+  return protectedLine.split("|").map((part) => part.replace(/\x00PIPE\x00/g, "|").trim());
 }
 
 function parseIndexRows(content) {
   return content
     .split("\n")
     .filter((line) => {
-      if (!line.startsWith("|")) return false;
-      if (/^\|(?:\s*:?-{2,}:?\s*\|)+\s*$/.test(line.trim())) return false;
-      const cols = splitIndexCells(line)
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("|")) return false;
+      if (/^\|(?:\s*:?-{2,}:?\s*\|)+\s*$/.test(trimmed)) return false;
+      const cols = splitIndexCells(trimmed)
         .map((c) => c.toLowerCase())
         .filter(Boolean);
       if (cols.length > 0 && INDEX_HEADER_KEYWORDS.some((kw) => cols[0] === kw.toLowerCase())) {
@@ -493,15 +496,27 @@ function parseIndexRows(content) {
       return true;
     })
     .map((line) => splitIndexCells(line))
-    .filter((parts) => parts.length >= 7)
-    .map((parts) => ({
-      id: parts[1],
-      title: parts[2],
-      description: parts[3],
-      status: parts[4],
-      createdAt: parts[5],
-      updatedAt: parts[6]
-    }));
+    .filter((parts) => parts.length >= 5 && parts[0])
+    .map((parts) => {
+      if (parts.length === 5) {
+        return {
+          id: parts[0],
+          title: parts[1],
+          description: "",
+          status: parts[2],
+          createdAt: parts[3],
+          updatedAt: parts[4]
+        };
+      }
+      return {
+        id: parts[0],
+        title: parts[1],
+        description: parts[2],
+        status: parts[3],
+        createdAt: parts[4],
+        updatedAt: parts[5]
+      };
+    });
 }
 
 function buildIndexMarkdown(langCode, rows = []) {
@@ -855,7 +870,7 @@ const AGENTS_LOCALIZED = {
 
 - \`sa-spec instructions <init|propose|analyze|commit|pdf> [--with-rules] [--json]\`：获取当前工作区状态、阶段步骤与完整分析规范。
 - \`sa-spec rules [name|all] [--list] [--json]\`：读取内置补充规则。
-- \`sa-spec templates [name] [--list] [--json]\`：读取内置规格模板。
+- \`sa-spec templates [name] [--lang <code>] [--list] [--json]\`：读取内置规格模板。
 
 # 核心交付物
 
@@ -893,7 +908,7 @@ const AGENTS_LOCALIZED = {
 
 - \`sa-spec instructions <init|propose|analyze|commit|pdf> [--with-rules] [--json]\`: 現在のワークスペース状態・ステップ・分析規範を取得します。
 - \`sa-spec rules [name|all] [--list] [--json]\`: 組み込み補足ルールを読み込みます。
-- \`sa-spec templates [name] [--list] [--json]\`: 組み込みテンプレートを読み込みます。
+- \`sa-spec templates [name] [--lang <code>] [--list] [--json]\`: 組み込みテンプレートを読み込みます。
 
 # 必須成果物
 
@@ -931,7 +946,7 @@ const AGENTS_LOCALIZED = {
 
 - \`sa-spec instructions <init|propose|analyze|commit|pdf> [--with-rules] [--json]\`: 현재 워크스페이스 상태, 단계별 절차, 전체 분석 규범을 가져옵니다.
 - \`sa-spec rules [name|all] [--list] [--json]\`: 내장 세부 규칙을 조회합니다.
-- \`sa-spec templates [name] [--list] [--json]\`: 내장 문서 템플릿을 조회합니다.
+- \`sa-spec templates [name] [--lang <code>] [--list] [--json]\`: 내장 문서 템플릿을 조회합니다.
 
 # 핵심 산출물
 
@@ -1030,6 +1045,7 @@ module.exports = {
   extractMergeStrategy,
   stampSpecVersionInContent,
   escapeIndexCell,
+  splitIndexCells,
   parseIndexRows,
   buildIndexMarkdown,
   buildSystemSpecMarkdown,

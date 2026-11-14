@@ -348,8 +348,8 @@ function runInstructions({ cwd, templatesDir, isSourceRepoFlag, packageVersion, 
       "",
       "## 常用規範與範本查詢",
       "- `sa-spec instructions <init|propose|analyze|commit|pdf> [--with-rules] [--json]`",
-      `- \`sa-spec rules [${availableRules.map((r) => r.name).join("|")}|all]\``,
-      `- \`sa-spec templates [${availableTemplates.map((t) => t.name).join("|")}]\``
+      `- \`sa-spec rules [${availableRules.map((r) => r.name).join("|")}|all] [--list] [--json]\``,
+      `- \`sa-spec templates [${availableTemplates.map((t) => t.name).join("|")}] [--lang <code>] [--list] [--json]\``
     ];
     console.log(output.join("\n"));
     return;
@@ -584,6 +584,7 @@ module.exports = {
   STAGE_ALIASES,
   STAGE_CONFIG,
   TEMPLATE_DEFINITIONS,
+  getPositionalArgs,
   getOption,
   collectWorkspaceContext,
   runInstructions,
