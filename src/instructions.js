@@ -150,8 +150,25 @@ function getPositionalArgs(args, valueFlags = []) {
 }
 
 function getOption(args, flag) {
+  const eqPrefix = `${flag}=`;
+  const eqArg = args.find((arg) => arg.startsWith(eqPrefix));
+  if (eqArg !== undefined) {
+    const value = eqArg.slice(eqPrefix.length);
+    if (!value) {
+      throw new Error(`參數 ${flag} 缺少設定值。`);
+    }
+    return value;
+  }
+
   const index = args.indexOf(flag);
-  return index >= 0 ? args[index + 1] || null : null;
+  if (index < 0) {
+    return null;
+  }
+  const next = args[index + 1];
+  if (!next || next.startsWith("-")) {
+    throw new Error(`參數 ${flag} 缺少設定值。`);
+  }
+  return next;
 }
 
 function stripFrontmatter(content) {
@@ -513,8 +530,7 @@ function buildLocalizedTemplateByName(name, langConfig, templatesDir) {
 function runTemplatesList({ cwd = process.cwd(), templatesDir, args = [], fail }) {
   const asJson = args.includes("--json");
   const listOnly = args.includes("--list");
-  const langEqArg = args.find((a) => a.startsWith("--lang="));
-  const langOverride = getOption(args, "--lang") || (langEqArg ? langEqArg.slice("--lang=".length) : "");
+  const langOverride = getOption(args, "--lang") || "";
 
   let langConfig = detectProjectLanguage(cwd);
   if (langOverride) {
@@ -568,6 +584,7 @@ module.exports = {
   STAGE_ALIASES,
   STAGE_CONFIG,
   TEMPLATE_DEFINITIONS,
+  getOption,
   collectWorkspaceContext,
   runInstructions,
   runRules,

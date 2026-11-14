@@ -484,3 +484,62 @@ test("#15 built-in rules have no legacy file names, db/history templates align, 
   assert.equal(afterMatch[1], createdBefore);
   assert.notEqual(afterMatch[2], updatedBefore);
 });
+
+test("#16 upgrade localizes injected UI handoff section, getOption validates missing values and supports --flag=value", (t) => {
+  const dir = makeTempDir();
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  assert.equal(runCli(dir, ["init", "--lang", "en"]).status, 0);
+  assert.equal(runCli(dir, ["new", "--id", "REQ-001", "--name", "demo"]).status, 0);
+
+  const handoffPath = path.join(dir, "project", "REQ-001-demo", "handoff.md");
+  fs.writeFileSync(
+    handoffPath,
+    [
+      "# REQ-001 demo Developer Handoff Summary",
+      "",
+      "## API Contracts",
+      "- GET /api/v1/demo",
+      "",
+      "## DB Changes",
+      "- None",
+      "",
+      "## Acceptance Criteria",
+      "- Works",
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+
+  const upgRes = runCli(dir, ["upgrade"]);
+  assert.equal(upgRes.status, 0, upgRes.stderr);
+
+  const handoffAfter = fs.readFileSync(handoffPath, "utf8");
+  assert.match(handoffAfter, /## UI \/ Screen Specification/);
+  assert.match(handoffAfter, /uml\/wireframe\.puml/);
+  assert.doesNotMatch(handoffAfter, /畫面規格|驗收條件/);
+  assert.ok(
+    handoffAfter.indexOf("## UI / Screen Specification") < handoffAfter.indexOf("## Acceptance Criteria"),
+    "UI section should be inserted before Acceptance Criteria"
+  );
+
+  // Missing value before another flag must fail and not create project/branch
+  const missingVal = runCli(dir, ["new", "--name", "--branch"]);
+  assert.notEqual(missingVal.status, 0);
+  assert.match(missingVal.stderr, /--name/);
+  assert.equal(fs.existsSync(path.join(dir, "project", "branch")), false);
+
+  // Empty --flag= value must fail
+  const emptyEq = runCli(dir, ["new", "--name="]);
+  assert.notEqual(emptyEq.status, 0);
+  assert.match(emptyEq.stderr, /--name/);
+
+  // Valid --flag=value must work cleanly across commands
+  const eqValid = runCli(dir, ["new", "--name=inline-test"]);
+  assert.equal(eqValid.status, 0, eqValid.stderr);
+  assert.equal(fs.existsSync(path.join(dir, "project", "inline-test", "srs.md")), true);
+
+  const eqTpl = runCli(dir, ["templates", "uml-main", "--lang=ko"]);
+  assert.equal(eqTpl.status, 0, eqTpl.stderr);
+  assert.match(eqTpl.stdout, /주요 시퀀스 다이어그램/);
+});

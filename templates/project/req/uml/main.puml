@@ -1,14 +1,15 @@
 @startuml
-title {{REQ_ID}} {{REQ_NAME}}
+title {{REQ_ID}} {{REQ_NAME}} - 主要互動循序圖
 
-actor User as "使用者"
-participant System as "系統"
+actor "使用者" as User
+participant "前端介面" as Client
+participant "後端 API 服務" as API
+database "資料庫" as DB
 
-User -> System: 發起需求
-System --> User: 回傳結果
-
-note right of System
-待於 spec:analyze 後補充流程細節。
-end note
-
+User -> Client : 操作與送出請求
+Client -> API : POST /api/v1/resource
+API -> DB : 寫入 / 查詢資料
+DB --> API : 回傳結果
+API --> Client : 200 OK (JSON Payload)
+Client --> User : 顯示操作結果
 @enduml

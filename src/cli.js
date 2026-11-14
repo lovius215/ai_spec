@@ -33,7 +33,7 @@ const {
   remoteBranchHasReqId
 } = require("./git");
 const { runDoctor, runCheck } = require("./validator");
-const { runInstructions, runRules, runTemplatesList } = require("./instructions");
+const { runInstructions, runRules, runTemplatesList, getOption } = require("./instructions");
 
 const cwd = process.cwd();
 const rootDir = path.resolve(__dirname, "..");
@@ -48,67 +48,71 @@ function main() {
   const args = process.argv.slice(2);
   const command = args[0];
 
-  switch (command) {
-    case "init":
-      initProject(args.slice(1));
-      return;
-    case "new":
-      createReqTemplate(args.slice(1));
-      return;
-    case "finalize":
-      finalizeReq(args.slice(1));
-      return;
-    case "reindex":
-      reindexProject();
-      return;
-    case "check":
-      runCheck(cwd, isSourceRepo(), getPackageVersion(), showStatus, args.slice(1));
-      return;
-    case "upgrade":
-    case "update":
-      upgradeProject(args.slice(1));
-      return;
-    case "doctor":
-      runDoctor(cwd, getPackageVersion());
-      return;
-    case "status":
-      showStatus();
-      return;
-    case "template":
-      runTemplate(args.slice(1));
-      return;
-    case "templates":
-      runTemplatesList({ cwd, templatesDir, args: args.slice(1), fail });
-      return;
-    case "instructions":
-      runInstructions({
-        cwd,
-        templatesDir,
-        isSourceRepoFlag: isSourceRepo(),
-        packageVersion: getPackageVersion(),
-        args: args.slice(1),
-        fail
-      });
-      return;
-    case "rules":
-      runRules({ templatesDir, args: args.slice(1), fail });
-      return;
-    case "pdf":
-      runPdf(args.slice(1));
-      return;
-    case "version":
-    case "--version":
-    case "-v":
-      showVersion();
-      return;
-    case "help":
-    case "--help":
-    case "-h":
-    case undefined:
-      showHelp();
-      return;
-    default:
-      fail(`Unknown command: ${command}`);
+  try {
+    switch (command) {
+      case "init":
+        initProject(args.slice(1));
+        return;
+      case "new":
+        createReqTemplate(args.slice(1));
+        return;
+      case "finalize":
+        finalizeReq(args.slice(1));
+        return;
+      case "reindex":
+        reindexProject();
+        return;
+      case "check":
+        runCheck(cwd, isSourceRepo(), getPackageVersion(), showStatus, args.slice(1));
+        return;
+      case "upgrade":
+      case "update":
+        upgradeProject(args.slice(1));
+        return;
+      case "doctor":
+        runDoctor(cwd, getPackageVersion());
+        return;
+      case "status":
+        showStatus();
+        return;
+      case "template":
+        runTemplate(args.slice(1));
+        return;
+      case "templates":
+        runTemplatesList({ cwd, templatesDir, args: args.slice(1), fail });
+        return;
+      case "instructions":
+        runInstructions({
+          cwd,
+          templatesDir,
+          isSourceRepoFlag: isSourceRepo(),
+          packageVersion: getPackageVersion(),
+          args: args.slice(1),
+          fail
+        });
+        return;
+      case "rules":
+        runRules({ templatesDir, args: args.slice(1), fail });
+        return;
+      case "pdf":
+        runPdf(args.slice(1));
+        return;
+      case "version":
+      case "--version":
+      case "-v":
+        showVersion();
+        return;
+      case "help":
+      case "--help":
+      case "-h":
+      case undefined:
+        showHelp();
+        return;
+      default:
+        fail(`Unknown command: ${command}`);
+    }
+  } catch (err) {
+    fail(err && err.message ? err.message : String(err));
   }
 }
 
@@ -714,11 +718,6 @@ function applyReplacements(content, replacements) {
   );
 }
 
-function getOption(args, flag) {
-  const index = args.indexOf(flag);
-  return index >= 0 ? args[index + 1] || null : null;
-}
-
 function slugify(value) {
   return String(value || "")
     .toLowerCase()
@@ -840,6 +839,7 @@ function upgradeProject(args = []) {
   const dryRun = args.includes("--dry-run");
   const keepLegacy = args.includes("--keep-legacy");
   const langConfig = detectProjectLanguage(cwd);
+  const t = getLangStrings(langConfig.code);
   const version = getPackageVersion();
   console.log(`專案目前語言: ${langConfig.label}（依現有語言升級，不變更設定）`);
   const results = [];
@@ -915,9 +915,15 @@ function upgradeProject(args = []) {
             content = content.replace(/uml\.puml/g, "uml/");
             updatedHandoff = true;
           }
-          if (!content.includes("## UI") && !content.includes("畫面規格") && !content.includes("界面规格") && !content.includes("画面仕様") && !content.includes("화면 사양")) {
-            const uiSection = `\n## UI / 畫面規格\n待補充；若有前端介面需求，參照 \`uml/wireframe.puml\`；若無 UI 需求，明確標示「無 UI 介面需求」。\n`;
-            if (content.includes("## 驗收條件")) {
+          const hasUiSection =
+            content.includes(`## ${t.handoffSections[7]}`) ||
+            /^##\s+.*(?:UI|畫面|界面|画面|화면|Wireframe)/im.test(content);
+          if (!hasUiSection) {
+            const uiSection = `\n## ${t.handoffSections[7]}\n${t.handoffUiNote}\n`;
+            const acHeading = `## ${t.handoffSections[8]}`;
+            if (content.includes(acHeading)) {
+              content = content.replace(acHeading, `${uiSection}\n${acHeading}`);
+            } else if (content.includes("## 驗收條件")) {
               content = content.replace("## 驗收條件", `${uiSection}\n## 驗收條件`);
             } else {
               content = `${content.trimEnd()}\n${uiSection}`;
@@ -1208,7 +1214,7 @@ Usage:
   sa-spec finalize --name login [--slug login] [--no-merge | --pr]
   sa-spec instructions [init|propose|analyze|commit|pdf] [--with-rules] [--json]
   sa-spec rules [name|all] [--list] [--json]
-  sa-spec templates [name] [--list] [--json]
+  sa-spec templates [name] [--lang <code>] [--list] [--json]
   sa-spec template <system-spec|req> [options]
   sa-spec pdf <file.md|REQ-001|name> [--split] [--output out.pdf] [--online-uml | --no-uml-render]
   sa-spec pdf --all [--split] [--online-uml | --no-uml-render]
