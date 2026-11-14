@@ -112,29 +112,8 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
-function parseInline(text) {
-  if (!text) return "";
-  const codeSpans = [];
-  let processed = String(text).replace(/`([^`]+)`/g, (_, code) => {
-    const idx = codeSpans.length;
-    codeSpans.push(`<code>${escapeHtml(code)}</code>`);
-    return `\x00CODE_${idx}\x00`;
-  });
-
-  processed = processed.replace(/<br\s*\/?>/gi, "\x00BR\x00");
-  processed = escapeHtml(processed);
-  processed = processed.replace(/\x00BR\x00/g, "<br/>");
-
-  // Images: ![alt](src)
-  processed = processed.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) => {
-    return `<img alt="${alt}" src="${sanitizeUrl(src)}" style="max-width:100%;" />`;
-  });
-
-  // Links: [text](url)
-  processed = processed.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) => {
-    return `<a href="${sanitizeUrl(href)}">${label}</a>`;
-  });
-
+function formatInlineStyles(str) {
+  let processed = String(str);
   // Bold + Italic
   processed = processed.replace(/\*\*\*([^*]+)\*\*\*/g, "<strong><em>$1</em></strong>");
   // Bold
@@ -144,9 +123,39 @@ function parseInline(text) {
   processed = processed.replace(/\*([^*\n]+)\*/g, "<em>$1</em>");
   // Strikethrough
   processed = processed.replace(/~~([^~]+)~~/g, "<del>$1</del>");
+  return processed;
+}
 
-  // Restore inline code spans
-  processed = processed.replace(/\x00CODE_(\d+)\x00/g, (_, idx) => codeSpans[Number(idx)]);
+function parseInline(text) {
+  if (!text) return "";
+  const tokens = [];
+  const holdToken = (html) => {
+    const idx = tokens.length;
+    tokens.push(html);
+    return `\x00TOK_${idx}\x00`;
+  };
+
+  let processed = String(text).replace(/`([^`]+)`/g, (_, code) => holdToken(`<code>${escapeHtml(code)}</code>`));
+
+  processed = processed.replace(/<br\s*\/?>/gi, "\x00BR\x00");
+  processed = escapeHtml(processed);
+  processed = processed.replace(/\x00BR\x00/g, "<br/>");
+
+  // Images: ![alt](src) - protect attributes before style formatting
+  processed = processed.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) => {
+    return holdToken(`<img alt="${alt}" src="${sanitizeUrl(src)}" style="max-width:100%;" />`);
+  });
+
+  // Links: [text](url) - format link text only, protect href from __ / * replacement
+  processed = processed.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) => {
+    return holdToken(`<a href="${sanitizeUrl(href)}">${formatInlineStyles(label)}</a>`);
+  });
+
+  processed = formatInlineStyles(processed);
+
+  while (/\x00TOK_(\d+)\x00/.test(processed)) {
+    processed = processed.replace(/\x00TOK_(\d+)\x00/g, (_, idx) => tokens[Number(idx)]);
+  }
   return processed;
 }
 

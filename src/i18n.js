@@ -438,7 +438,9 @@ function extractMergeStrategy(content) {
   return "auto-merge";
 }
 
-function stampSpecVersionInContent(content, version) {
+function stampSpecVersionInContent(content, version, langCode = "zh-TW") {
+  const t = getLangStrings(langCode);
+  const versionLine = `- ${t.specVersionLabel}：${version}`;
   const versionLineRegex = /^-\s*(?:規範版本|规范版本|仕様バージョン|사양 버전|Spec Version)[：:].*$/im;
   if (versionLineRegex.test(content)) {
     return content.replace(versionLineRegex, (line) => {
@@ -449,9 +451,17 @@ function stampSpecVersionInContent(content, version) {
   }
   const langLineRegex = /^-\s*(?:主要語言|主要语言|主要言語|주요 언어|語言|Language)[：:].*$/im;
   if (langLineRegex.test(content)) {
-    return content.replace(langLineRegex, (line) => `${line}\n- Spec Version: ${version}`);
+    return content.replace(langLineRegex, (line) => `${line}\n${versionLine}`);
   }
-  return content;
+  const statusLineRegex = /^-\s*(?:狀態|状态|ステータス|상태|Status)[：:].*$/im;
+  if (statusLineRegex.test(content)) {
+    return content.replace(statusLineRegex, (line) => `${line}\n${versionLine}`);
+  }
+  const headingRegex = /^#\s+.+$/m;
+  if (headingRegex.test(content)) {
+    return content.replace(headingRegex, (line) => `${line}\n\n${versionLine}`);
+  }
+  return `${versionLine}\n${content}`;
 }
 
 const INDEX_HEADER_KEYWORDS = ["編號", "编号", "番号", "번호", "id"];

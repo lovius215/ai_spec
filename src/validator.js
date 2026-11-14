@@ -94,7 +94,8 @@ function checkDuplicateReqIds(cwd) {
   return true;
 }
 
-function validateSingleRequirementDir(reqAbsDir, reqDirName) {
+function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
+  const { isDraft = false } = options;
   const issues = [];
 
   for (const item of REQUIRED_DELIVERABLES) {
@@ -103,13 +104,13 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName) {
     }
   }
 
-  // Check leftover {{REQ_ID}} placeholder
+  // Check leftover {{REQ_ID}} placeholder (allowed in draft dirs before finalize)
   const checkFiles = ["srs.md", "openapi.yaml", "db-schema.md", "handoff.md", "history.md"];
   for (const fileName of checkFiles) {
     const fileAbs = path.join(reqAbsDir, fileName);
     if (!fs.existsSync(fileAbs)) continue;
     const text = fs.readFileSync(fileAbs, "utf8");
-    if (text.includes("{{REQ_ID}}")) {
+    if (!isDraft && text.includes("{{REQ_ID}}")) {
       issues.push(`${fileName} 仍殘留未替換的 {{REQ_ID}} 佔位符`);
     }
   }
@@ -123,7 +124,7 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName) {
     }
     for (const f of pumlFiles) {
       const pumlText = fs.readFileSync(path.join(umlDir, f), "utf8");
-      if (pumlText.includes("{{REQ_ID}}")) {
+      if (!isDraft && pumlText.includes("{{REQ_ID}}")) {
         issues.push(`uml/${f} 仍殘留未替換的 {{REQ_ID}} 佔位符`);
       }
       const startCount = (pumlText.match(/@start\w+/gi) || []).length;
@@ -176,7 +177,32 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName) {
     }
   }
 
+  // Validate db-schema.md basic section structure
+  const dbAbs = path.join(reqAbsDir, "db-schema.md");
+  if (fs.existsSync(dbAbs)) {
+    const dbText = fs.readFileSync(dbAbs, "utf8");
+    if (!/^##\s+/m.test(dbText)) {
+      issues.push("db-schema.md 缺少資料表/規格章節標題 (## ...)");
+    }
+  }
+
+  // Validate history.md contains Markdown table
+  const historyAbs = path.join(reqAbsDir, "history.md");
+  if (fs.existsSync(historyAbs)) {
+    const historyText = fs.readFileSync(historyAbs, "utf8");
+    if (!/^\|.+\|$/m.test(historyText)) {
+      issues.push("history.md 缺少版本歷程 Markdown 表格");
+    }
+  }
+
   return issues.map((msg) => ({ reqDirName, msg }));
+}
+
+function isDraftSpecDir(dirAbs, dirName) {
+  if (!dirName || dirName.startsWith("REQ-") || dirName === "req") return false;
+  return ["srs.md", "handoff.md", "openapi.yaml", "db-schema.md", "history.md"].some((file) =>
+    fs.existsSync(path.join(dirAbs, file))
+  );
 }
 
 function validateRequirementsContent(cwd) {
@@ -185,9 +211,18 @@ function validateRequirementsContent(cwd) {
 
   const allIssues = [];
   const entries = fs.readdirSync(projectDir, { withFileTypes: true });
+  let reqCount = 0;
+  let draftCount = 0;
+
   for (const entry of entries) {
-    if (entry.isDirectory() && entry.name.startsWith("REQ-")) {
-      allIssues.push(...validateSingleRequirementDir(path.join(projectDir, entry.name), entry.name));
+    if (!entry.isDirectory()) continue;
+    const dirAbs = path.join(projectDir, entry.name);
+    if (entry.name.startsWith("REQ-")) {
+      reqCount += 1;
+      allIssues.push(...validateSingleRequirementDir(dirAbs, entry.name, { isDraft: false }));
+    } else if (isDraftSpecDir(dirAbs, entry.name)) {
+      draftCount += 1;
+      allIssues.push(...validateSingleRequirementDir(dirAbs, entry.name, { isDraft: true }));
     }
   }
 
@@ -196,11 +231,10 @@ function validateRequirementsContent(cwd) {
     for (const issue of allIssues) {
       console.log(`  - [${issue.reqDirName}] ${issue.msg}`);
     }
-  } else {
-    const reqCount = entries.filter((e) => e.isDirectory() && e.name.startsWith("REQ-")).length;
-    if (reqCount > 0) {
-      console.log(`需求內容檢查: OK (${reqCount} 個已歸檔需求)`);
-    }
+  } else if (reqCount > 0 || draftCount > 0) {
+    console.log(
+      `需求內容檢查: OK (${reqCount} 個已歸檔需求${draftCount > 0 ? `、${draftCount} 個草稿` : ""})`
+    );
   }
 
   return allIssues;

@@ -634,3 +634,71 @@ test("#17 finalize preserves own ID on re-run without collision, tables escape p
     fs.readFileSync(path.join(ROOT_DIR, "README.zh-TW.md"), "utf8")
   );
 });
+
+test("#18 URL inline formatting guard, legacy spec version stamping, existing branch checkout, and draft/db/history check", (t) => {
+  const { stampSpecVersionInContent } = require("../src/i18n");
+
+  // 1. Links & images containing __ or * in URLs must not get <strong>/<em> inside href/src
+  const urlHtml = buildHtmlDocument(
+    "URL Guard",
+    "[__bold__ link and `code`](https://example.com/__v1__/users) ![img](https://example.com/__v1__/a*b*.png)",
+    { noUmlRender: true, lang: "en" }
+  );
+  assert.match(
+    urlHtml,
+    /<a href="https:\/\/example\.com\/__v1__\/users"><strong>bold<\/strong> link and <code>code<\/code><\/a>/
+  );
+  assert.match(urlHtml, /<img alt="img" src="https:\/\/example\.com\/__v1__\/a\*b\*\.png"/);
+
+  // 2. Legacy system-spec.md with only Status line gets version stamped cleanly on upgrade
+  const dir = makeTempDir();
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  execFileSync("git", ["init", "-b", "master"], { cwd: dir });
+  execFileSync("git", ["config", "user.email", "dev@example.com"], { cwd: dir });
+  execFileSync("git", ["config", "user.name", "Developer"], { cwd: dir });
+
+  assert.equal(runCli(dir, ["init"]).status, 0);
+  const specPath = path.join(dir, "project", "system-spec.md");
+  fs.writeFileSync(specPath, "# 系統概覽\n\n- 狀態：草稿\n\n## 這個系統要解決什麼\n待補充。\n", "utf8");
+  execFileSync("git", ["add", "."], { cwd: dir });
+  execFileSync("git", ["commit", "-m", "legacy init"], { cwd: dir });
+
+  const upgRes = runCli(dir, ["upgrade"]);
+  assert.equal(upgRes.status, 0, upgRes.stderr);
+  const stampedSpec = fs.readFileSync(specPath, "utf8");
+  assert.match(stampedSpec, new RegExp(`- 規範版本：${PKG_VERSION.replace(/\./g, "\\.")}`));
+
+  const strictAfterUpgrade = runCli(dir, ["check", "--strict"]);
+  assert.equal(strictAfterUpgrade.status, 0, strictAfterUpgrade.stdout);
+
+  assert.match(
+    stampSpecVersionInContent("# Overview\n\n- Status：Draft\n", "0.2.8", "en"),
+    /- Spec Version：0\.2\.8/
+  );
+
+  // 3. Existing local branch feat/login should be checked out instead of staying on master
+  execFileSync("git", ["branch", "feat/login"], { cwd: dir });
+  const newExistingBranch = runCli(dir, ["new", "--name", "login", "--branch"]);
+  assert.equal(newExistingBranch.status, 0, newExistingBranch.stderr);
+  const activeBranch = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: dir, encoding: "utf8" }).trim();
+  assert.equal(activeBranch, "feat/login");
+  assert.equal(fs.existsSync(path.join(dir, "project", "login", "srs.md")), true);
+
+  // Clean draft passes check (with {{REQ_ID}} allowed in draft)
+  const cleanDraftCheck = runCli(dir, ["check"]);
+  assert.equal(cleanDraftCheck.status, 0, cleanDraftCheck.stdout);
+  assert.match(cleanDraftCheck.stdout, /1 個草稿/);
+
+  // 4. check catches malformed openapi.yaml, sectionless db-schema.md, and tableless history.md in draft dirs
+  const draftDir = path.join(dir, "project", "login");
+  fs.writeFileSync(path.join(draftDir, "openapi.yaml"), "openapi: 3.0.3\ninfo:\n  title: Bad: Title\npaths: {}\n", "utf8");
+  fs.writeFileSync(path.join(draftDir, "db-schema.md"), "# DB\nempty\n", "utf8");
+  fs.writeFileSync(path.join(draftDir, "history.md"), "# History\nno table here\n", "utf8");
+
+  const brokenDraftCheck = runCli(dir, ["check"]);
+  assert.equal(brokenDraftCheck.status, 1);
+  assert.match(brokenDraftCheck.stdout, /\[login\].*未加引號的冒號/);
+  assert.match(brokenDraftCheck.stdout, /\[login\] db-schema\.md 缺少/);
+  assert.match(brokenDraftCheck.stdout, /\[login\] history\.md 缺少/);
+});

@@ -279,17 +279,39 @@ function createReqTemplate(args, label = "new") {
   // 草稿模式（Git-Flow 多人協作）：未指定 id 時建立草稿目錄，以 {{REQ_ID}} 佔位
   if (!id) {
     if (args.includes("--branch")) {
-      const branchName = `feat/${slug}`;
-      const branchRes = spawnSync("git", ["checkout", "-b", branchName], { cwd, encoding: "utf8" });
-      if (branchRes.status === 0) {
-        console.log(`已建立並切換至分支: ${branchName}`);
+      const targetBranch = `feat/${slug}`;
+      const mainBranch = detectMainBranch(cwd);
+      let activeBranch = getCurrentBranch(cwd);
+
+      if (activeBranch === targetBranch) {
+        console.log(`已在目標分支: ${targetBranch}`);
+      } else if (activeBranch && mainBranch && activeBranch !== mainBranch && activeBranch.startsWith("feat/")) {
+        console.log(`沿用目前 feature 分支: ${activeBranch}`);
       } else {
-        console.log(`提示: 分支切換略過 (${(branchRes.stderr || "").trim() || "可能是已有同名分支或未在 git 目錄"})`);
+        const existsRes = spawnSync("git", ["show-ref", "--verify", "--quiet", `refs/heads/${targetBranch}`], {
+          cwd,
+          encoding: "utf8"
+        });
+        if (existsRes.status === 0) {
+          const switchRes = spawnSync("git", ["checkout", targetBranch], { cwd, encoding: "utf8" });
+          if (switchRes.status === 0) {
+            console.log(`已切換至既有分支: ${targetBranch}`);
+          } else {
+            console.warn(`警告: 切換至既有分支 ${targetBranch} 失敗 (${(switchRes.stderr || "").trim()})`);
+          }
+        } else {
+          const branchRes = spawnSync("git", ["checkout", "-b", targetBranch], { cwd, encoding: "utf8" });
+          if (branchRes.status === 0) {
+            console.log(`已建立並切換至分支: ${targetBranch}`);
+          } else {
+            console.log(`提示: 分支切換略過 (${(branchRes.stderr || "").trim() || "未在 git 目錄"})`);
+          }
+        }
+        activeBranch = getCurrentBranch(cwd);
       }
 
       const remote = getDefaultRemote(cwd);
-      const activeBranch = getCurrentBranch(cwd) || branchName;
-      if (remote && activeBranch) {
+      if (remote && activeBranch && activeBranch !== mainBranch) {
         pushBranchToRemote(cwd, remote, activeBranch);
       }
     }
@@ -361,21 +383,27 @@ function finalizeReq(args) {
   } else if (fs.existsSync(path.join(projectDir, `draft-${slug}`))) {
     sourceDir = path.join(projectDir, `draft-${slug}`);
   } else {
-    // 2. 支援對既有 REQ-xxx-<slug> 或 REQ-xxx 重新定號
+    // 2. 支援對既有 REQ-xxx-<slug> 或 REQ-xxx 重新定號（若有多筆取最新編號）
     const entries = fs.readdirSync(projectDir, { withFileTypes: true });
-    const reqMatch = entries.find(
-      (e) =>
-        e.isDirectory() &&
-        (e.name.toUpperCase() === rawName.toUpperCase() ||
-          (e.name.startsWith("REQ-") && e.name.toLowerCase().endsWith(`-${slug}`)))
-    );
+    const reqMatches = entries
+      .filter(
+        (e) =>
+          e.isDirectory() &&
+          (e.name.toUpperCase() === rawName.toUpperCase() ||
+            (e.name.startsWith("REQ-") && e.name.toLowerCase().endsWith(`-${slug}`)))
+      )
+      .sort((a, b) => {
+        const na = parseInt((a.name.match(/^REQ-(\d+)/i) || [])[1] || "0", 10);
+        const nb = parseInt((b.name.match(/^REQ-(\d+)/i) || [])[1] || "0", 10);
+        return nb - na;
+      });
+    const reqMatch = reqMatches[0];
     if (reqMatch) {
       sourceDir = path.join(projectDir, reqMatch.name);
       cleanSlug = reqMatch.name.replace(/^REQ-\d+-/i, "");
       if (cleanSlug.toUpperCase().startsWith("REQ-")) {
         cleanSlug = slug;
       }
-      console.log(`偵測到既有目錄 ${reqMatch.name}，將進行重新定號 (Re-number)...`);
     }
   }
 
@@ -401,6 +429,14 @@ function finalizeReq(args) {
   const maxId = getLatestMaxReqId(cwd, projectDir, mainBranch, remote, oldReqId ? oldDirName : null);
   const nextNum = maxId + 1;
   const nextId = `REQ-${String(nextNum).padStart(3, "0")}`;
+
+  if (oldReqId) {
+    if (nextId === oldReqId) {
+      console.log(`序號無衝突，沿用既有編號 ${oldReqId}`);
+    } else {
+      console.log(`偵測到既有目錄 ${oldDirName}，重新定號 (Re-number): ${oldReqId} -> ${nextId}`);
+    }
+  }
 
   const finalDirName = oldReqId && nextId === oldReqId ? oldDirName : `${nextId}-${cleanSlug}`;
   const finalDir = path.join(projectDir, finalDirName);
@@ -859,7 +895,7 @@ function upgradeProject(args = []) {
     const systemSpecAbs = path.join(cwd, systemSpecRel);
     if (fs.existsSync(systemSpecAbs)) {
       const currentSpec = fs.readFileSync(systemSpecAbs, "utf8");
-      const stamped = stampSpecVersionInContent(currentSpec, version);
+      const stamped = stampSpecVersionInContent(currentSpec, version, langConfig.code);
       if (stamped !== currentSpec) {
         if (!dryRun) {
           fs.writeFileSync(systemSpecAbs, stamped, "utf8");

@@ -98,7 +98,7 @@ const STAGE_CONFIG = {
     steps: [
       "若有設定 Git remote，先執行 git push -u <remote> <branch> 與 git fetch <remote> 同步遠端狀態。",
       "查詢主分支（main/master 與遠端主分支）最新可用序號定號 REQ-xxx，執行 sa-spec finalize --name <slug>（若主分支有保護策略可加 --no-merge 或將 system-spec.md 的合併策略設為 pr）。",
-      "依使用者確認內容更新 project/system-spec.md，補齊 handoff.md 十大必要章節與 history.md（未經確認不可標示「已審核」）。",
+      "依使用者確認內容更新 project/system-spec.md，補齊 handoff.md 11 項必要章節與 history.md（未經確認不可標示「已審核」）。",
       "只 stage 本次歸檔相關檔案並 commit（格式：docs(REQ-xxx): 需求名稱 - 簡短需求說明）；auto-merge 模式下自動合併回主分支並 push，pr 模式下推送 feature 分支並提示建立 PR。"
     ]
   },
