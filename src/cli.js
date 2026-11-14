@@ -18,7 +18,9 @@ const {
   buildIndexMarkdown,
   buildSystemSpecMarkdown,
   buildWorkspaceReadmeMarkdown,
-  buildLocalizedReqFileContent
+  buildLocalizedReqFileContent,
+  buildLocalizedAgentsMarkdown,
+  extractSrsMetadata
 } = require("./i18n");
 const {
   ensureGitRepository,
@@ -60,7 +62,7 @@ function main() {
       reindexProject();
       return;
     case "check":
-      runCheck(cwd, isSourceRepo(), getPackageVersion(), showStatus);
+      runCheck(cwd, isSourceRepo(), getPackageVersion(), showStatus, args.slice(1));
       return;
     case "upgrade":
     case "update":
@@ -76,7 +78,7 @@ function main() {
       runTemplate(args.slice(1));
       return;
     case "templates":
-      runTemplatesList({ templatesDir, args: args.slice(1), fail });
+      runTemplatesList({ cwd, templatesDir, args: args.slice(1), fail });
       return;
     case "instructions":
       runInstructions({
@@ -140,12 +142,11 @@ function initProject(args = []) {
   }
 
   const version = getPackageVersion();
-  const agentsTemplateName = langConfig.code === "en" ? "AGENTS.en.md" : "AGENTS.md";
 
   const results = [
     ensureGitRepository(cwd),
     ensureDir("project"),
-    ensureFileFromTemplate(agentsTemplateName, "AGENTS.md"),
+    writeGeneratedFileIfMissing("AGENTS.md", buildLocalizedAgentsMarkdown(langConfig.code, templatesDir)),
     writeGeneratedFileIfMissing("readme.md", buildWorkspaceReadmeMarkdown(langConfig.code)),
     writeGeneratedFileIfMissing(path.join("project", "index.md"), buildIndexMarkdown(langConfig.code)),
     writeGeneratedFileIfMissing(
@@ -295,12 +296,8 @@ function createReqTemplate(args, label = "new") {
       ensureDir(reqDir),
       ensureDir(umlDir),
       writeReqArtifact(langConfig.code, "srs.md", path.join(reqDir, "srs.md"), replacements),
-      ensureFileFromTemplate(path.join("project", "req", "uml", "main.puml"), path.join(umlDir, "main.puml"), replacements),
-      ensureFileFromTemplate(
-        path.join("project", "req", "uml", "wireframe.puml"),
-        path.join(umlDir, "wireframe.puml"),
-        replacements
-      ),
+      writeReqArtifact(langConfig.code, "uml/main.puml", path.join(umlDir, "main.puml"), replacements),
+      writeReqArtifact(langConfig.code, "uml/wireframe.puml", path.join(umlDir, "wireframe.puml"), replacements),
       ensureFileFromTemplate(path.join("project", "req", "openapi.yaml"), path.join(reqDir, "openapi.yaml"), replacements),
       writeReqArtifact(langConfig.code, "db-schema.md", path.join(reqDir, "db-schema.md"), replacements),
       writeReqArtifact(langConfig.code, "handoff.md", path.join(reqDir, "handoff.md"), replacements),
@@ -321,12 +318,8 @@ function createReqTemplate(args, label = "new") {
     ensureDir(reqDir),
     ensureDir(umlDir),
     writeReqArtifact(langConfig.code, "srs.md", path.join(reqDir, "srs.md"), replacements),
-    ensureFileFromTemplate(path.join("project", "req", "uml", "main.puml"), path.join(umlDir, "main.puml"), replacements),
-    ensureFileFromTemplate(
-      path.join("project", "req", "uml", "wireframe.puml"),
-      path.join(umlDir, "wireframe.puml"),
-      replacements
-    ),
+    writeReqArtifact(langConfig.code, "uml/main.puml", path.join(umlDir, "main.puml"), replacements),
+    writeReqArtifact(langConfig.code, "uml/wireframe.puml", path.join(umlDir, "wireframe.puml"), replacements),
     ensureFileFromTemplate(path.join("project", "req", "openapi.yaml"), path.join(reqDir, "openapi.yaml"), replacements),
     writeReqArtifact(langConfig.code, "db-schema.md", path.join(reqDir, "db-schema.md"), replacements),
     writeReqArtifact(langConfig.code, "handoff.md", path.join(reqDir, "handoff.md"), replacements),
@@ -432,6 +425,18 @@ function finalizeReq(args) {
   reindexProject();
   console.log(`\n 需求已成功定號歸檔為: ${nextId} (${finalDirName})`);
 
+  const finalRel = path.posix.join("project", finalDirName);
+  const oldRel = sourceDir !== finalDir ? path.posix.join("project", oldDirName) : null;
+  const stageFinalizePaths = () => {
+    spawnSync("git", ["add", "-A", "--", finalRel, "project/index.md"], { cwd, encoding: "utf8" });
+    if (oldRel) {
+      const trackedOld = spawnSync("git", ["ls-files", "--", oldRel], { cwd, encoding: "utf8" });
+      if (trackedOld.status === 0 && (trackedOld.stdout || "").trim()) {
+        spawnSync("git", ["add", "-u", "--", oldRel], { cwd, encoding: "utf8" });
+      }
+    }
+  };
+
   const systemSpecPath = path.join(cwd, "project", "system-spec.md");
   const configMergeStrategy = fs.existsSync(systemSpecPath)
     ? extractMergeStrategy(fs.readFileSync(systemSpecPath, "utf8"))
@@ -440,7 +445,7 @@ function finalizeReq(args) {
 
   if (currentBranch && mainBranch && currentBranch !== mainBranch) {
     console.log(`[Git] 正在為分支 ${currentBranch} 建立歸檔 commit...`);
-    spawnSync("git", ["add", "project/"], { cwd, encoding: "utf8" });
+    stageFinalizePaths();
     const commitRes = spawnSync("git", ["commit", "-m", `docs(${nextId}): ${rawName} - 規格確認歸檔`], {
       cwd,
       encoding: "utf8"
@@ -462,39 +467,47 @@ function finalizeReq(args) {
         return;
       }
 
-      console.log(`[Git] 自動切換至主分支 ${mainBranch} 並合併 ${currentBranch}...`);
-      const checkoutRes = spawnSync("git", ["checkout", mainBranch], { cwd, encoding: "utf8" });
-      if (checkoutRes.status !== 0) {
-        console.error(`[Git 警告] 切換至主分支 ${mainBranch} 失敗: ${(checkoutRes.stderr || "").trim()}`);
-        return;
-      }
-
-      if (remote) {
-        const pullRes = spawnSync("git", ["pull", "--ff-only", remote, mainBranch], { cwd, encoding: "utf8" });
-        if (pullRes.status !== 0) {
-          console.warn(`[Git 警告] 同步 ${remote}/${mainBranch} 略過: ${(pullRes.stderr || "").trim()}`);
-        }
-      }
-
-      const mergeRes = spawnSync("git", ["merge", currentBranch, "--no-edit"], { cwd, encoding: "utf8" });
-      if (mergeRes.status === 0) {
-        console.log(`[Git] 已成功將 ${currentBranch} 合併至 ${mainBranch}！`);
-        reindexProject();
-        const statusRes = spawnSync("git", ["status", "--porcelain", "project/index.md"], { cwd, encoding: "utf8" });
-        if (statusRes.stdout && statusRes.stdout.trim()) {
-          spawnSync("git", ["add", "project/index.md"], { cwd, encoding: "utf8" });
-          spawnSync("git", ["commit", "-m", `chore: update project/index.md for ${nextId}`], { cwd, encoding: "utf8" });
-        }
-        if (remote) {
-          pushBranchToRemote(cwd, remote, mainBranch);
-        }
-        console.log(
-          ` 全部歸檔流程完成！已自動領取新號 ${nextId} 並自動合併回主分支 ${mainBranch}${remote ? ` 且推送至 ${remote}` : ""}。`
+      const dirtyStatus = spawnSync("git", ["status", "--porcelain"], { cwd, encoding: "utf8" });
+      const dirtyOutput = dirtyStatus.status === 0 ? (dirtyStatus.stdout || "").trim() : "";
+      if (dirtyOutput) {
+        console.warn(
+          `[Git 警告] 工作區仍有未提交的變更，為避免污染或切換失敗，已略過自動合併至 ${mainBranch}：\n${dirtyOutput}\n請處理剩餘變更後手動執行：git checkout ${mainBranch} && git merge ${currentBranch}`
         );
       } else {
-        console.error(
-          `[Git 警告] 合併至 ${mainBranch} 發生衝突，請手動確認衝突狀況：\n${(mergeRes.stderr || mergeRes.stdout || "").trim()}`
-        );
+        console.log(`[Git] 自動切換至主分支 ${mainBranch} 並合併 ${currentBranch}...`);
+        const checkoutRes = spawnSync("git", ["checkout", mainBranch], { cwd, encoding: "utf8" });
+        if (checkoutRes.status !== 0) {
+          console.error(`[Git 警告] 切換至主分支 ${mainBranch} 失敗: ${(checkoutRes.stderr || "").trim()}`);
+          return;
+        }
+
+        if (remote) {
+          const pullRes = spawnSync("git", ["pull", "--ff-only", remote, mainBranch], { cwd, encoding: "utf8" });
+          if (pullRes.status !== 0) {
+            console.warn(`[Git 警告] 同步 ${remote}/${mainBranch} 略過: ${(pullRes.stderr || "").trim()}`);
+          }
+        }
+
+        const mergeRes = spawnSync("git", ["merge", currentBranch, "--no-edit"], { cwd, encoding: "utf8" });
+        if (mergeRes.status === 0) {
+          console.log(`[Git] 已成功將 ${currentBranch} 合併至 ${mainBranch}！`);
+          reindexProject();
+          const statusRes = spawnSync("git", ["status", "--porcelain", "project/index.md"], { cwd, encoding: "utf8" });
+          if (statusRes.stdout && statusRes.stdout.trim()) {
+            spawnSync("git", ["add", "project/index.md"], { cwd, encoding: "utf8" });
+            spawnSync("git", ["commit", "-m", `chore: update project/index.md for ${nextId}`], { cwd, encoding: "utf8" });
+          }
+          if (remote) {
+            pushBranchToRemote(cwd, remote, mainBranch);
+          }
+          console.log(
+            ` 全部歸檔流程完成！已自動領取新號 ${nextId} 並自動合併回主分支 ${mainBranch}${remote ? ` 且推送至 ${remote}` : ""}。`
+          );
+        } else {
+          console.error(
+            `[Git 警告] 合併至 ${mainBranch} 發生衝突，請手動確認衝突狀況：\n${(mergeRes.stderr || mergeRes.stdout || "").trim()}`
+          );
+        }
       }
     } else {
       console.log(
@@ -503,7 +516,7 @@ function finalizeReq(args) {
       console.log(`  git checkout ${mainBranch} && git merge ${currentBranch}`);
     }
   } else if (currentBranch && currentBranch === mainBranch) {
-    spawnSync("git", ["add", "project/"], { cwd, encoding: "utf8" });
+    stageFinalizePaths();
     spawnSync("git", ["commit", "-m", `docs(${nextId}): ${rawName} - 規格確認歸檔`], { cwd, encoding: "utf8" });
     console.log(`[Git] 已直接於主分支 ${mainBranch} 建立提交完成。`);
     if (remote) {
@@ -511,7 +524,7 @@ function finalizeReq(args) {
     }
   } else {
     console.log("建議接下來執行：");
-    console.log("  git add project/");
+    console.log(`  git add -A -- ${finalRel} project/index.md`);
     console.log(`  git commit -m "docs(${nextId}): ${rawName} - 規格確認歸檔"`);
   }
 }
@@ -565,14 +578,15 @@ function reindexProject() {
 
     if (fs.existsSync(srsPath)) {
       const srsContent = fs.readFileSync(srsPath, "utf8");
-      const titleMatch = srsContent.match(/^#\s*(?:需求規格[：:]\s*(?:REQ-\d+\s*)?|REQ-\d+\s+(.+?)\s+SRS)(.*)$/m);
-      if (titleMatch) {
-        const extracted = (titleMatch[1] || titleMatch[2] || "").trim();
-        if (extracted) title = extracted;
+      const meta = extractSrsMetadata(srsContent);
+      if (meta.title) {
+        title = meta.title;
       }
-      const srsStatus = extractStatusFromContent(srsContent);
-      if (srsStatus) {
-        status = srsStatus;
+      if (meta.description) {
+        description = meta.description;
+      }
+      if (meta.status) {
+        status = meta.status;
       }
     }
 
@@ -814,8 +828,7 @@ function upgradeProject(args = []) {
       message: "套件開發主目錄，保留原始開發設定與範本"
     });
   } else {
-    const agentsTemplate = langConfig.code === "en" ? "AGENTS.en.md" : "AGENTS.md";
-    results.push(updateFileFromTemplate(agentsTemplate, "AGENTS.md", dryRun));
+    results.push(updateFileWithContent("AGENTS.md", buildLocalizedAgentsMarkdown(langConfig.code, templatesDir), dryRun));
     results.push(...removeLegacyManagedAssets(dryRun, keepLegacy));
 
     const systemSpecRel = path.join("project", "system-spec.md");
@@ -946,17 +959,12 @@ function upgradeProject(args = []) {
   printResultList(dryRun ? "upgrade (dry-run)" : "upgrade", results);
 }
 
-function updateFileFromTemplate(templateRelativePath, targetRelativePath, dryRun = false) {
+function updateFileWithContent(targetRelativePath, nextContent, dryRun = false) {
   const targetAbsolutePath = path.join(cwd, targetRelativePath);
-  const templateAbsolutePath = path.join(templatesDir, templateRelativePath);
-  if (!fs.existsSync(templateAbsolutePath)) {
-    return { action: "skip", target: targetRelativePath };
-  }
-
-  let templateContent = readTemplate(templateRelativePath);
+  let resolvedContent = nextContent;
   if (!fs.existsSync(targetAbsolutePath)) {
     if (!dryRun) {
-      writeFileIfMissing(targetAbsolutePath, templateContent);
+      writeFileIfMissing(targetAbsolutePath, resolvedContent);
     }
     return { action: "create", target: targetRelativePath };
   }
@@ -964,19 +972,27 @@ function updateFileFromTemplate(templateRelativePath, targetRelativePath, dryRun
   const currentContent = fs.readFileSync(targetAbsolutePath, "utf8");
   if (currentContent.includes("<claude-mem-context>")) {
     const memMatch = currentContent.match(/(<claude-mem-context>[\s\S]*?<\/claude-mem-context>)/);
-    if (memMatch && !templateContent.includes("<claude-mem-context>")) {
-      templateContent = `${templateContent.trimEnd()}\n\n\n${memMatch[1]}\n`;
+    if (memMatch && !resolvedContent.includes("<claude-mem-context>")) {
+      resolvedContent = `${resolvedContent.trimEnd()}\n\n\n${memMatch[1]}\n`;
     }
   }
 
-  if (currentContent.trim() === templateContent.trim()) {
+  if (currentContent.trim() === resolvedContent.trim()) {
     return { action: "skip", target: targetRelativePath };
   }
 
   if (!dryRun) {
-    fs.writeFileSync(targetAbsolutePath, templateContent, "utf8");
+    fs.writeFileSync(targetAbsolutePath, resolvedContent, "utf8");
   }
   return { action: "update", target: targetRelativePath };
+}
+
+function updateFileFromTemplate(templateRelativePath, targetRelativePath, dryRun = false) {
+  const templateAbsolutePath = path.join(templatesDir, templateRelativePath);
+  if (!fs.existsSync(templateAbsolutePath)) {
+    return { action: "skip", target: targetRelativePath };
+  }
+  return updateFileWithContent(targetRelativePath, readTemplate(templateRelativePath), dryRun);
 }
 
 function printResultList(label, results) {
@@ -1075,9 +1091,11 @@ function runPdf(args = []) {
   const split = args.includes("--split");
   const all = args.includes("--all");
   const noUmlRender = args.includes("--no-uml-render");
+  const onlineUml = args.includes("--online-uml");
   const output = getOption(args, "--output");
   const browser = getOption(args, "--browser");
-  const pdfOptions = { noUmlRender };
+  const langConfig = detectProjectLanguage(cwd);
+  const pdfOptions = { noUmlRender, onlineUml, lang: langConfig.code };
 
   const positional = [];
   for (let i = 0; i < args.length; i++) {
@@ -1094,7 +1112,7 @@ function runPdf(args = []) {
   const target = positional[0];
   if (!all && !target) {
     fail(
-      "Usage: sa-spec pdf <file.md|REQ-001|name> [--split] [--output out.pdf] [--browser <path>] [--no-uml-render]\n       sa-spec pdf --all [--split] [--no-uml-render]"
+      "Usage: sa-spec pdf <file.md|REQ-001|name> [--split] [--output out.pdf] [--browser <path>] [--online-uml | --no-uml-render]\n       sa-spec pdf --all [--split] [--online-uml | --no-uml-render]"
     );
     return;
   }
@@ -1169,10 +1187,10 @@ Usage:
   sa-spec rules [name|all] [--list] [--json]
   sa-spec templates [name] [--list] [--json]
   sa-spec template <system-spec|req> [options]
-  sa-spec pdf <file.md|REQ-001|name> [--split] [--output out.pdf] [--no-uml-render]
-  sa-spec pdf --all [--split] [--no-uml-render]
+  sa-spec pdf <file.md|REQ-001|name> [--split] [--output out.pdf] [--online-uml | --no-uml-render]
+  sa-spec pdf --all [--split] [--online-uml | --no-uml-render]
   sa-spec reindex
-  sa-spec check
+  sa-spec check [--strict]
   sa-spec doctor
   sa-spec status
   sa-spec upgrade [--dry-run] [--keep-legacy]

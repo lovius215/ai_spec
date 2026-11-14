@@ -28,10 +28,10 @@
 | 指令 | 簡寫 | 用途 | 規則 |
 |---|---|---|---|
 | `spec:init` | `sci` | 初始化 | 執行 `sa-spec instructions init` 載入內建完整規範與必要規則，確認 `project/` 結構與語言設定是否存在。 |
-| `spec:propose` | `scp` | 提出需求 | 使用者提出需求後，自動依需求名稱建立並切換至專屬 feature 分支（`feat/<name>`，若已在 feature branch 則沿用），檢查是否有設定 Git remote，若有則自動將分支推上 remote（`git push -u <remote> feat/<name>`），並建立草稿目錄（內部使用 `{{REQ_ID}}` 佔位），整理需求摘要、目標、初步流程與待確認事項，不歸檔、不修改既有需求。 |
+| `spec:propose` | `scp` | 提出需求 | 使用者提出需求後，自動依需求名稱建立並切換至專屬 feature 分支（`feat/<slug>`，若需求名稱含中文/日文/韓文等非 ASCII 字元必須搭配 `--slug <ascii-slug>`；已在 feature branch 則沿用），檢查是否有設定 Git remote，若有則自動將分支推上 remote（`git push -u <remote> feat/<slug>`），並建立草稿目錄 `project/<slug>/`（內部使用 `{{REQ_ID}}` 佔位），整理需求摘要、目標、初步流程與待確認事項，不歸檔、不修改既有需求。 |
 | `spec:analyze` | `sca` | 分析與起草 | 先檢查新需求是否與 `project/` 內所有既有需求衝突；無衝突才產出 SRS、UML、OpenAPI、DB Schema 草稿；有衝突則只列出衝突與待釐清問題，待使用者釐清後再次執行 `spec:analyze`（或 `sca`）。 |
-| `spec:commit` | `scc` | 確認歸檔 | 只把使用者已確認的版本歸檔到該需求資料夾；若有 Git remote 則先將目前分支推上 remote 並同步遠端狀態，接著才查詢主分支（`master`/`main`）最新可用序號定號（`REQ-xxx`）、替換佔位符，更新 `project/index.md`、`project/system-spec.md` 與 `history.md`，建立 Git commit（若有 remote 則推送分支），再自動切換回主分支完成合併並推送到 remote。 |
-| `spec:pdf` | `spd` | 匯出 PDF | 呼叫 `sa-spec pdf <target> [--split] [--output <path>]`（或 `--all`），將指定的單一 `.md` 檔轉為同名 `.pdf`，或將指定需求目錄/編號（如 `REQ-001`）整包合併匯出成一份完整規格書 PDF（加 `--split` 則各別轉為獨立 PDF）。 |
+| `spec:commit` | `scc` | 確認歸檔 | 只把使用者已確認的版本歸檔到該需求資料夾；執行 `sa-spec finalize --name <slug> [--pr \| --no-merge]`：若有 Git remote 先推分支並 fetch 遠端最新狀態，向主分支（`master`/`main`）查詢可用序號定號（`REQ-xxx`）、替換佔位符並更新 `project/index.md`、`project/system-spec.md` 與 `history.md`，建立 Git commit 與推送。若未指定 `--pr`/`--no-merge` 且 `system-spec.md` 未設 `合併策略：pr`，則檢查工作區乾淨後自動切回主分支合併並推送 remote。 |
+| `spec:pdf` | `spd` | 匯出 PDF | 呼叫 `sa-spec pdf <target> [--split] [--online-uml \| --no-uml-render] [--output <path>]`（或 `--all`），將指定 `.md` 或需求目錄（如 `REQ-001`）匯出 PDF（預設不將 `.puml` 傳送至公開 PlantUML 網路伺服器；僅使用本機 `plantuml` 或加 `--online-uml` / 自建 `SA_SPEC_PLANTUML_SERVER` 轉繪 SVG）。 |
 
 # 重要限制
 

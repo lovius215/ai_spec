@@ -1,11 +1,18 @@
 const fs = require("fs");
 const path = require("path");
 const {
+  SUPPORTED_LANGS,
+  normalizeLangKey,
   detectProjectLanguage,
   extractStatusFromContent,
   extractSpecVersion,
   extractMergeStrategy,
-  parseIndexRows
+  parseIndexRows,
+  buildIndexMarkdown,
+  buildSystemSpecMarkdown,
+  buildWorkspaceReadmeMarkdown,
+  buildLocalizedReqFileContent,
+  buildLocalizedAgentsMarkdown
 } = require("./i18n");
 const {
   isGitWorkingTree,
@@ -340,6 +347,10 @@ function runInstructions({ cwd, templatesDir, isSourceRepoFlag, packageVersion, 
   const stage = STAGE_CONFIG[stageKey];
   const skillRaw = readTemplateFile(templatesDir, path.join("skills", "system-analysis", "SKILL.md"));
   const skillContent = stripFrontmatter(skillRaw);
+  const languageDirective =
+    context.language.code !== "zh-TW"
+      ? `IMPORTANT: This project's locked language is ${context.language.label}. Write ALL generated specification artifacts (srs.md, uml/*.puml, openapi.yaml, db-schema.md, handoff.md, history.md) 100% in ${context.language.label}, keeping only standard technical terms (REST API, Webhook, JWT, OAuth 2.0, Payload, Idempotency, Redis, etc.) in English. Do NOT leak Traditional Chinese phrasing from the reference guide below into output documents.`
+      : "";
   const includedRules = withRules
     ? stage.recommendedRules.map((ruleName) => ({
         name: ruleName,
@@ -357,6 +368,7 @@ function runInstructions({ cwd, templatesDir, isSourceRepoFlag, packageVersion, 
         id: reqId || null
       },
       context,
+      ...(languageDirective ? { languageDirective } : {}),
       steps: stage.steps,
       recommendedRules: stage.recommendedRules,
       recommendedTemplates: stage.recommendedTemplates,
@@ -384,6 +396,7 @@ function runInstructions({ cwd, templatesDir, isSourceRepoFlag, packageVersion, 
     "## 相關規範與範本",
     `- 建議規範: ${stage.recommendedRules.map((r) => `\`sa-spec rules ${r}\``).join("、") || "無"}`,
     `- 建議範本: ${stage.recommendedTemplates.map((t) => `\`sa-spec templates ${t}\``).join("、") || "無"}`,
+    ...(languageDirective ? ["", "## 語言強制規範 (Language Directive)", languageDirective] : []),
     "",
     "## 完整系統分析規範 (SKILL.md)",
     skillContent
@@ -454,16 +467,71 @@ function runRules({ templatesDir, args = [], fail }) {
   console.log(content);
 }
 
-function runTemplatesList({ templatesDir, args = [], fail }) {
+function getTemplatesPackageVersion(templatesDir) {
+  try {
+    const pkgPath = path.join(templatesDir, "..", "package.json");
+    if (fs.existsSync(pkgPath)) {
+      return JSON.parse(fs.readFileSync(pkgPath, "utf8")).version || "0.2.8";
+    }
+  } catch {
+    // ignore read failure
+  }
+  return "0.2.8";
+}
+
+function buildLocalizedTemplateByName(name, langConfig, templatesDir) {
+  const reqMap = {
+    srs: "srs.md",
+    "db-schema": "db-schema.md",
+    handoff: "handoff.md",
+    history: "history.md",
+    "uml-main": "uml/main.puml",
+    "uml-wireframe": "uml/wireframe.puml"
+  };
+  if (name === "AGENTS") {
+    return buildLocalizedAgentsMarkdown(langConfig.code, templatesDir).trim();
+  }
+  if (name === "readme") {
+    return buildWorkspaceReadmeMarkdown(langConfig.code).trim();
+  }
+  if (name === "index") {
+    return buildIndexMarkdown(langConfig.code, []).trim();
+  }
+  if (name === "system-spec") {
+    return buildSystemSpecMarkdown(langConfig, getTemplatesPackageVersion(templatesDir)).trim();
+  }
+  if (reqMap[name]) {
+    return buildLocalizedReqFileContent(langConfig.code, reqMap[name], {
+      REQ_ID: "{{REQ_ID}}",
+      REQ_NAME: "{{REQ_NAME}}"
+    }).trim();
+  }
+  return null;
+}
+
+function runTemplatesList({ cwd = process.cwd(), templatesDir, args = [], fail }) {
   const asJson = args.includes("--json");
   const listOnly = args.includes("--list");
-  const positional = getPositionalArgs(args);
+  const langEqArg = args.find((a) => a.startsWith("--lang="));
+  const langOverride = getOption(args, "--lang") || (langEqArg ? langEqArg.slice("--lang=".length) : "");
+
+  let langConfig = detectProjectLanguage(cwd);
+  if (langOverride) {
+    const normalizedLang = normalizeLangKey(langOverride);
+    if (!SUPPORTED_LANGS[normalizedLang]) {
+      fail(`不支援的語言 "${langOverride}"。可用語言: ${Object.values(SUPPORTED_LANGS).map((l) => l.code).join(", ")}`);
+      return;
+    }
+    langConfig = SUPPORTED_LANGS[normalizedLang];
+  }
+
+  const positional = getPositionalArgs(args, ["--lang"]);
   const target = positional[0];
   const entries = listTemplateEntries(templatesDir);
 
   if (listOnly || !target) {
     if (asJson) {
-      console.log(JSON.stringify({ templates: entries }, null, 2));
+      console.log(JSON.stringify({ language: langConfig.code, templates: entries }, null, 2));
       return;
     }
     const lines = [
@@ -471,7 +539,7 @@ function runTemplatesList({ templatesDir, args = [], fail }) {
       "",
       ...entries.map((entry) => `- \`${entry.name}\` (${entry.path}): ${entry.description}`),
       "",
-      "使用方式: `sa-spec templates <name>` 或 `sa-spec templates <name> --json`"
+      "使用方式: `sa-spec templates <name> [--lang <code>]` 或 `sa-spec templates <name> --json`"
     ];
     console.log(lines.join("\n"));
     return;
@@ -486,9 +554,10 @@ function runTemplatesList({ templatesDir, args = [], fail }) {
     return;
   }
 
-  const content = readTemplateFile(templatesDir, matched.path).trim();
+  const localized = buildLocalizedTemplateByName(matched.name, langConfig, templatesDir);
+  const content = localized !== null ? localized : readTemplateFile(templatesDir, matched.path).trim();
   if (asJson) {
-    console.log(JSON.stringify({ ...matched, content }, null, 2));
+    console.log(JSON.stringify({ ...matched, language: langConfig.code, content }, null, 2));
     return;
   }
   console.log(content);

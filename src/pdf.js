@@ -57,11 +57,16 @@ function renderPlantUmlToSvg(source, options = {}) {
     }
   }
 
-  // 2. Fallback to PlantUML server SVG endpoint if network rendering is enabled
-  if (process.env.SA_SPEC_NO_UML_NET === "1" || options.offlineUml) {
+  // 2. Opt-in remote PlantUML server SVG rendering (never send diagrams to public server by default)
+  const customServer = options.umlServerUrl || process.env.SA_SPEC_PLANTUML_SERVER;
+  const allowNetwork =
+    process.env.SA_SPEC_NO_UML_NET !== "1" &&
+    !options.offlineUml &&
+    (options.onlineUml === true || Boolean(customServer));
+  if (!allowNetwork) {
     return null;
   }
-  const baseUrl = (options.umlServerUrl || process.env.SA_SPEC_PLANTUML_SERVER || "https://www.plantuml.com/plantuml").replace(/\/+$/, "");
+  const baseUrl = (customServer || "https://www.plantuml.com/plantuml").replace(/\/+$/, "");
   const encoded = encodePlantUml(source);
   const curlRes = spawnSync("curl", ["-fsSL", "--max-time", "4", `${baseUrl}/svg/${encoded}`], {
     encoding: "utf8",
@@ -316,8 +321,9 @@ function markdownToHtmlBody(markdown, options = {}) {
 
 function buildHtmlDocument(title, markdownContent, options = {}) {
   const bodyHtml = markdownToHtmlBody(markdownContent, options);
+  const htmlLang = options.lang || "zh-TW";
   return `<!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="${escapeHtml(htmlLang)}">
 <head>
   <meta charset="UTF-8" />
   <title>${escapeHtml(title)}</title>

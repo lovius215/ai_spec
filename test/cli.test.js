@@ -93,10 +93,18 @@ test("#3 & #7 check detects version mismatch, multi-diagram puml, leftover {{REQ
   assert.match(cleanCheck.stdout, new RegExp(`規範版本: OK \\(${PKG_VERSION.replace(/\./g, "\\.")}\\)`));
   assert.match(cleanCheck.stdout, /需求內容檢查: OK \(1 個已歸檔需求\)/);
 
-  // Introduce version mismatch + multi-diagram puml + leftover placeholder + broken handoff
+  // Introduce version mismatch alone first -> pass in normal mode, fail in --strict mode
   const specPath = path.join(dir, "project", "system-spec.md");
   fs.writeFileSync(specPath, fs.readFileSync(specPath, "utf8").replace(PKG_VERSION, "0.2.5"), "utf8");
 
+  const mismatchCheck = runCli(dir, ["check"]);
+  assert.equal(mismatchCheck.status, 0);
+  assert.match(mismatchCheck.stdout, /規範版本: WARNING/);
+
+  const strictCheck = runCli(dir, ["check", "--strict"]);
+  assert.equal(strictCheck.status, 1);
+
+  // Introduce multi-diagram puml + leftover placeholder + broken handoff -> non-zero exit code
   const reqDir = path.join(dir, "project", "REQ-001-login");
   fs.writeFileSync(
     path.join(reqDir, "uml", "main.puml"),
@@ -107,7 +115,7 @@ test("#3 & #7 check detects version mismatch, multi-diagram puml, leftover {{REQ
   fs.writeFileSync(path.join(reqDir, "handoff.md"), "# Empty handoff\n", "utf8");
 
   const dirtyCheck = runCli(dir, ["check"]);
-  assert.equal(dirtyCheck.status, 0);
+  assert.equal(dirtyCheck.status, 1);
   assert.match(dirtyCheck.stdout, /規範版本: WARNING/);
   assert.match(dirtyCheck.stdout, /違反單檔單圖原則/);
   assert.match(dirtyCheck.stdout, /\{\{REQ_ID\}\}/);
@@ -192,23 +200,45 @@ test("#8 upgrade removes legacy managed skills/rules, preserves custom files & c
   assert.match(agentsAfter, /important memory/);
   assert.match(agentsAfter, /sa-spec instructions/);
 
-  // Source repo protection
+  // Source repo protection & single-source templates check
   const srcDry = runCli(ROOT_DIR, ["upgrade", "--dry-run"]);
   assert.equal(srcDry.status, 0);
   assert.match(srcDry.stdout, /套件開發主目錄/);
-  assert.equal(fs.existsSync(path.join(ROOT_DIR, "skills", "system-analysis", "SKILL.md")), true);
+  assert.equal(fs.existsSync(path.join(ROOT_DIR, "skills")), false);
+  assert.equal(fs.existsSync(path.join(ROOT_DIR, "rules")), false);
+  assert.equal(fs.existsSync(path.join(TEMPLATES_DIR, "skills", "system-analysis", "SKILL.md")), true);
 });
 
-test("#9 PlantUML encoder, SVG rendering, and HTML fallback work cleanly offline", (t) => {
+test("#9 PlantUML encoder, SVG rendering, privacy default, and dynamic html lang", (t) => {
   const encoded = encodePlantUml("@startuml\nAlice -> Bob: Hi\n@enduml");
   assert.ok(encoded.length > 10);
   assert.match(encoded, /^[0-9A-Za-z\-_]+$/);
 
   const fallbackHtml = buildHtmlDocument("Test", "```plantuml\n@startuml\nA -> B\n@enduml\n```", {
-    noUmlRender: true
+    noUmlRender: true,
+    lang: "en"
   });
+  assert.match(fallbackHtml, /<html lang="en">/);
   assert.match(fallbackHtml, /class="language-plantuml"/);
   assert.match(fallbackHtml, /\.uml-diagram/);
+
+  // Test offline-by-default privacy guard (without SA_SPEC_NO_UML_NET and without --online-uml)
+  const emptyBinDir = makeTempDir("sa-spec-empty-bin-");
+  t.after(() => fs.rmSync(emptyBinDir, { recursive: true, force: true }));
+  const prevNoNet = process.env.SA_SPEC_NO_UML_NET;
+  const prevPath = process.env.PATH;
+  delete process.env.SA_SPEC_NO_UML_NET;
+  process.env.PATH = emptyBinDir;
+  try {
+    const privateHtml = buildHtmlDocument("Test", "```plantuml\n@startuml\nA -> B\n@enduml\n```", {
+      lang: "ja"
+    });
+    assert.match(privateHtml, /<html lang="ja">/);
+    assert.match(privateHtml, /class="language-plantuml"/);
+  } finally {
+    process.env.PATH = prevPath;
+    if (prevNoNet !== undefined) process.env.SA_SPEC_NO_UML_NET = prevNoNet;
+  }
 
   // Test local plantuml CLI SVG embedding via mock binary on PATH
   const binDir = makeTempDir("sa-spec-bin-");
@@ -216,7 +246,6 @@ test("#9 PlantUML encoder, SVG rendering, and HTML fallback work cleanly offline
   const mockPlantUml = path.join(binDir, "plantuml");
   fs.writeFileSync(mockPlantUml, '#!/bin/sh\necho "<svg><text>UML</text></svg>"\n', { mode: 0o755 });
 
-  const prevPath = process.env.PATH;
   process.env.PATH = `${binDir}:${prevPath}`;
   try {
     const svgHtml = buildHtmlDocument("Test", "```plantuml\n@startuml\nA -> B\n@enduml\n```", {
@@ -226,4 +255,116 @@ test("#9 PlantUML encoder, SVG rendering, and HTML fallback work cleanly offline
   } finally {
     process.env.PATH = prevPath;
   }
+});
+
+test("#11 init --lang ja localizes AGENTS.md and UML, instructions emits directive, templates supports --lang", (t) => {
+  const dir = makeTempDir();
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  assert.equal(runCli(dir, ["init", "--lang", "ja"]).status, 0);
+  const agents = fs.readFileSync(path.join(dir, "AGENTS.md"), "utf8");
+  assert.match(agents, /プロジェクトでの役割/);
+  assert.match(agents, /100% 日本語/);
+
+  const newRes = runCli(dir, ["new", "--name", "カート決済", "--slug", "cart-checkout"]);
+  assert.equal(newRes.status, 0, newRes.stderr);
+
+  const mainPuml = fs.readFileSync(path.join(dir, "project", "cart-checkout", "uml", "main.puml"), "utf8");
+  assert.match(mainPuml, /主要シーケンス図/);
+  assert.match(mainPuml, /ユーザー/);
+  assert.match(mainPuml, /カート決済/);
+
+  const wirePuml = fs.readFileSync(path.join(dir, "project", "cart-checkout", "uml", "wireframe.puml"), "utf8");
+  assert.match(wirePuml, /@startsalt/);
+  assert.match(wirePuml, /画面ワイヤーフレーム/);
+
+  const instRes = runCli(dir, ["instructions", "analyze", "--json"]);
+  assert.equal(instRes.status, 0, instRes.stderr);
+  const parsedInst = JSON.parse(instRes.stdout);
+  assert.match(parsedInst.languageDirective, /日本語 \(ja\)/);
+
+  const koTplRes = runCli(dir, ["templates", "uml-main", "--lang", "ko"]);
+  assert.equal(koTplRes.status, 0, koTplRes.stderr);
+  assert.match(koTplRes.stdout, /주요 시퀀스 다이어그램/);
+});
+
+test("#12 reindex extracts smart title and summary description from varied srs.md headings", (t) => {
+  const dir = makeTempDir();
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  assert.equal(runCli(dir, ["init"]).status, 0);
+  const req1Dir = path.join(dir, "project", "REQ-001-cart");
+  const req2Dir = path.join(dir, "project", "REQ-002-checkout");
+  fs.mkdirSync(req1Dir, { recursive: true });
+  fs.mkdirSync(req2Dir, { recursive: true });
+
+  fs.writeFileSync(
+    path.join(req1Dir, "srs.md"),
+    "# REQ-001：購物車結帳系統\n\n- 狀態：已審核\n\n## 摘要\n- 建立支援優惠券折扣與信用卡付款的購物車結帳 API。\n",
+    "utf8"
+  );
+  fs.writeFileSync(
+    path.join(req2Dir, "srs.md"),
+    "# [REQ-002] Checkout Flow SRS\n\n- Status：Approved\n\n## Summary\nTBD\nSupport one-click checkout with idempotent payment intent creation.\n",
+    "utf8"
+  );
+
+  const reindexRes = runCli(dir, ["reindex"]);
+  assert.equal(reindexRes.status, 0, reindexRes.stderr);
+
+  const indexContent = fs.readFileSync(path.join(dir, "project", "index.md"), "utf8");
+  assert.match(
+    indexContent,
+    /\| REQ-001 \| 購物車結帳系統 \| 建立支援優惠券折扣與信用卡付款的購物車結帳 API。 \| 已審核 \|/
+  );
+  assert.match(
+    indexContent,
+    /\| REQ-002 \| Checkout Flow \| Support one-click checkout with idempotent payment intent creation\. \| Approved \|/
+  );
+});
+
+test("#13 finalize scopes git staging and skips auto-merge safely when working tree is dirty", (t) => {
+  const dir = makeTempDir();
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  execFileSync("git", ["init", "-b", "master"], { cwd: dir });
+  execFileSync("git", ["config", "user.email", "dev@example.com"], { cwd: dir });
+  execFileSync("git", ["config", "user.name", "Developer"], { cwd: dir });
+
+  assert.equal(runCli(dir, ["init"]).status, 0);
+  execFileSync("git", ["add", "."], { cwd: dir });
+  execFileSync("git", ["commit", "-m", "init workspace"], { cwd: dir });
+
+  // Create draft branch & commit tracked draft once so rename deletion is also exercised
+  assert.equal(runCli(dir, ["new", "--name", "購物車", "--slug", "shopping-cart", "--branch"]).status, 0);
+  execFileSync("git", ["add", "project/shopping-cart"], { cwd: dir });
+  execFileSync("git", ["commit", "-m", "wip draft"], { cwd: dir });
+
+  // Introduce unrelated untracked draft & modified tracked file
+  fs.mkdirSync(path.join(dir, "project", "other-draft"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "project", "other-draft", "srs.md"), "# Keep untracked\n", "utf8");
+  fs.appendFileSync(path.join(dir, "readme.md"), "\nLocal uncommitted edit\n", "utf8");
+
+  const finRes = runCli(dir, ["finalize", "--name", "shopping-cart"]);
+  assert.equal(finRes.status, 0, finRes.stderr);
+  assert.match(finRes.stderr, /工作區仍有未提交的變更/);
+  assert.equal(fs.existsSync(path.join(dir, "project", "REQ-001-shopping-cart", "srs.md")), true);
+
+  // Branch remains feat/shopping-cart (not switched while dirty)
+  const headBranch = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: dir, encoding: "utf8" }).trim();
+  assert.equal(headBranch, "feat/shopping-cart");
+
+  // Commit includes only finalized REQ + index + renamed draft removal, not other-draft or readme.md
+  const committedFiles = execFileSync("git", ["show", "--pretty=format:", "--name-only", "HEAD"], {
+    cwd: dir,
+    encoding: "utf8"
+  });
+  assert.match(committedFiles, /project\/REQ-001-shopping-cart\/srs\.md/);
+  assert.match(committedFiles, /project\/index\.md/);
+  assert.doesNotMatch(committedFiles, /other-draft/);
+  assert.doesNotMatch(committedFiles, /readme\.md/);
+
+  // Dirty changes still remain intact in working tree
+  assert.equal(fs.existsSync(path.join(dir, "project", "other-draft", "srs.md")), true);
+  assert.match(fs.readFileSync(path.join(dir, "readme.md"), "utf8"), /Local uncommitted edit/);
 });

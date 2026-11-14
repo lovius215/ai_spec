@@ -196,21 +196,26 @@ function runDoctor(cwd, packageVersion) {
   return ok;
 }
 
-function runCheck(cwd, isSourceRepoFlag, packageVersion, showStatusFn) {
+function runCheck(cwd, isSourceRepoFlag, packageVersion, showStatusFn, args = []) {
   console.log("sa-spec check");
+  const strict = args.includes("--strict");
   if (!checkRequiredPaths(cwd, null)) {
     return;
   }
-  checkSpecVersion(cwd, packageVersion);
-  if (!isSourceRepoFlag) {
-    const hasLegacySkills = fs.existsSync(path.join(cwd, "skills"));
-    const hasLegacyRules = fs.existsSync(path.join(cwd, "rules"));
-    if (hasLegacySkills || hasLegacyRules) {
-      console.log("提示: 偵測到舊版專案內置 skills/ 或 rules/，建議執行 sa-spec upgrade 移除並改用套件內建規範。");
-    }
+  const verRes = checkSpecVersion(cwd, packageVersion);
+  const hasLegacySkills = !isSourceRepoFlag && fs.existsSync(path.join(cwd, "skills"));
+  const hasLegacyRules = !isSourceRepoFlag && fs.existsSync(path.join(cwd, "rules"));
+  if (hasLegacySkills || hasLegacyRules) {
+    console.log("提示: 偵測到舊版專案內置 skills/ 或 rules/，建議執行 sa-spec upgrade 移除並改用套件內建規範。");
   }
-  checkDuplicateReqIds(cwd);
-  validateRequirementsContent(cwd);
+  const dupOk = checkDuplicateReqIds(cwd);
+  const contentIssues = validateRequirementsContent(cwd);
+  if (!dupOk || contentIssues.length > 0) {
+    process.exitCode = 1;
+  }
+  if (strict && (verRes.status !== "ok" || hasLegacySkills || hasLegacyRules)) {
+    process.exitCode = 1;
+  }
   console.log("");
   showStatusFn(false);
 }

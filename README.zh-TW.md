@@ -283,10 +283,10 @@ sa-spec check
 | `sa-spec finalize --name login [--slug login] [--no-merge \| --pr]` | 將草稿需求定號歸檔為最新序號（支援 `--no-merge` / `--pr` 或於 `system-spec.md` 設定 `合併策略：pr` 改走 PR 流程，並具備遠端撞號防護）。 |
 | `sa-spec instructions [init\|propose\|analyze\|commit\|pdf] [--with-rules] [--json]` | 輸出目前工作區狀態、對應階段步驟與套件內建完整系統分析規範（供 AI 動態讀取）。 |
 | `sa-spec rules [name\|all] [--list] [--json]` | 讀取或列出套件內建補充規則（`spec`、`uml-style`、`wireframe`、`db-table`、`estimation`、`system-spec`、`file-style`、`history`、`review`）。 |
-| `sa-spec templates [name] [--list] [--json]` | 讀取或列出套件內建規格與圖表範本（`srs`、`openapi`、`db-schema`、`handoff`、`history`、`uml-main`、`uml-wireframe` 等）。 |
-| `sa-spec pdf <target> [--split] [--output out.pdf] [--no-uml-render]` | 將指定 `.md` 或需求目錄匯出為 PDF（自動將 PlantUML 轉繪為 SVG 圖表，無法轉繪時自動退回程式碼區塊；加 `--no-uml-render` 可跳過轉繪）。 |
-| `sa-spec reindex` | 掃描 `project/REQ-*` 目錄，依專案鎖定語言與序號重新生成 `project/index.md`。 |
-| `sa-spec check` | 檢查核心檔案、規範版本鎖定、重複序號、以及已歸檔需求的交付物完整度（單檔單圖 `.puml`、`{{REQ_ID}}` 殘留、`handoff.md` 必備章節、`openapi.yaml` 結構）。 |
+| `sa-spec templates [name] [--lang <code>] [--list] [--json]` | 讀取或列出套件內建規格與圖表範本（依專案語言或 `--lang` 輸出對應語系的 `srs`、`db-schema`、`handoff`、`history`、`uml-main`、`uml-wireframe` 等）。 |
+| `sa-spec pdf <target> [--split] [--output out.pdf] [--online-uml \| --no-uml-render]` | 將指定 `.md` 或需求目錄匯出為 PDF（優先使用本機 `plantuml` 轉繪 SVG；預設不外傳至公開網路伺服器，需線上轉繪請加 `--online-uml` 或設定 `SA_SPEC_PLANTUML_SERVER`，無法轉繪時退回程式碼區塊）。 |
+| `sa-spec reindex` | 掃描 `project/REQ-*` 目錄，依專案鎖定語言與序號重新生成 `project/index.md`（自動從 `srs.md` 擷取標題與 `## 摘要`）。 |
+| `sa-spec check [--strict]` | 檢查核心檔案、規範版本鎖定、重複序號、以及已歸檔需求的交付物完整度（有錯誤時回傳 exit code `1`；加 `--strict` 時若規範版本不一致或殘留舊版 `skills/`/`rules/` 亦回傳 exit code `1`）。 |
 | `sa-spec status` | 顯示系統規格與需求索引狀態。 |
 | `sa-spec doctor` | 檢查必要檔案是否存在。 |
 | `sa-spec upgrade [--dry-run] [--keep-legacy]` | 將既有專案升級為最新版本：更新 `AGENTS.md`、自動刪除舊版套件管理的 `skills/` 與 `rules/`（可用 `--keep-legacy` 保留），並將既有需求中的 `uml.puml` 自動遷移為 `uml/main.puml`。（別名：`sa-spec update`） |

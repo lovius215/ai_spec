@@ -28,10 +28,10 @@ Five commands with shorthand aliases (fully equivalent):
 | Command | Alias | Purpose | Rules |
 |---|---|---|---|
 | `spec:init` | `sci` | Initialize | Run `sa-spec instructions init` to load built-in specifications, verify `project/` structure, and lock language. |
-| `spec:propose` | `scp` | Propose | Create & switch to `feat/<slug>` branch (push to remote if configured), create draft directory under `project/<slug>/` using `{{REQ_ID}}` placeholder, and summarize scope & open questions without archiving or altering existing requirements. |
+| `spec:propose` | `scp` | Propose | Create & switch to `feat/<slug>` branch (for non-ASCII names such as CJK, pass `--slug <ascii-slug>` via `sa-spec new --name "..." --slug <ascii-slug>`; push to remote if configured), create draft directory under `project/<slug>/` using `{{REQ_ID}}` placeholder, and summarize scope & open questions without archiving or altering existing requirements. |
 | `spec:analyze` | `sca` | Analyze & Draft | Check conflicts against all existing requirements in `project/` first; only generate SRS, UML, OpenAPI, DB Schema, and Handoff drafts if conflict-free. |
-| `spec:commit` | `scc` | Archive | Archive only user-confirmed versions: push feature branch & fetch remote first, query `main`/`master` for next `REQ-xxx`, substitute `{{REQ_ID}}`, update `project/index.md`, `project/system-spec.md`, and `history.md`, commit, and handle merge/push per merge strategy. |
-| `spec:pdf` | `spd` | Export PDF | Run `sa-spec pdf <target> [--split] [--output <path>]` (or `--all`) to export Markdown or a full requirement folder to PDF. |
+| `spec:commit` | `scc` | Archive | Archive only user-confirmed versions via `sa-spec finalize --name <slug> [--pr \| --no-merge]`: push feature branch & fetch remote first, query `main`/`master` for next `REQ-xxx`, substitute `{{REQ_ID}}`, update `project/index.md`, `project/system-spec.md`, and `history.md`, commit, and auto-merge/push (or skip auto-merge when `--pr`, `--no-merge`, or `Merge Strategy: pr` is set). |
+| `spec:pdf` | `spd` | Export PDF | Run `sa-spec pdf <target> [--split] [--online-uml \| --no-uml-render] [--output <path>]` (or `--all`) to export Markdown or a full requirement folder to PDF (offline/privacy-safe PlantUML rendering by default). |
 
 # Hard Constraints
 

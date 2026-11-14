@@ -457,10 +457,11 @@ function buildWorkspaceReadmeMarkdown(langCode) {
   ].join("\n");
 }
 
-function buildLocalizedReqFileContent(langCode, relType, replacements) {
+function buildLocalizedReqFileContent(langCode, relType, replacements = {}) {
   const t = getLangStrings(langCode);
-  const reqId = replacements.REQ_ID || "{{REQ_ID}}";
-  const reqName = replacements.REQ_NAME || "";
+  const safeReplacements = replacements || {};
+  const reqId = safeReplacements.REQ_ID || safeReplacements["{{REQ_ID}}"] || "{{REQ_ID}}";
+  const reqName = safeReplacements.REQ_NAME || safeReplacements["{{REQ_NAME}}"] || "";
 
   switch (relType) {
     case "srs.md": {
@@ -523,9 +524,365 @@ function buildLocalizedReqFileContent(langCode, relType, replacements) {
         `| v0.1 | ${t.tbd} | ${t.draft} | ${t.pending} |`,
         ""
       ].join("\n");
+    case "uml/main.puml": {
+      const umlCopy = getUmlCopy(langCode);
+      const displayName = reqName ? ` ${reqName}` : "";
+      return [
+        "@startuml",
+        `title ${reqId}${displayName} - ${umlCopy.mainTitle}`,
+        "",
+        `actor "${umlCopy.userActor}" as User`,
+        `participant "${umlCopy.client}" as Client`,
+        `participant "${umlCopy.api}" as API`,
+        `database "${umlCopy.db}" as DB`,
+        "",
+        `User -> Client : ${umlCopy.stepInput}`,
+        `Client -> API : ${umlCopy.stepRequest}`,
+        `API -> DB : ${umlCopy.stepQuery}`,
+        `DB --> API : ${umlCopy.stepDbResult}`,
+        `API --> Client : ${umlCopy.stepResponse}`,
+        `Client --> User : ${umlCopy.stepRender}`,
+        "@enduml",
+        ""
+      ].join("\n");
+    }
+    case "uml/wireframe.puml": {
+      const umlCopy = getUmlCopy(langCode);
+      const displayName = reqName ? ` ${reqName}` : "";
+      return [
+        "@startsalt",
+        "{",
+        `  {+ ${reqId}${displayName} - ${umlCopy.wireframeTitle} }`,
+        "  ---",
+        `  { ${umlCopy.searchLabel} | "                    " | [${umlCopy.searchBtn}] | [${umlCopy.createBtn}] }`,
+        "  ---",
+        "  {#",
+        `    ${umlCopy.colId} | ${umlCopy.colName} | ${umlCopy.colStatus} | ${umlCopy.colAction}`,
+        `    001 | ${umlCopy.sampleItem} | ${umlCopy.sampleActive} | [${umlCopy.editBtn}]`,
+        "  }",
+        "  ---",
+        `  { [${umlCopy.cancelBtn}] | [${umlCopy.saveBtn}] }`,
+        "}",
+        "@endsalt",
+        ""
+      ].join("\n");
+    }
     default:
       return null;
   }
+}
+
+const UML_COPY = {
+  "zh-tw": {
+    mainTitle: "主要互動循序圖",
+    userActor: "使用者",
+    client: "前端介面",
+    api: "後端 API 服務",
+    db: "資料庫",
+    stepInput: "操作與送出請求",
+    stepRequest: "POST /api/v1/resource",
+    stepQuery: "寫入 / 查詢資料",
+    stepDbResult: "回傳結果",
+    stepResponse: "200 OK (JSON Payload)",
+    stepRender: "顯示操作結果",
+    wireframeTitle: "畫面線框圖",
+    searchLabel: "關鍵字",
+    searchBtn: "查詢",
+    createBtn: "+ 新增",
+    colId: "編號",
+    colName: "名稱",
+    colStatus: "狀態",
+    colAction: "操作",
+    sampleItem: "範例項目",
+    sampleActive: "啟用",
+    editBtn: "編輯",
+    cancelBtn: "取消",
+    saveBtn: "儲存"
+  },
+  en: {
+    mainTitle: "Main Sequence Diagram",
+    userActor: "User",
+    client: "Frontend UI",
+    api: "Backend API Service",
+    db: "Database",
+    stepInput: "Trigger action and submit",
+    stepRequest: "POST /api/v1/resource",
+    stepQuery: "Read / write record",
+    stepDbResult: "Query result",
+    stepResponse: "200 OK (JSON Payload)",
+    stepRender: "Render updated state",
+    wireframeTitle: "UI Wireframe",
+    searchLabel: "Search",
+    searchBtn: "Search",
+    createBtn: "+ Create",
+    colId: "ID",
+    colName: "Name",
+    colStatus: "Status",
+    colAction: "Action",
+    sampleItem: "Sample Item",
+    sampleActive: "Active",
+    editBtn: "Edit",
+    cancelBtn: "Cancel",
+    saveBtn: "Save"
+  },
+  "zh-cn": {
+    mainTitle: "主要交互时序图",
+    userActor: "用户",
+    client: "前端界面",
+    api: "后端 API 服务",
+    db: "数据库",
+    stepInput: "操作并提交请求",
+    stepRequest: "POST /api/v1/resource",
+    stepQuery: "写入 / 查询数据",
+    stepDbResult: "返回结果",
+    stepResponse: "200 OK (JSON Payload)",
+    stepRender: "显示操作结果",
+    wireframeTitle: "界面线框图",
+    searchLabel: "关键字",
+    searchBtn: "查询",
+    createBtn: "+ 新增",
+    colId: "编号",
+    colName: "名称",
+    colStatus: "状态",
+    colAction: "操作",
+    sampleItem: "示例项目",
+    sampleActive: "启用",
+    editBtn: "编辑",
+    cancelBtn: "取消",
+    saveBtn: "保存"
+  },
+  ja: {
+    mainTitle: "主要シーケンス図",
+    userActor: "ユーザー",
+    client: "フロントエンド UI",
+    api: "バックエンド API サービス",
+    db: "データベース",
+    stepInput: "操作・リクエスト送信",
+    stepRequest: "POST /api/v1/resource",
+    stepQuery: "データの読み書き",
+    stepDbResult: "処理結果",
+    stepResponse: "200 OK (JSON Payload)",
+    stepRender: "画面に結果を表示",
+    wireframeTitle: "画面ワイヤーフレーム",
+    searchLabel: "検索",
+    searchBtn: "検索",
+    createBtn: "+ 新規作成",
+    colId: "ID",
+    colName: "名称",
+    colStatus: "ステータス",
+    colAction: "操作",
+    sampleItem: "サンプル項目",
+    sampleActive: "有効",
+    editBtn: "編集",
+    cancelBtn: "キャンセル",
+    saveBtn: "保存"
+  },
+  ko: {
+    mainTitle: "주요 시퀀스 다이어그램",
+    userActor: "사용자",
+    client: "프론트엔드 UI",
+    api: "백엔드 API 서비스",
+    db: "데이터베이스",
+    stepInput: "작업 수행 및 요청 전송",
+    stepRequest: "POST /api/v1/resource",
+    stepQuery: "데이터 조회 / 저장",
+    stepDbResult: "처리 결과",
+    stepResponse: "200 OK (JSON Payload)",
+    stepRender: "화면 결과 표시",
+    wireframeTitle: "화면 와이어프레임",
+    searchLabel: "검색어",
+    searchBtn: "조회",
+    createBtn: "+ 추가",
+    colId: "번호",
+    colName: "이름",
+    colStatus: "상태",
+    colAction: "작업",
+    sampleItem: "예시 항목",
+    sampleActive: "활성",
+    editBtn: "수정",
+    cancelBtn: "취소",
+    saveBtn: "저장"
+  }
+};
+
+function getUmlCopy(langCode) {
+  return UML_COPY[normalizeLangKey(langCode)] || UML_COPY["zh-tw"];
+}
+
+const AGENTS_LOCALIZED = {
+  "zh-cn": `# 项目角色
+
+你是一位资深系统分析协作者，负责把需求想法整理成可确认、可归档、可检查的系统分析文档。
+
+# 规范加载方式（OpenSpec CLI 模式）
+
+本项目采用 \`@loviusc/sa-spec\` CLI 内置规范架构，**项目目录内不保留 \`skills/\` 与 \`rules/\` 文件夹**，完整规则与模板均由全局 \`sa-spec\` CLI 动态提供。执行任务前请先运行以下命令：
+
+- \`sa-spec instructions <init|propose|analyze|commit|pdf> [--with-rules] [--json]\`：获取当前工作区状态、阶段步骤与完整分析规范。
+- \`sa-spec rules [name|all] [--list] [--json]\`：读取内置补充规则。
+- \`sa-spec templates [name] [--list] [--json]\`：读取内置规格模板。
+
+# 核心交付物
+
+每个需求归档时固定包含：
+- \`srs.md\`：需求规格说明书
+- \`uml/\`：UML 图目录（按视角拆分为独立 \`.puml\` 文件，禁止单文件混放多图；涉及 UI 时需产出 \`uml/wireframe.puml\` 的 \`@startsalt\` 线框图）
+- \`openapi.yaml\`：OpenAPI 3.0.3 草案
+- \`db-schema.md\`：DB Schema 草案
+- \`handoff.md\`：开发交接摘要
+- \`history.md\`：版本历程
+
+# 指令流程
+
+| 指令 | 简写 | 用途 | 核心规则 |
+|---|---|---|---|
+| \`spec:init\` | \`sci\` | 初始化 | 运行 \`sa-spec instructions init\` 与 \`sa-spec init --lang zh-CN\`。 |
+| \`spec:propose\` | \`scp\` | 提出需求 | 建立并切换 \`feat/<slug>\`（支持 \`--slug <ascii-slug>\`），存在 remote 时自动推送，在 \`project/<slug>/\` 建立 \`{{REQ_ID}}\` 占位草案。 |
+| \`spec:analyze\` | \`sca\` | 分析与起草 | 先检查 \`project/\` 内所有既有需求是否冲突；有冲突则只列冲突并最多提 3 个待澄清问题；无冲突才产出整套草稿。 |
+| \`spec:commit\` | \`scc\` | 确认归档 | 运行 \`sa-spec finalize --name <slug> [--pr | --no-merge]\`：仅归档已确认版本，支持 PR 模式（默认由 \`system-spec.md\` 控制）。 |
+| \`spec:pdf\` | \`spd\` | 导出 PDF | 运行 \`sa-spec pdf <target> [--split] [--online-uml] [--output <path>]\`。 |
+
+# 重要限制
+
+- **全项目语言单一纯粹**：所有需求文档（\`srs.md\`、\`uml/\`、\`openapi.yaml\`、\`db-schema.md\`、\`handoff.md\`、\`history.md\`）必须 **100% 使用简体中文**，业界公认英文技术术语（REST API、Webhook、JWT、OAuth 2.0、Payload、Idempotency、Redis 等）保留英文原文。
+- 未经用户确认，不得将文档标记为「已审核」或擅自虚构未确认的业务规则。
+- Git 提交信息格式：\`docs(REQ-001): 需求名称 - 简短需求说明\`。
+`,
+  ja: `# プロジェクトでの役割
+
+あなたはシニアシステムアナリスト（System Analysis Collaborator）として、要望やアイデアを確認・アーカイブ・検証可能なシステム分析ドキュメントへ整理する役割を担います。
+
+# 規範の読み込み方法（OpenSpec CLI モード）
+
+本プロジェクトは \`@loviusc/sa-spec\` CLI の組み込み規範アーキテクチャを採用しており、**プロジェクト配下に \`skills/\` や \`rules/\` フォルダは保持しません**。実行前に必ず以下のコマンドで最新コンテキストと規範を取得してください：
+
+- \`sa-spec instructions <init|propose|analyze|commit|pdf> [--with-rules] [--json]\`: 現在のワークスペース状態・ステップ・分析規範を取得します。
+- \`sa-spec rules [name|all] [--list] [--json]\`: 組み込み補足ルールを読み込みます。
+- \`sa-spec templates [name] [--list] [--json]\`: 組み込みテンプレートを読み込みます。
+
+# 必須成果物
+
+各要件のアーカイブには以下を必ず含めます：
+- \`srs.md\`: 要件定義書（SRS）
+- \`uml/\`: UML 図ディレクトリ（1 ファイル 1 図を厳守し、\`main.puml\` 等へ分割。UI がある場合は \`uml/wireframe.puml\` に \`@startsalt\` ワイヤーフレームを作成）
+- \`openapi.yaml\`: OpenAPI 3.0.3 ドラフト
+- \`db-schema.md\`: DB Schema ドラフト
+- \`handoff.md\`: 開発ハンドオフサマリー
+- \`history.md\`: 変更履歴
+
+# コマンドフロー
+
+| コマンド | 略称 | 用途 | ルール |
+|---|---|---|---|
+| \`spec:init\` | \`sci\` | 初期化 | \`sa-spec instructions init\` および \`sa-spec init --lang ja\` を実行。 |
+| \`spec:propose\` | \`scp\` | 要件提案 | \`feat/<slug>\` ブランチを作成・切替（日本語名の場合は \`--slug <ascii-slug>\` を必須指定）、remote があれば push し \`project/<slug>/\` に \`{{REQ_ID}}\` プレースホルダー付きドラフトを作成。 |
+| \`spec:analyze\` | \`sca\` | 分析・起草 | \`project/\` 内の既存要件と競合チェックを実施。競合がある場合は成果物を生成せず最大 3 つの確認質問のみ提示。競合なしの場合のみドラフトを生成。 |
+| \`spec:commit\` | \`scc\` | 確定アーカイブ | ユーザー承認済みの版のみ \`sa-spec finalize --name <slug> [--pr | --no-merge]\` でアーカイブ。 |
+| \`spec:pdf\` | \`spd\` | PDF 出力 | \`sa-spec pdf <target> [--split] [--online-uml] [--output <path>]\` を実行。 |
+
+# 重要な制約
+
+- **単一言語の徹底**：すべての要件ドキュメント（\`srs.md\`、\`uml/\`、\`openapi.yaml\`、\`db-schema.md\`、\`handoff.md\`、\`history.md\`）は **100% 日本語** で統一し、REST API、Webhook、JWT、OAuth 2.0、Payload、Idempotency、Redis 等の標準技術用語のみ英語表記を維持してください。
+- ユーザー確認前に「承認済み（已審核 / Approved）」とマークしたり、未確認の業務ルールを推測で補完したりすることは禁止です。
+- Git コミットメッセージ形式：\`docs(REQ-001): 要件名 - 簡潔な説明\`。
+`,
+  ko: `# 프로젝트 역할
+
+당신은 시니어 시스템 분석 협업자(System Analysis Collaborator)로서, 요구사항 아이디어를 검토·아카이빙·검증 가능한 시스템 분석 문서로 정리합니다.
+
+# 규범 로드 방식 (OpenSpec CLI 모드)
+
+본 프로젝트는 \`@loviusc/sa-spec\` CLI 내장 규범 아키텍처를 사용하며, **프로젝트 디렉터리에 \`skills/\` 및 \`rules/\` 폴더를 두지 않습니다**. 작업 전 반드시 아래 명령으로 최신 컨텍스트와 규범을 조회하세요:
+
+- \`sa-spec instructions <init|propose|analyze|commit|pdf> [--with-rules] [--json]\`: 현재 워크스페이스 상태, 단계별 절차, 전체 분석 규범을 가져옵니다.
+- \`sa-spec rules [name|all] [--list] [--json]\`: 내장 세부 규칙을 조회합니다.
+- \`sa-spec templates [name] [--list] [--json]\`: 내장 문서 템플릿을 조회합니다.
+
+# 핵심 산출물
+
+각 요구사항 아카이브에는 다음 파일이 포함됩니다:
+- \`srs.md\`: 요구사항 명세서 (SRS)
+- \`uml/\`: UML 다이어그램 디렉터리 (단일 파일 단일 다이어그램 원칙 엄수, UI 화면이 있을 경우 \`uml/wireframe.puml\`에 \`@startsalt\` 와이어프레임 필수 작성)
+- \`openapi.yaml\`: OpenAPI 3.0.3 초안
+- \`db-schema.md\`: DB Schema 초안
+- \`handoff.md\`: 개발 핸드오프 요약서
+- \`history.md\`: 버전 이력
+
+# 명령 워크플로우
+
+| 명령 | 단축어 | 용도 | 규칙 |
+|---|---|---|---|
+| \`spec:init\` | \`sci\` | 초기화 | \`sa-spec instructions init\` 및 \`sa-spec init --lang ko\` 실행. |
+| \`spec:propose\` | \`scp\` | 요구사항 제안 | \`feat/<slug>\` 브랜치 생성 및 전환(비영문 이름은 \`--slug <ascii-slug>\` 필수), remote 설정 시 자동 push 후 \`project/<slug>/\`에 \`{{REQ_ID}}\` 플레이스홀더 초안 생성. |
+| \`spec:analyze\` | \`sca\` | 분석 및 초안 작성 | \`project/\` 내 모든 기존 요구사항과 충돌 여부를 먼저 검사. 충돌 시 초안 생성 없이 최대 3개의 확인 질문만 제시. 충돌이 없을 때만 전체 초안 작성. |
+| \`spec:commit\` | \`scc\` | 확정 아카이브 | 사용자 승인 버전에 한해 \`sa-spec finalize --name <slug> [--pr | --no-merge]\`로 아카이브. |
+| \`spec:pdf\` | \`spd\` | PDF 내보내기 | \`sa-spec pdf <target> [--split] [--online-uml] [--output <path>]\` 실행. |
+
+# 주요 제한 사항
+
+- **단일 언어 일관성**: 모든 요구사항 문서(\`srs.md\`, \`uml/\`, \`openapi.yaml\`, \`db-schema.md\`, \`handoff.md\`, \`history.md\`)는 **100% 한국어**로 작성하며, REST API, Webhook, JWT, OAuth 2.0, Payload, Idempotency, Redis 등 표준 기술 용어만 영문 원어를 유지합니다.
+- 사용자 승인 없이 문서를 승인됨 상태로 표시하거나 미확인 비즈니스 규칙을 임의로 가정하지 마세요.
+- Git 커밋 메시지 형식: \`docs(REQ-001): 요구사항 이름 - 간략한 설명\`.
+`
+};
+
+function buildLocalizedAgentsMarkdown(langCode, templatesDir) {
+  const key = normalizeLangKey(langCode);
+  if (key === "en") {
+    const enPath = templatesDir ? path.join(templatesDir, "AGENTS.en.md") : "";
+    if (enPath && fs.existsSync(enPath)) {
+      return fs.readFileSync(enPath, "utf8");
+    }
+  }
+  if (AGENTS_LOCALIZED[key]) {
+    return AGENTS_LOCALIZED[key];
+  }
+  const twPath = templatesDir ? path.join(templatesDir, "AGENTS.md") : "";
+  if (twPath && fs.existsSync(twPath)) {
+    return fs.readFileSync(twPath, "utf8");
+  }
+  return AGENTS_LOCALIZED["zh-cn"];
+}
+
+function extractSrsMetadata(srsContent) {
+  const content = String(srsContent || "");
+  const status = extractStatusFromContent(content);
+  let title = "";
+
+  const headingMatch = content.match(/^#\s+(.+)$/m);
+  if (headingMatch) {
+    let rawHeading = headingMatch[1].trim();
+    rawHeading = rawHeading
+      .replace(/^(?:需求規格|需求规格|要件定義書?|要件仕様書?|요구사항\s*명세서?|Software Requirements Specification)\s*[：:]\s*/i, "")
+      .replace(/^\[?\s*(?:REQ-\d+|\{\{REQ_ID\}\})\s*\]?\s*(?:[：:\-–—]\s*)?/i, "")
+      .replace(/\s+(?:SRS|需求規格|需求规格|要件定義書?|요구사항\s*명세서?)$/i, "")
+      .trim();
+    if (rawHeading && !/^\{\{.+\}\}$/.test(rawHeading)) {
+      title = rawHeading;
+    }
+  }
+
+  let description = "";
+  const summaryMatch = content.match(/^##\s+(?:摘要|Summary|概要|요약)(?=$|[\s：:])[^\n]*\n([\s\S]*?)(?=^##\s|(?![\s\S]))/im);
+  if (summaryMatch) {
+    const lines = summaryMatch[1].split(/\r?\n/);
+    for (const rawLine of lines) {
+      let line = rawLine.trim();
+      if (!line || line.startsWith("<!--") || line.startsWith("---")) continue;
+      line = line.replace(/^[-*>]\s+/, "").replace(/^\|+\s*/, "").replace(/\s*\|+$/, "").trim();
+      if (!line || /^[\s|:\-]+$/.test(line)) continue;
+      if (/^(?:\{\{.+\}\}|\[(?:TBD|TODO)\]|TBD|TODO|[(（<](?:尚未填寫|待補充|待补充|未記入|작성 전|請填寫|请填写)[)）>])$/i.test(line)) {
+        continue;
+      }
+      description = line.replace(/\s+/g, " ");
+      if (description.length > 80) {
+        description = `${description.slice(0, 77)}...`;
+      }
+      break;
+    }
+  }
+
+  return { title, description, status };
 }
 
 module.exports = {
@@ -541,5 +898,7 @@ module.exports = {
   buildIndexMarkdown,
   buildSystemSpecMarkdown,
   buildWorkspaceReadmeMarkdown,
-  buildLocalizedReqFileContent
+  buildLocalizedReqFileContent,
+  buildLocalizedAgentsMarkdown,
+  extractSrsMetadata
 };
