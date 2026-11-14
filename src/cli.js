@@ -561,14 +561,24 @@ function reindexProject() {
     const reqDirPath = path.join(projectDir, dirName);
     const srsPath = path.join(reqDirPath, "srs.md");
 
+    let latestMtimeMs = 0;
+    for (const filePath of listFilesRecursive(reqDirPath)) {
+      try {
+        const mtimeMs = fs.statSync(filePath).mtimeMs;
+        if (mtimeMs > latestMtimeMs) latestMtimeMs = mtimeMs;
+      } catch (_) {}
+    }
+    const latestMtimeStr = formatLocalDateTime(latestMtimeMs > 0 ? new Date(latestMtimeMs) : new Date());
+
     let title = fallbackTitle;
     let description = t.tbd;
     let status = t.pending;
-    let createdAt = formatLocalDateTime(new Date());
-    let updatedAt = createdAt;
+    let createdAt = latestMtimeStr;
+    let updatedAt = latestMtimeStr;
+    let prev = null;
 
     if (existingMap.has(id)) {
-      const prev = existingMap.get(id);
+      prev = existingMap.get(id);
       title = prev.title || title;
       description = prev.description || description;
       status = prev.status || status;
@@ -587,6 +597,15 @@ function reindexProject() {
       }
       if (meta.status) {
         status = meta.status;
+      }
+    }
+
+    if (prev) {
+      if (latestMtimeStr > (prev.updatedAt || "")) {
+        updatedAt = latestMtimeStr;
+      } else if (title !== prev.title || description !== prev.description || status !== prev.status) {
+        const nowStr = formatLocalDateTime(new Date());
+        updatedAt = nowStr > (prev.updatedAt || "") ? nowStr : latestMtimeStr;
       }
     }
 
@@ -708,13 +727,17 @@ function slugify(value) {
     .replace(/^-+|-+$/g, "");
 }
 
+function toPosixPath(p) {
+  return String(p || "").replace(/\\/g, "/");
+}
+
 function getManagedLegacyRelativePaths() {
   const files = [];
   for (const dirName of ["skills", "rules"]) {
     const absDir = path.join(templatesDir, dirName);
     if (fs.existsSync(absDir)) {
       for (const file of listFilesRecursive(absDir)) {
-        files.push(path.relative(templatesDir, file));
+        files.push(toPosixPath(path.relative(templatesDir, file)));
       }
     }
   }
@@ -731,7 +754,7 @@ function pruneEmptyLegacyDirs(relDir, dryRun, managedSet, results) {
   let canRemove = true;
 
   for (const entry of entries) {
-    const childRel = path.join(relDir, entry.name);
+    const childRel = toPosixPath(path.join(relDir, entry.name));
     if (entry.isDirectory()) {
       if (!pruneEmptyLegacyDirs(childRel, dryRun, managedSet, results)) {
         canRemove = false;
@@ -751,7 +774,7 @@ function pruneEmptyLegacyDirs(relDir, dryRun, managedSet, results) {
     }
     results.push({
       action: dryRun ? "would-remove" : "remove",
-      target: `${relDir}/`,
+      target: toPosixPath(`${relDir}/`),
       message: "移除舊版目錄"
     });
   }
@@ -797,7 +820,7 @@ function removeLegacyManagedAssets(dryRun = false, keepLegacy = false) {
     const absRoot = path.join(cwd, rootName);
     if (!fs.existsSync(absRoot)) continue;
     for (const fileAbs of listFilesRecursive(absRoot)) {
-      const relPath = path.relative(cwd, fileAbs);
+      const relPath = toPosixPath(path.relative(cwd, fileAbs));
       if (path.basename(fileAbs) === ".DS_Store" || managedSet.has(relPath)) {
         continue;
       }
@@ -1012,7 +1035,7 @@ function printResultList(label, results) {
         : result.action === "warn"
         ? "WARNING"
         : "SKIPPED";
-    console.log(`${action} ${result.target}${result.message ? ` - ${result.message}` : ""}`);
+    console.log(`${action} ${toPosixPath(result.target)}${result.message ? ` - ${result.message}` : ""}`);
   }
 }
 

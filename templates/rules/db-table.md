@@ -7,16 +7,16 @@
 - 若資料庫類型未指定，先使用通用關聯式資料庫描述，不綁定特定 SQL 方言。
 
 ## 輸出文件
-DB Table 設計使用 `db-table.md`，放在對應需求資料夾內。
+DB Table 設計使用 `db-schema.md`，放在對應需求資料夾內。
 
 ```text
 project/
   REQ-001-login/
-    db-table.md
+    db-schema.md
 ```
 
 ## 文件欄位
-`db-table.md` 至少包含：
+`db-schema.md` 至少包含：
 - 需求編號。
 - 狀態：`草稿`、`待確認`、`已審核`。
 - 設計目的。

@@ -423,3 +423,64 @@ test("#14 YAML-safe openapi title, complete srs sections/check, template system-
   assert.match(html, /<td[^>]*>Line 1<br\/>Line 2<\/td>/);
   assert.match(html, /<ul><li>Parent<ul><li>Child<ol><li>Sub<\/li><\/ol><\/li><\/ul><\/li><li>Sibling<\/li><\/ul>/);
 });
+
+test("#15 built-in rules have no legacy file names, db/history templates align, and reindex refreshes updatedAt", (t) => {
+  const dir = makeTempDir();
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  const fileStyle = runCli(dir, ["rules", "file-style"]);
+  assert.equal(fileStyle.status, 0, fileStyle.stderr);
+  assert.doesNotMatch(fileStyle.stdout, /\bdb-table\.md\b/);
+  assert.doesNotMatch(fileStyle.stdout, /\bwireframe\.md\b/);
+  assert.doesNotMatch(fileStyle.stdout, /\bapi\.md\b/);
+  assert.match(fileStyle.stdout, /project\/system-spec\.md/);
+  assert.match(fileStyle.stdout, /uml\/wireframe\.puml/);
+
+  const dbRule = runCli(dir, ["rules", "db-table"]);
+  assert.equal(dbRule.status, 0, dbRule.stderr);
+  assert.match(dbRule.stdout, /`db-schema\.md` 至少包含/);
+
+  const wireRule = runCli(dir, ["rules", "wireframe"]);
+  assert.equal(wireRule.status, 0, wireRule.stderr);
+  assert.match(wireRule.stdout, /uml\/wireframe\.puml/);
+  assert.match(wireRule.stdout, /@startsalt/);
+
+  const estRule = runCli(dir, ["rules", "estimation"]);
+  assert.equal(estRule.status, 0, estRule.stderr);
+  assert.doesNotMatch(estRule.stdout, /\bspec:review\b/);
+
+  assert.equal(runCli(dir, ["init"]).status, 0);
+  assert.equal(runCli(dir, ["new", "--id", "REQ-001", "--name", "orders"]).status, 0);
+
+  const reqDir = path.join(dir, "project", "REQ-001-orders");
+  const dbContent = fs.readFileSync(path.join(reqDir, "db-schema.md"), "utf8");
+  assert.match(dbContent, /- 狀態：待確認/);
+  assert.match(dbContent, /## Migration 與資料保留規則/);
+
+  const historyContent = fs.readFileSync(path.join(reqDir, "history.md"), "utf8");
+  assert.match(historyContent, /\| 版本 \| 日期 \| 異動類型 \| 異動摘要 \| 影響範圍 \| 狀態 \|/);
+  assert.match(historyContent, /\|\s*v0\.1\s*\|\s*\d{4}-\d{2}-\d{2}\s*\|/);
+
+  // Modify srs.md with a future mtime (+5 min) -> reindex must advance updatedAt
+  const indexBefore = fs.readFileSync(path.join(dir, "project", "index.md"), "utf8");
+  const beforeMatch = indexBefore.match(/\| REQ-001 \|[^|]+\|[^|]+\|[^|]+\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|/);
+  assert.ok(beforeMatch);
+  const createdBefore = beforeMatch[1];
+  const updatedBefore = beforeMatch[2];
+
+  const srsPath = path.join(reqDir, "srs.md");
+  fs.writeFileSync(
+    srsPath,
+    fs.readFileSync(srsPath, "utf8").replace("待確認", "已審核").replace("待補充。", "支援訂單查詢。"),
+    "utf8"
+  );
+  const futureDate = new Date(Date.now() + 5 * 60 * 1000);
+  fs.utimesSync(srsPath, futureDate, futureDate);
+
+  assert.equal(runCli(dir, ["reindex"]).status, 0);
+  const indexAfter = fs.readFileSync(path.join(dir, "project", "index.md"), "utf8");
+  const afterMatch = indexAfter.match(/\| REQ-001 \|[^|]+\|[^|]+\|[^|]+\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|/);
+  assert.ok(afterMatch);
+  assert.equal(afterMatch[1], createdBefore);
+  assert.notEqual(afterMatch[2], updatedBefore);
+});

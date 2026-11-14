@@ -2,22 +2,26 @@
 
 ## 基本原則
 - Wireframe 是 SA 用低保真畫面行為規格，不是 UI 美術稿或前端設計稿。
-- Wireframe 以 Markdown 為主，可使用表格、ASCII 或 Mermaid 輔助說明。
+- 畫面視覺佈局圖使用 PlantUML Salt（`@startsalt ... @endsalt`）產出至 `uml/wireframe.puml`，純後端需求則在 `handoff.md` 標記「無 UI 介面需求」。
+- 畫面目的、元素表、操作流程、狀態與 API / DB 影響應寫入 `srs.md`（`## UI / 畫面規格`）與 `handoff.md`，無需建立額外 `wireframe.md`。
 - Wireframe 必須依據 SRS 產出，並能追溯到需求編號。
 - 不可自行新增 SRS 未提到且未標示待確認的欄位、按鈕、流程或錯誤狀態。
 - 若 Wireframe 發現 SRS 缺口，必須列為待確認事項。
 
 ## 輸出文件
-若需求涉及畫面，使用 `wireframe.md`，放在對應需求資料夾內。
+若需求涉及前端介面，使用 `uml/wireframe.puml`（PlantUML Salt 語法），並將行為說明整理於 `srs.md` 與 `handoff.md`：
 
 ```text
 project/
   REQ-001-login/
-    wireframe.md
+    srs.md
+    handoff.md
+    uml/
+      wireframe.puml
 ```
 
 ## 文件欄位
-`wireframe.md` 至少包含：
+`srs.md` / `handoff.md` 與 `uml/wireframe.puml` 的畫面規格應涵蓋：
 - 需求編號。
 - 狀態：`草稿`、`待確認`、`已審核`。
 - 畫面清單。

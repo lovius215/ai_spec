@@ -42,7 +42,15 @@ const LANG_COPY = {
       relatedDocs: "相關文件"
     },
     dbTitle: "DB Schema",
-    dbSections: ["資料表清單", "欄位說明", "索引與唯一性", "待確認"],
+    dbSections: [
+      "設計目的與適用範圍",
+      "資料表清單",
+      "欄位與型別定義",
+      "主鍵、外鍵與唯一性約束",
+      "索引設計",
+      "Migration 與資料保留規則",
+      "待確認"
+    ],
     handoffTitle: "開發交接摘要",
     handoffSections: [
       "來源文件",
@@ -59,7 +67,7 @@ const LANG_COPY = {
     ],
     handoffUiNote: "若有前端操作介面，實作時請參照 `uml/wireframe.puml`；若為純後端需求，請保留「無 UI 介面需求」。",
     historyTitle: "版本歷程",
-    historyHeader: "| 版本 | 日期 | 變更摘要 | 狀態 |",
+    historyHeader: "| 版本 | 日期 | 異動類型 | 異動摘要 | 影響範圍 | 狀態 |",
     readmeTitle: "系統分析規格專案",
     readmeIntro: "本專案使用 `@loviusc/sa-spec` 管理系統分析規格文件，完整分析規範與補充規則由 `sa-spec` CLI 動態提供（專案目錄不額外放置 `skills/` 與 `rules/`）。",
     readmeDirs: [
@@ -108,7 +116,15 @@ const LANG_COPY = {
       relatedDocs: "Related Documents"
     },
     dbTitle: "DB Schema",
-    dbSections: ["Tables", "Columns & Types", "Indexes & Constraints", "Open Questions"],
+    dbSections: [
+      "Purpose & Scope",
+      "Tables",
+      "Columns & Types",
+      "Keys & Constraints",
+      "Indexes",
+      "Migration & Retention Rules",
+      "Open Questions"
+    ],
     handoffTitle: "Developer Handoff Summary",
     handoffSections: [
       "Source Documents",
@@ -125,7 +141,7 @@ const LANG_COPY = {
     ],
     handoffUiNote: "If frontend UI is required, follow `uml/wireframe.puml`; for backend-only requirements, explicitly keep \"No UI required\".",
     historyTitle: "Version History",
-    historyHeader: "| Version | Date | Summary | Status |",
+    historyHeader: "| Version | Date | Change Type | Summary | Impact Scope | Status |",
     readmeTitle: "System Analysis Specification Workspace",
     readmeIntro: "This workspace is managed with `@loviusc/sa-spec`. Full workflow instructions and rule sets are served dynamically via the `sa-spec` CLI (no `skills/` or `rules/` folders are stored in this repository).",
     readmeDirs: [
@@ -174,7 +190,15 @@ const LANG_COPY = {
       relatedDocs: "相关文档"
     },
     dbTitle: "DB Schema",
-    dbSections: ["数据表清单", "字段说明", "索引与唯一性", "待确认"],
+    dbSections: [
+      "设计目的与适用范围",
+      "数据表清单",
+      "字段与类型定义",
+      "主键、外键与唯一性约束",
+      "索引设计",
+      "Migration 与数据保留规则",
+      "待确认"
+    ],
     handoffTitle: "开发交接摘要",
     handoffSections: [
       "来源文档",
@@ -191,7 +215,7 @@ const LANG_COPY = {
     ],
     handoffUiNote: "若涉及前端界面请参照 `uml/wireframe.puml`；纯后端需求请保留「无 UI 界面需求」。",
     historyTitle: "版本历程",
-    historyHeader: "| 版本 | 日期 | 变更摘要 | 状态 |",
+    historyHeader: "| 版本 | 日期 | 异动类型 | 异动摘要 | 影响范围 | 状态 |",
     readmeTitle: "系统分析规格项目",
     readmeIntro: "本项目使用 `@loviusc/sa-spec` 管理需求规格文档，完整规范与补充规则通过 `sa-spec` CLI 动态提供（项目目录中不保留 `skills/` 与 `rules/`）。",
     readmeDirs: [
@@ -240,7 +264,15 @@ const LANG_COPY = {
       relatedDocs: "関連ドキュメント"
     },
     dbTitle: "DB Schema",
-    dbSections: ["テーブル一覧", "カラム定義", "インデックスと制約", "未確認事項"],
+    dbSections: [
+      "設計目的と適用範囲",
+      "テーブル一覧",
+      "カラム・型定義",
+      "主キー・外部キー・制約",
+      "インデックス設計",
+      "Migration・データ保持ルール",
+      "未確認事項"
+    ],
     handoffTitle: "開発引き継ぎ要約",
     handoffSections: [
       "参照ドキュメント",
@@ -257,7 +289,7 @@ const LANG_COPY = {
     ],
     handoffUiNote: "UI がある場合は `uml/wireframe.puml` を参照してください。バックエンド専用の場合は「UI 要件なし」と明記してください。",
     historyTitle: "変更履歴",
-    historyHeader: "| バージョン | 日付 | 変更概要 | ステータス |",
+    historyHeader: "| バージョン | 日付 | 変更種別 | 変更概要 | 影響範囲 | ステータス |",
     readmeTitle: "システム分析仕様ワークスペース",
     readmeIntro: "本ワークスペースは `@loviusc/sa-spec` で管理されています。詳細な分析手順とルールは `sa-spec` CLI から動的に提供されます（`skills/` や `rules/` は配置されません）。",
     readmeDirs: [
@@ -306,7 +338,15 @@ const LANG_COPY = {
       relatedDocs: "관련 문서"
     },
     dbTitle: "DB Schema",
-    dbSections: ["테이블 목록", "컬럼 정의", "인덱스 및 제약조건", "미확인 사항"],
+    dbSections: [
+      "설계 목적 및 적용 범위",
+      "테이블 목록",
+      "컬럼 및 타입 정의",
+      "기본키·외래키 및 제약조건",
+      "인덱스 설계",
+      "Migration 및 데이터 보존 규칙",
+      "미확인 사항"
+    ],
     handoffTitle: "개발 인수인계 요약",
     handoffSections: [
       "참조 문서",
@@ -323,7 +363,7 @@ const LANG_COPY = {
     ],
     handoffUiNote: "UI 구현이 필요한 경우 `uml/wireframe.puml`을 참조하세요. 백엔드 전용 요구사항은 \"UI 요구사항 없음\"을 유지하세요.",
     historyTitle: "변경 이력",
-    historyHeader: "| 버전 | 날짜 | 변경 요약 | 상태 |",
+    historyHeader: "| 버전 | 날짜 | 변경 유형 | 변경 요약 | 영향 범위 | 상태 |",
     readmeTitle: "시스템 분석 사양 워크스페이스",
     readmeIntro: "이 프로젝트는 `@loviusc/sa-spec`으로 관리됩니다. 전체 분석 규칙과 절차는 `sa-spec` CLI에서 동적으로 제공됩니다(`skills/`, `rules/` 폴더 미생성).",
     readmeDirs: [
@@ -552,7 +592,9 @@ function buildLocalizedReqFileContent(langCode, relType, replacements = {}) {
     }
     case "db-schema.md":
       return [
-        `# ${reqId} ${reqName} ${t.dbTitle}`,
+        `# ${reqId}${reqName ? ` ${reqName}` : ""} ${t.dbTitle}`,
+        "",
+        `- ${t.statusLabel}：${t.pending}`,
         "",
         ...t.dbSections.flatMap((h) => [`## ${h}`, `${t.tbd}.`, ""]),
         ""
@@ -574,11 +616,11 @@ function buildLocalizedReqFileContent(langCode, relType, replacements = {}) {
         .trimEnd() + "\n";
     case "history.md":
       return [
-        `# ${reqId} ${reqName} ${t.historyTitle}`,
+        `# ${reqId}${reqName ? ` ${reqName}` : ""} ${t.historyTitle}`,
         "",
         t.historyHeader,
-        "|---|---|---|---|",
-        `| v0.1 | ${t.tbd} | ${t.draft} | ${t.pending} |`,
+        "|---|---|---|---|---|---|",
+        `| v0.1 | ${new Date().toISOString().slice(0, 10)} | ${t.draft} | ${t.tbd} | SRS, UML, OpenAPI, DB | ${t.pending} |`,
         ""
       ].join("\n");
     case "uml/main.puml": {
