@@ -101,14 +101,14 @@ sa-spec --version
 | 指令 | 说明 |
 |---|---|
 | `sa-spec init [--full] [--lang <lang>]` | 初始化干净的工作区骨架，不在项目目录暴露 `skills/` 与 `rules/`（`--full` 仅作兼容保留，规范统一由 CLI 内置提供；支持 5 种语言）。 |
-| `sa-spec new [--id REQ-001] --name login [--branch]` | 创建需求模板文件夹。省略 `--id` 时自动切入多人协作草稿分支（`feat/<name>`）。 |
-| `sa-spec finalize --name login` | 将草稿需求正式定号归档为最新序号，自动重命名目录、替换 `{{REQ_ID}}` 并重构索引。 |
-| `sa-spec instructions [stage] [--with-rules] [--json]` | 输出当前工作区上下文、阶段步骤与内置完整分析规范（`init` / `propose` / `analyze` / `commit` / `pdf`）。 |
+| `sa-spec new [--id REQ-001] --name login [--slug login] [--branch]` | 创建需求模板文件夹（若名称含中文/日文/韩文等非 ASCII 字符请搭配 `--slug <ascii-slug>`）。省略 `--id` 时启用多人草稿分支（`feat/<slug>`）。 |
+| `sa-spec finalize --name login [--slug login] [--no-merge \| --pr]` | 将草稿需求正式定号归档为最新序号，支持 `--no-merge` / `--pr` 或 `合并策略：pr` 流程，并具备跨分支远端撞号防护。 |
+| `sa-spec instructions [stage] [--with-rules] [--json]` | 输出当前工作区上下文、语言强制规范、阶段步骤与内置完整分析规范（`init` / `propose` / `analyze` / `commit` / `pdf`）。 |
 | `sa-spec rules [name\|all] [--list] [--json]` | 读取或列出套件内置补充规则文档。 |
-| `sa-spec templates [name] [--list] [--json]` | 读取或列出套件内置文档与 PlantUML 模板。 |
-| `sa-spec pdf <target> [--split] [--output out.pdf]` | 将指定 `.md` 或需求（如 `REQ-001`）合并或拆分导出为 PDF（`--all` 导出全项目）。 |
-| `sa-spec reindex` | 扫描 `project/REQ-*` 目录，按序数字顺序动态重新生成 `project/index.md`。 |
-| `sa-spec check` | 检查项目必要文件、编号唯一性，并提示旧版 `skills/` 或 `rules/` 迁移。 |
+| `sa-spec templates [name] [--lang <code>] [--list] [--json]` | 读取或列出按项目语言或 `--lang` 本地化的文档与 PlantUML 模板。 |
+| `sa-spec pdf <target> [--split] [--output out.pdf] [--online-uml \| --no-uml-render]` | 将指定 `.md` 或需求（`REQ-001`）合并或拆分导出为 PDF（默认不上传公开网络服务器，优先使用本机 `plantuml`，在线转绘请加 `--online-uml`）。 |
+| `sa-spec reindex` | 扫描 `project/REQ-*` 目录，按数字序号重新生成 `project/index.md` 并提取 SRS 标题与摘要。 |
+| `sa-spec check [--strict]` | 校验项目必要文件、编号唯一性与交付物完整度并回传非零退出码（`--strict` 同时严查规范版本与旧版 `skills/`/`rules/`）。 |
 | `sa-spec status` | 查看系统规格与需求总览状态。 |
 | `sa-spec doctor` | 诊断工作区环境与必要文件依赖。 |
 | `sa-spec upgrade [--dry-run] [--keep-legacy]` | 更新 `AGENTS.md`，自动移除旧版套件托管的 `skills/` 与 `rules/`（保留自定义文件与原语言），并迁移旧版 `uml.puml`。别名：`sa-spec update`。 |

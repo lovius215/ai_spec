@@ -482,6 +482,7 @@ function getTemplatesPackageVersion(templatesDir) {
 function buildLocalizedTemplateByName(name, langConfig, templatesDir) {
   const reqMap = {
     srs: "srs.md",
+    openapi: "openapi.yaml",
     "db-schema": "db-schema.md",
     handoff: "handoff.md",
     history: "history.md",

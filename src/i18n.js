@@ -29,11 +29,17 @@ const LANG_COPY = {
       usersGoals: "使用者與目標",
       users: "使用者/角色",
       goals: "目標",
+      preconditions: "前置條件",
       flows: "流程",
+      mainFlow: "主要流程",
+      exceptionFlow: "例外流程",
+      functionalReqs: "功能需求",
+      nonFunctionalReqs: "非功能需求與業務規則",
       uiSpec: "UI / 畫面規格",
       uiRef: "若有前端介面需求，請參考 `uml/wireframe.puml`；純後端需求請填寫「無 UI 介面需求」。",
       acceptance: "驗收條件",
-      openQuestions: "待確認"
+      openQuestions: "待確認",
+      relatedDocs: "相關文件"
     },
     dbTitle: "DB Schema",
     dbSections: ["資料表清單", "欄位說明", "索引與唯一性", "待確認"],
@@ -89,11 +95,17 @@ const LANG_COPY = {
       usersGoals: "Users & Goals",
       users: "Users / Roles",
       goals: "Goals",
+      preconditions: "Preconditions",
       flows: "Workflows",
+      mainFlow: "Main Flow",
+      exceptionFlow: "Exception Flow",
+      functionalReqs: "Functional Requirements",
+      nonFunctionalReqs: "Non-Functional Requirements & Business Rules",
       uiSpec: "UI / Screen Specification",
       uiRef: "If this requirement includes frontend UI, refer to `uml/wireframe.puml`; for backend-only work, state \"No UI required\".",
       acceptance: "Acceptance Criteria",
-      openQuestions: "Open Questions"
+      openQuestions: "Open Questions",
+      relatedDocs: "Related Documents"
     },
     dbTitle: "DB Schema",
     dbSections: ["Tables", "Columns & Types", "Indexes & Constraints", "Open Questions"],
@@ -149,11 +161,17 @@ const LANG_COPY = {
       usersGoals: "用户与目标",
       users: "用户/角色",
       goals: "目标",
+      preconditions: "前置条件",
       flows: "流程",
+      mainFlow: "主要流程",
+      exceptionFlow: "异常流程",
+      functionalReqs: "功能需求",
+      nonFunctionalReqs: "非功能需求与业务规则",
       uiSpec: "UI / 界面规格",
       uiRef: "若涉及前端界面，请参考 `uml/wireframe.puml`；纯后端需求请注明「无 UI 界面需求」。",
       acceptance: "验收条件",
-      openQuestions: "待确认"
+      openQuestions: "待确认",
+      relatedDocs: "相关文档"
     },
     dbTitle: "DB Schema",
     dbSections: ["数据表清单", "字段说明", "索引与唯一性", "待确认"],
@@ -209,11 +227,17 @@ const LANG_COPY = {
       usersGoals: "利用者と目的",
       users: "利用者/ロール",
       goals: "目的",
+      preconditions: "前提条件",
       flows: "業務フロー",
+      mainFlow: "基本フロー",
+      exceptionFlow: "例外フロー",
+      functionalReqs: "機能要件",
+      nonFunctionalReqs: "非機能要件・業務ルール",
       uiSpec: "UI / 画面仕様",
       uiRef: "フロントエンド UI がある場合は `uml/wireframe.puml` を参照してください。バックエンド専用の場合は「UI 要件なし」と記載してください。",
       acceptance: "受入条件",
-      openQuestions: "未確認事項"
+      openQuestions: "未確認事項",
+      relatedDocs: "関連ドキュメント"
     },
     dbTitle: "DB Schema",
     dbSections: ["テーブル一覧", "カラム定義", "インデックスと制約", "未確認事項"],
@@ -269,11 +293,17 @@ const LANG_COPY = {
       usersGoals: "사용자 및 목표",
       users: "사용자/역할",
       goals: "목표",
+      preconditions: "전제 조건",
       flows: "프로세스",
+      mainFlow: "주요 흐름",
+      exceptionFlow: "예외 흐름",
+      functionalReqs: "기능 요구사항",
+      nonFunctionalReqs: "비기능 요구사항 및 비즈니스 규칙",
       uiSpec: "UI / 화면 사양",
       uiRef: "프론트엔드 UI가 포함된 경우 `uml/wireframe.puml`을 참조하고, 백엔드 전용인 경우 \"UI 요구사항 없음\"으로 표기하세요.",
       acceptance: "인수 조건",
-      openQuestions: "미확인 사항"
+      openQuestions: "미확인 사항",
+      relatedDocs: "관련 문서"
     },
     dbTitle: "DB Schema",
     dbSections: ["테이블 목록", "컬럼 정의", "인덱스 및 제약조건", "미확인 사항"],
@@ -466,8 +496,9 @@ function buildLocalizedReqFileContent(langCode, relType, replacements = {}) {
   switch (relType) {
     case "srs.md": {
       const s = t.srsLabels;
+      const heading = reqName ? `# ${reqId} ${reqName} ${t.srsTitlePrefix}` : `# ${reqId} ${t.srsTitlePrefix}`;
       return [
-        `# ${reqId} ${reqName} ${t.srsTitlePrefix}`,
+        heading,
         "",
         `- ${t.statusLabel}：${t.pending}`,
         `- ${s.latestVersion}：v0.1`,
@@ -478,9 +509,17 @@ function buildLocalizedReqFileContent(langCode, relType, replacements = {}) {
         `## ${s.usersGoals}`,
         `- ${s.users}：${t.tbd}`,
         `- ${s.goals}：${t.tbd}`,
+        `- ${s.preconditions}：${t.tbd}`,
         "",
         `## ${s.flows}`,
-        `${t.tbd}.`,
+        `- ${s.mainFlow}：${t.tbd}`,
+        `- ${s.exceptionFlow}：${t.tbd}`,
+        "",
+        `## ${s.functionalReqs}`,
+        `- ${t.tbd}`,
+        "",
+        `## ${s.nonFunctionalReqs}`,
+        `- ${t.tbd}`,
         "",
         `## ${s.uiSpec}`,
         s.uiRef,
@@ -490,6 +529,24 @@ function buildLocalizedReqFileContent(langCode, relType, replacements = {}) {
         "",
         `## ${s.openQuestions}`,
         `- ${t.tbd}`,
+        "",
+        `## ${s.relatedDocs}`,
+        "- `uml/main.puml`",
+        "- `openapi.yaml`",
+        "- `db-schema.md`",
+        "- `handoff.md`",
+        "- `history.md`",
+        ""
+      ].join("\n");
+    }
+    case "openapi.yaml": {
+      const apiTitle = JSON.stringify(`${reqId}${reqName ? ` ${reqName}` : ""} API`);
+      return [
+        "openapi: 3.0.3",
+        "info:",
+        `  title: ${apiTitle}`,
+        "  version: 0.1.0",
+        "paths: {}",
         ""
       ].join("\n");
     }

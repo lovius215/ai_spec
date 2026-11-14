@@ -4,7 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawnSync, execFileSync } = require("child_process");
-const { encodePlantUml, buildHtmlDocument } = require("../src/pdf");
+const { encodePlantUml, buildHtmlDocument, buildMergedRequirementMarkdown } = require("../src/pdf");
 
 const ROOT_DIR = path.resolve(__dirname, "..");
 const CLI_PATH = path.join(ROOT_DIR, "bin", "sa-spec.js");
@@ -153,20 +153,22 @@ test("#5 & #6 finalize respects --pr / --no-merge and guards against concurrent 
   const finPr = runCli(workA, ["finalize", "--name", "auth", "--pr"]);
   assert.equal(finPr.status, 0, finPr.stderr);
   assert.match(finPr.stdout, /已略過自動合併/);
+  assert.equal(fs.existsSync(path.join(workA, "project", "REQ-001-auth")), true);
   const branchA = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: workA, encoding: "utf8" }).trim();
   assert.equal(branchA, "feat/auth");
 
-  // B creates feat/pay and finalizes -> auto-merges REQ-001-pay into master and pushes
+  // B creates feat/pay and finalizes -> scans origin/feat/auth, reserves REQ-002-pay without colliding!
   assert.equal(runCli(workB, ["new", "--name", "pay", "--branch"]).status, 0);
   const finB = runCli(workB, ["finalize", "--name", "pay"]);
   assert.equal(finB.status, 0, finB.stderr);
-  assert.equal(fs.existsSync(path.join(workB, "project", "REQ-001-pay")), true);
+  assert.equal(fs.existsSync(path.join(workB, "project", "REQ-002-pay")), true);
 
-  // Now A finalizes auth with auto-merge -> fetches origin/master, sees REQ-001-pay, assigns REQ-002-auth!
+  // Now A finalizes auth with auto-merge -> sees origin/master REQ-002-pay, assigns REQ-003-auth and merges cleanly!
   execFileSync("git", ["checkout", "feat/auth"], { cwd: workA });
   const finA2 = runCli(workA, ["finalize", "--name", "auth"]);
   assert.equal(finA2.status, 0, finA2.stderr);
-  assert.equal(fs.existsSync(path.join(workA, "project", "REQ-002-auth")), true);
+  assert.equal(fs.existsSync(path.join(workA, "project", "REQ-003-auth")), true);
+  assert.equal(fs.existsSync(path.join(workA, "project", "REQ-002-pay")), true);
 });
 
 test("#8 upgrade removes legacy managed skills/rules, preserves custom files & claude-mem-context, and protects source repo", (t) => {
@@ -367,4 +369,57 @@ test("#13 finalize scopes git staging and skips auto-merge safely when working t
   // Dirty changes still remain intact in working tree
   assert.equal(fs.existsSync(path.join(dir, "project", "other-draft", "srs.md")), true);
   assert.match(fs.readFileSync(path.join(dir, "readme.md"), "utf8"), /Local uncommitted edit/);
+});
+
+test("#14 YAML-safe openapi title, complete srs sections/check, template system-spec, localized merged PDF & nested lists", (t) => {
+  const dir = makeTempDir();
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  assert.equal(runCli(dir, ["init"]).status, 0);
+  const res = runCli(dir, ["new", "--id", "REQ-001", "--name", "會員: OAuth", "--slug", "oauth"]);
+  assert.equal(res.status, 0, res.stderr);
+
+  const reqDir = path.join(dir, "project", "REQ-001-oauth");
+  const openapiContent = fs.readFileSync(path.join(reqDir, "openapi.yaml"), "utf8");
+  assert.match(openapiContent, /title: "REQ-001 會員: OAuth API"/);
+
+  const srsContent = fs.readFileSync(path.join(reqDir, "srs.md"), "utf8");
+  assert.match(srsContent, /## 功能需求/);
+  assert.match(srsContent, /## 非功能需求與業務規則/);
+  assert.match(srsContent, /## 相關文件/);
+
+  // Clean project passes check
+  assert.equal(runCli(dir, ["check"]).status, 0);
+
+  // Unquoted colon in openapi.yaml title should trigger check failure
+  fs.writeFileSync(
+    path.join(reqDir, "openapi.yaml"),
+    "openapi: 3.0.3\ninfo:\n  title: REQ-001 會員: OAuth API\n  version: 0.1.0\npaths: {}\n",
+    "utf8"
+  );
+  const badYamlCheck = runCli(dir, ["check"]);
+  assert.equal(badYamlCheck.status, 1);
+  assert.match(badYamlCheck.stdout, /未加引號的冒號/);
+
+  // Legacy template system-spec should emit live localized content without raw {{LANG_LABEL}}
+  const tplSpec = runCli(dir, ["template", "system-spec", "--stdout"]);
+  assert.equal(tplSpec.status, 0, tplSpec.stderr);
+  assert.doesNotMatch(tplSpec.stdout, /\{\{LANG_LABEL\}\}/);
+  assert.match(tplSpec.stdout, /規範版本/);
+  assert.match(tplSpec.stdout, /合併策略/);
+
+  // Localized merged markdown headings for non-zh-TW PDF export
+  const enMerged = buildMergedRequirementMarkdown(reqDir, { lang: "en" });
+  assert.match(enMerged.markdown, /# OpenAPI Specification \(`openapi\.yaml`\)/);
+  assert.match(enMerged.markdown, /# UML Diagrams \(`uml\/`\)/);
+  assert.doesNotMatch(enMerged.markdown, /OpenAPI 介面規格/);
+
+  // <br> inside Markdown tables & nested lists render properly in HTML
+  const html = buildHtmlDocument(
+    "Formatting",
+    "| Col |\n|---|\n| Line 1<br>Line 2 |\n\n- Parent\n  - Child\n    1. Sub\n- Sibling\n",
+    { noUmlRender: true, lang: "en" }
+  );
+  assert.match(html, /<td[^>]*>Line 1<br\/>Line 2<\/td>/);
+  assert.match(html, /<ul><li>Parent<ul><li>Child<ol><li>Sub<\/li><\/ol><\/li><\/ul><\/li><li>Sibling<\/li><\/ul>/);
 });

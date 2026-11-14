@@ -204,7 +204,8 @@ function runTemplate(args) {
   const type = args[0];
 
   if (type === "system-spec") {
-    outputTemplate(path.join("project", "system-spec.md"), args.slice(1));
+    const content = buildSystemSpecMarkdown(detectProjectLanguage(cwd), getPackageVersion());
+    outputTemplateContent(content, path.join("project", "system-spec.md"), args.slice(1));
     return;
   }
 
@@ -216,16 +217,15 @@ function runTemplate(args) {
   fail("Usage: sa-spec template <system-spec|req> [options]");
 }
 
-function outputTemplate(templatePath, args) {
+function outputTemplateContent(content, defaultOutputName, args) {
   const output = getOption(args, "--output");
-  const content = readTemplate(templatePath);
 
   if (args.includes("--stdout") || !output) {
     process.stdout.write(content.endsWith("\n") ? content : `${content}\n`);
     return;
   }
 
-  writeFileIfMissing(path.resolve(cwd, output), content);
+  writeFileIfMissing(path.resolve(cwd, output || defaultOutputName), content);
   console.log(`Created ${output}`);
 }
 
@@ -298,7 +298,7 @@ function createReqTemplate(args, label = "new") {
       writeReqArtifact(langConfig.code, "srs.md", path.join(reqDir, "srs.md"), replacements),
       writeReqArtifact(langConfig.code, "uml/main.puml", path.join(umlDir, "main.puml"), replacements),
       writeReqArtifact(langConfig.code, "uml/wireframe.puml", path.join(umlDir, "wireframe.puml"), replacements),
-      ensureFileFromTemplate(path.join("project", "req", "openapi.yaml"), path.join(reqDir, "openapi.yaml"), replacements),
+      writeReqArtifact(langConfig.code, "openapi.yaml", path.join(reqDir, "openapi.yaml"), replacements),
       writeReqArtifact(langConfig.code, "db-schema.md", path.join(reqDir, "db-schema.md"), replacements),
       writeReqArtifact(langConfig.code, "handoff.md", path.join(reqDir, "handoff.md"), replacements),
       writeReqArtifact(langConfig.code, "history.md", path.join(reqDir, "history.md"), replacements)
@@ -320,7 +320,7 @@ function createReqTemplate(args, label = "new") {
     writeReqArtifact(langConfig.code, "srs.md", path.join(reqDir, "srs.md"), replacements),
     writeReqArtifact(langConfig.code, "uml/main.puml", path.join(umlDir, "main.puml"), replacements),
     writeReqArtifact(langConfig.code, "uml/wireframe.puml", path.join(umlDir, "wireframe.puml"), replacements),
-    ensureFileFromTemplate(path.join("project", "req", "openapi.yaml"), path.join(reqDir, "openapi.yaml"), replacements),
+    writeReqArtifact(langConfig.code, "openapi.yaml", path.join(reqDir, "openapi.yaml"), replacements),
     writeReqArtifact(langConfig.code, "db-schema.md", path.join(reqDir, "db-schema.md"), replacements),
     writeReqArtifact(langConfig.code, "handoff.md", path.join(reqDir, "handoff.md"), replacements),
     writeReqArtifact(langConfig.code, "history.md", path.join(reqDir, "history.md"), replacements),
@@ -1051,7 +1051,7 @@ function exportReqDirToPdf(reqAbsDir, options = {}) {
   const results = [];
 
   if (!split) {
-    const merged = buildMergedRequirementMarkdown(reqAbsDir);
+    const merged = buildMergedRequirementMarkdown(reqAbsDir, pdfOptions);
     if (!merged.markdown.trim()) {
       results.push({ action: "skip", target: dirName, message: "無可轉換的 Markdown 內容" });
       return results;

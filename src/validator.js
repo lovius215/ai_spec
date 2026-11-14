@@ -1,6 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const { extractSpecVersion } = require("./i18n");
+const { extractSpecVersion, extractStatusFromContent } = require("./i18n");
 
 const REQUIRED_DELIVERABLES = [
   "srs.md",
@@ -134,6 +134,21 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName) {
     }
   }
 
+  // Validate srs.md status and required sections
+  const srsAbs = path.join(reqAbsDir, "srs.md");
+  if (fs.existsSync(srsAbs)) {
+    const srsText = fs.readFileSync(srsAbs, "utf8");
+    if (!extractStatusFromContent(srsText)) {
+      issues.push("srs.md 缺少狀態欄位 (- 狀態：...)");
+    }
+    const hasSummary = /^##\s+.*(?:摘要|Summary|概要|요약)/im.test(srsText);
+    const hasFunctional = /^##\s+.*(?:功能需求|Functional Requirements|機能要件|기능 요구사항)/im.test(srsText);
+    const hasAcceptance = /^##\s+.*(?:驗收|验收|受入|인수|Acceptance)/im.test(srsText);
+    if (!hasSummary || !hasFunctional || !hasAcceptance) {
+      issues.push("srs.md 缺少關鍵章節（需包含摘要、功能需求、驗收條件）");
+    }
+  }
+
   // Validate handoff.md key sections (multi-language aware)
   const handoffAbs = path.join(reqAbsDir, "handoff.md");
   if (fs.existsSync(handoffAbs)) {
@@ -155,6 +170,9 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName) {
     const explicitNoApi = /(?:無\s*API|No API|無需\s*API|无\s*API|API\s*不要|API\s*불필요)/i.test(openapiText);
     if (!explicitNoApi && (!/^openapi\s*:/m.test(openapiText) || !/^paths\s*:/m.test(openapiText))) {
       issues.push("openapi.yaml 缺少 openapi: 或 paths: 宣告");
+    }
+    if (/^\s*title\s*:[ \t]*(?!["'\s])[^\n]*:[ \t]/m.test(openapiText)) {
+      issues.push("openapi.yaml 的 title 欄位含未加引號的冒號，將導致 YAML 解析失敗");
     }
   }
 

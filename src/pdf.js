@@ -97,7 +97,9 @@ function parseInline(text) {
     return `\x00CODE_${idx}\x00`;
   });
 
+  processed = processed.replace(/<br\s*\/?>/gi, "\x00BR\x00");
   processed = escapeHtml(processed);
+  processed = processed.replace(/\x00BR\x00/g, "<br/>");
 
   // Images: ![alt](src)
   processed = processed.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) => {
@@ -265,32 +267,61 @@ function markdownToHtmlBody(markdown, options = {}) {
       continue;
     }
 
-    // Unordered or Ordered List
+    // Unordered or Ordered List (supports nested indentation)
     const ulMatch = line.match(/^(\s*)([-*+])\s+(.+)$/);
     const olMatch = line.match(/^(\s*)(\d+)\.\s+(.+)$/);
     if (ulMatch || olMatch) {
-      const isOrdered = Boolean(olMatch);
-      const tag = isOrdered ? "ol" : "ul";
-      const items = [];
+      const renderListItem = (rawText) => {
+        const taskMatch = rawText.match(/^\[([ xX])\]\s+(.+)$/);
+        if (taskMatch) {
+          const checked = taskMatch[1].toLowerCase() === "x";
+          return `<input type="checkbox" disabled ${checked ? "checked" : ""} /> ${parseInline(taskMatch[2])}`;
+        }
+        return parseInline(rawText);
+      };
+
+      const stack = [];
+      let listHtml = "";
       while (i < lines.length) {
         const cur = lines[i];
         const mUl = cur.match(/^(\s*)([-*+])\s+(.+)$/);
         const mOl = cur.match(/^(\s*)(\d+)\.\s+(.+)$/);
-        const m = isOrdered ? mOl : mUl;
+        const m = mUl || mOl;
         if (!m) break;
-        let itemText = m[3];
-        // Task list checkbox
-        const taskMatch = itemText.match(/^\[([ xX])\]\s+(.+)$/);
-        if (taskMatch) {
-          const checked = taskMatch[1].toLowerCase() === "x";
-          itemText = `<input type="checkbox" disabled ${checked ? "checked" : ""} /> ${parseInline(taskMatch[2])}`;
+
+        const indent = m[1].replace(/\t/g, "  ").length;
+        const tag = mOl ? "ol" : "ul";
+        const content = renderListItem(m[3]);
+
+        if (stack.length === 0) {
+          listHtml += `<${tag}><li>${content}`;
+          stack.push({ indent, tag });
         } else {
-          itemText = parseInline(itemText);
+          const top = stack[stack.length - 1];
+          if (indent >= top.indent + 2) {
+            listHtml += `<${tag}><li>${content}`;
+            stack.push({ indent, tag });
+          } else {
+            while (stack.length > 1 && indent < stack[stack.length - 1].indent) {
+              const popped = stack.pop();
+              listHtml += `</li></${popped.tag}>`;
+            }
+            if (stack[stack.length - 1].tag !== tag) {
+              const popped = stack.pop();
+              listHtml += `</li></${popped.tag}><${tag}><li>${content}`;
+              stack.push({ indent, tag });
+            } else {
+              listHtml += `</li><li>${content}`;
+            }
+          }
         }
-        items.push(`<li>${itemText}</li>`);
         i++;
       }
-      out.push(`<${tag}>${items.join("")}</${tag}>`);
+      while (stack.length > 0) {
+        const popped = stack.pop();
+        listHtml += `</li></${popped.tag}>`;
+      }
+      out.push(listHtml);
       continue;
     }
 
@@ -651,16 +682,26 @@ function convertMarkdownFileToPdf(mdFilePath, outputPdfPath, customBrowserPath, 
   return renderHtmlToPdf(html, targetPdf, customBrowserPath);
 }
 
-function buildMergedRequirementMarkdown(reqDir) {
+const MERGED_PDF_LABELS = {
+  "zh-tw": { openapi: "OpenAPI 介面規格", uml: "UML 圖表規格" },
+  en: { openapi: "OpenAPI Specification", uml: "UML Diagrams" },
+  "zh-cn": { openapi: "OpenAPI 接口规格", uml: "UML 图表规格" },
+  ja: { openapi: "OpenAPI インターフェース仕様", uml: "UML ダイアグラム仕様" },
+  ko: { openapi: "OpenAPI 인터페이스 사양", uml: "UML 다이어그램 사양" }
+};
+
+function buildMergedRequirementMarkdown(reqDir, options = {}) {
   const dirName = path.basename(reqDir);
+  const langKey = String(options.lang || "zh-TW").toLowerCase().trim();
+  const labels = MERGED_PDF_LABELS[langKey] || MERGED_PDF_LABELS["zh-tw"];
   const sections = [];
 
   const mdOrder = [
-    { file: "srs.md", label: "SRS 需求規格書" },
-    { file: "db-schema.md", label: "DB Schema 資料庫規格" },
-    { file: "openapi.yaml", label: "OpenAPI 介面規格", isYaml: true },
-    { file: "handoff.md", label: "Handoff 開發交接摘要" },
-    { file: "history.md", label: "History 版本歷程" }
+    { file: "srs.md" },
+    { file: "db-schema.md" },
+    { file: "openapi.yaml", label: labels.openapi, isYaml: true },
+    { file: "handoff.md" },
+    { file: "history.md" }
   ];
 
   for (const item of mdOrder) {
@@ -687,7 +728,7 @@ function buildMergedRequirementMarkdown(reqDir) {
         const pumlContent = fs.readFileSync(path.join(umlDir, f), "utf8").trim();
         return `## \`uml/${f}\`\n\n\`\`\`plantuml\n${pumlContent}\n\`\`\``;
       });
-      sections.push(`# UML 圖表規格 (\`uml/\`)\n\n${umlBlocks.join("\n\n")}`);
+      sections.push(`# ${labels.uml} (\`uml/\`)\n\n${umlBlocks.join("\n\n")}`);
     }
   }
 

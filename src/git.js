@@ -123,6 +123,19 @@ function getLatestMaxReqId(cwd, projectDir, mainBranch, remoteName = "origin") {
     }
   }
 
+  const refScopes = ["refs/heads", ...(remoteName ? [`refs/remotes/${remoteName}`] : [])];
+  const refsRes = spawnSync("git", ["for-each-ref", "--format=%(refname:short)", ...refScopes], {
+    cwd,
+    encoding: "utf8"
+  });
+  if (refsRes.status === 0 && refsRes.stdout) {
+    for (const rawRef of refsRes.stdout.split("\n")) {
+      const ref = rawRef.trim();
+      if (!ref || (remoteName && ref === `${remoteName}/HEAD`)) continue;
+      maxIdNum = scanTreeDirsForMaxReqId(cwd, ref, maxIdNum);
+    }
+  }
+
   return maxIdNum;
 }
 
