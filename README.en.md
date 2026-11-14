@@ -26,7 +26,7 @@ The AI workflow operates on five standard commands (with shorthand aliases):
 
 | Command | Alias | Purpose | Description |
 |---|---|---|---|
-| `spec:init` | `sci` | Initialize | Sets up `AGENTS.md`, system rules, and prompts for the target language. |
+| `spec:init` | `sci` | Initialize | Sets up `AGENTS.md`, loads CLI built-in rules (`sa-spec instructions init`), and prompts for the target language. |
 | `spec:propose` | `scp` | Propose | Summarizes objectives, user stories, workflows, and open items without altering existing requirements. |
 | `spec:analyze` | `sca` | Analyze & Draft | Checks for conflicts against existing requirements, APIs, and DB schemas; drafts SRS, UML, OpenAPI, and DB schema. |
 | `spec:commit` | `scc` | Commit & Archive | Archives the user-verified version, assigns sequential ID, updates indexes, and generates a local Git commit. |
@@ -100,15 +100,18 @@ sa-spec --version
 
 | Command | Description |
 |---|---|
-| `sa-spec init [--full] [--lang <lang>]` | Scaffolds the workspace skeleton (Supports `zh-TW`, `en`, `zh-CN`, `ja`, `ko`). |
+| `sa-spec init [--full] [--lang <lang>]` | Scaffolds a clean workspace skeleton without exposing `skills/` or `rules/` folders (`--full` kept for compatibility; rules are served via CLI). Supports `zh-TW`, `en`, `zh-CN`, `ja`, `ko`. |
 | `sa-spec new [--id REQ-001] --name login [--branch]` | Creates a requirement folder template. Omitting `--id` starts a draft in a feature branch (`feat/<name>`). |
 | `sa-spec finalize --name login` | Assigns the latest available sequential ID to a draft requirement, renames directory, substitutes `{{REQ_ID}}`, and regenerates index. |
+| `sa-spec instructions [stage] [--with-rules] [--json]` | Prints live workspace context, workflow steps, and built-in `SKILL.md` guidance for a stage (`init`, `propose`, `analyze`, `commit`, `pdf`). |
+| `sa-spec rules [name\|all] [--list] [--json]` | Reads or lists built-in analysis rule documents bundled in the package. |
+| `sa-spec templates [name] [--list] [--json]` | Reads or lists built-in document and PlantUML templates bundled in the package. |
 | `sa-spec pdf <target> [--split] [--output out.pdf]` | Converts a `.md` file or requirement (`REQ-001`) to a merged or split PDF (`--all` exports all). |
 | `sa-spec reindex` | Scans `project/REQ-*` directories and dynamically rebuilds `project/index.md` sorted by numerical ID. |
-| `sa-spec check` | Validates required project files and system spec status. |
+| `sa-spec check` | Validates required project files, checks duplicate IDs, and warns on legacy `skills/` or `rules/` folders. |
 | `sa-spec status` | Displays overview status of requirements and specs. |
 | `sa-spec doctor` | Diagnostic tool to verify workspace integrity. |
-| `sa-spec upgrade [--dry-run]` | Upgrades project rules, templates, and agent configs to the latest version while preserving existing language. |
+| `sa-spec upgrade [--dry-run] [--keep-legacy]` | Upgrades `AGENTS.md`, removes legacy managed `skills/` and `rules/` files (preserving custom files and language), and migrates legacy `uml.puml`. Alias: `sa-spec update`. |
 
 ---
 

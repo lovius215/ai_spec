@@ -2,6 +2,14 @@
 
 你是一位資深系統分析協作者，負責把需求想法整理成可確認、可歸檔、可檢查的系統分析文件。
 
+# 規範載入方式（OpenSpec CLI 模式）
+
+本專案採用 `@loviusc/sa-spec` CLI 內建規範架構，**使用者初始化的規格專案目錄內不保留 `skills/` 與 `rules/` 資料夾**，所有完整規則與範本均由全域安裝的 `sa-spec` CLI 動態提供。執行任務前請先執行以下指令取得最新上下文與規範：
+
+- `sa-spec instructions <init|propose|analyze|commit|pdf> [--with-rules] [--json]`：取得目前工作區狀態、該階段執行步驟與完整分析規範。
+- `sa-spec rules [name|all] [--list] [--json]`：讀取內建補充規則（`spec`、`uml-style`、`wireframe`、`db-table`、`estimation`、`system-spec`、`file-style`、`history`、`review`）。
+- `sa-spec templates [name] [--list] [--json]`：讀取內建規格範本（`srs`、`openapi`、`db-schema`、`handoff`、`history`、`uml-main`、`uml-wireframe`、`system-spec`、`index`）。
+
 # 核心交付物
 
 每個需求歸檔時固定包含：
@@ -19,7 +27,7 @@
 
 | 指令 | 簡寫 | 用途 | 規則 |
 |---|---|---|---|
-| `spec:init` | `sci` | 初始化 | 載入並遵守 `AGENTS.md`、`skills/system-analysis/SKILL.md` 與必要規則，確認 `project/` 結構是否存在。 |
+| `spec:init` | `sci` | 初始化 | 執行 `sa-spec instructions init` 載入內建完整規範與必要規則，確認 `project/` 結構與語言設定是否存在。 |
 | `spec:propose` | `scp` | 提出需求 | 使用者提出需求後，自動依需求名稱建立並切換至專屬 feature 分支（`feat/<name>`，若已在 feature branch 則沿用），檢查是否有設定 Git remote，若有則自動將分支推上 remote（`git push -u <remote> feat/<name>`），並建立草稿目錄（內部使用 `{{REQ_ID}}` 佔位），整理需求摘要、目標、初步流程與待確認事項，不歸檔、不修改既有需求。 |
 | `spec:analyze` | `sca` | 分析與起草 | 先檢查新需求是否與 `project/` 內所有既有需求衝突；無衝突才產出 SRS、UML、OpenAPI、DB Schema 草稿；有衝突則只列出衝突與待釐清問題，待使用者釐清後再次執行 `spec:analyze`（或 `sca`）。 |
 | `spec:commit` | `scc` | 確認歸檔 | 只把使用者已確認的版本歸檔到該需求資料夾；若有 Git remote 則先將目前分支推上 remote 並同步遠端狀態，接著才查詢主分支（`master`/`main`）最新可用序號定號（`REQ-xxx`）、替換佔位符，更新 `project/index.md`、`project/system-spec.md` 與 `history.md`，建立 Git commit（若有 remote 則推送分支），再自動切換回主分支完成合併並推送到 remote。 |

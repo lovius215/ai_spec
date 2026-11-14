@@ -20,7 +20,7 @@ description: 用 init、propose、analyze、commit 四段流程整理需求，�
 
 | 指令 | 簡寫 | 用途 | 執行規則 |
 |---|---|---|---|
-| `spec:init` | `sci` | 初始化 | 載入並遵守 `AGENTS.md`、本 skill 與必要規則，確認 `project/` 結構是否存在。 |
+| `spec:init` | `sci` | 初始化 | 載入並遵守 `AGENTS.md` 與 `sa-spec` CLI 內建完整規範（`sa-spec instructions` / `sa-spec rules`），確認 `project/` 結構是否存在。 |
 | `spec:propose` | `scp` | 提出需求 | 使用者提出需求後，自動依需求名稱建立並切換至專屬 feature 分支（`feat/<name>`，若已在 feature branch 則沿用），檢查是否有設定 Git remote，若有則自動將分支推上 remote（`git push -u <remote> feat/<name>`），並建立草稿目錄（內部使用 `{{REQ_ID}}` 佔位），整理需求摘要、目標、初步流程與待確認事項；不歸檔、不修改既有需求。 |
 | `spec:analyze` | `sca` | 分析與起草 | 先檢查新需求是否與 `project/` 內所有既有需求衝突；無衝突才產出 SRS、UML、OpenAPI、DB Schema 草稿；有衝突則只列出衝突與待釐清問題，待使用者釐清後再次執行 `spec:analyze`（或 `sca`）。 |
 | `spec:commit` | `scc` | 確認歸檔 | 只把使用者已確認的版本歸檔到該需求資料夾；若有 Git remote 則先將目前分支推上 remote 並同步遠端狀態，接著才查詢主分支（`master`/`main`）最新可用序號定號（`REQ-xxx`）、替換佔位符，更新 `project/index.md`、`project/system-spec.md` 與 `history.md`，建立 Git commit（若有 remote 則推送分支），再自動切換回主分支完成合併並推送到 remote。 |

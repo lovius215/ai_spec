@@ -26,7 +26,7 @@ AI ワークフローは 5 つの標準コマンド（エイリアス対応）�
 
 | コマンド | エイリアス | 目的 | 説明 |
 |---|---|---|---|
-| `spec:init` | `sci` | 初期化 | `AGENTS.md`、ルールセット、指定言語のプロンプトを読み込みます。 |
+| `spec:init` | `sci` | 初期化 | `AGENTS.md` と CLI 組み込みルール（`sa-spec instructions init`）を読み込み、言語設定を確定します。 |
 | `spec:propose` | `scp` | 要件提案 | 既存の仕様を変更せず、目的・概要・初期フロー・確認事項を整理します。 |
 | `spec:analyze` | `sca` | 分析と起草 | 既存の要件、API、DB スキーマとの競合をチェックし、問題がなければ SRS、UML、OpenAPI、DB スキーマのドラフトを作成します。 |
 | `spec:commit` | `scc` | 確認と保存 | ユーザーが承認したバージョンを正式に採番・保存し、インデックスを更新して Git コミットを作成します。 |
@@ -100,15 +100,18 @@ sa-spec --version
 
 | コマンド | 説明 |
 |---|---|
-| `sa-spec init [--full] [--lang <lang>]` | ワークスペースの骨格を初期化します（`zh-TW`、`en`、`zh-CN`、`ja`、`ko` に対応）。 |
+| `sa-spec init [--full] [--lang <lang>]` | `skills/` や `rules/` をプロジェクトに出力せずクリーンな骨格を初期化します（`--full` は互換用・5 言語対応）。 |
 | `sa-spec new [--id REQ-001] --name login [--branch]` | 要件テンプレートを作成します。`--id` を省略すると、Git 分岐を活用したドラフトモード（`feat/<name>`）で開始します。 |
 | `sa-spec finalize --name login` | ドラフト要件に最新の連続番号を割り当て、フォルダー名を変更し、`{{REQ_ID}}` を置換してインデックスを再生成します。 |
+| `sa-spec instructions [stage] [--with-rules] [--json]` | 現在のワークスペース状態と各段階（`init` / `propose` / `analyze` / `commit` / `pdf`）の組み込み規範を出力します。 |
+| `sa-spec rules [name\|all] [--list] [--json]` | パッケージに組み込まれた補助ルールの一覧表示または内容参照を行います。 |
+| `sa-spec templates [name] [--list] [--json]` | パッケージに組み込まれたドキュメント／PlantUML テンプレートの一覧または内容を表示します。 |
 | `sa-spec pdf <target> [--split] [--output out.pdf]` | 指定した `.md` または要件（`REQ-001`）を統合または個別 PDF として出力します（`--all` で全件出力）。 |
 | `sa-spec reindex` | `project/REQ-*` ディレクトリをスキャンし、数値順にソートされた `project/index.md` を自動再構築します。 |
-| `sa-spec check` | 必須ファイルとシステム仕様の状態を検証します。 |
+| `sa-spec check` | 必須ファイル・番号重複・旧版 `skills/` や `rules/` の残存を検証します。 |
 | `sa-spec status` | 要件とシステム仕様の概要ステータスを表示します。 |
 | `sa-spec doctor` | ワークスペースの依存関係と整合性を診断します。 |
-| `sa-spec upgrade [--dry-run]` | 既存の言語設定を保持したまま、ルールとスキルを最新版にアップグレードします。 |
+| `sa-spec upgrade [--dry-run] [--keep-legacy]` | `AGENTS.md` を更新し、旧版パッケージ管理下の `skills/`・`rules/` を削除（独自ファイルと言語は保持）し、旧 `uml.puml` を移行します。別名：`sa-spec update`。 |
 
 ---
 

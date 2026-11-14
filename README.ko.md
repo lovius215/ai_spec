@@ -26,7 +26,7 @@ AI 워크플로는 5가지 표준 명령어(별칭 지원)를 기반으로 동�
 
 | 표준 명령어 | 별칭 | 단계 | 설명 |
 |---|---|---|---|
-| `spec:init` | `sci` | 초기화 | `AGENTS.md`, 시스템 규칙 및 지정된 언어 프롬프트를 로드합니다. |
+| `spec:init` | `sci` | 초기화 | `AGENTS.md`와 CLI 내장 규범(`sa-spec instructions init`)을 로드하고 프로젝트 언어를 확정합니다. |
 | `spec:propose` | `scp` | 요구사항 제안 | 기존 사양을 변경하지 않고 목표, 요약, 초기 흐름 및 미확인 사항을 정리합니다. |
 | `spec:analyze` | `sca` | 분석 및 초안 작성 | 기존 요구사항, API, DB와의 충돌 여부를 검사하고, 문제가 없을 때만 SRS, UML, OpenAPI, DB Schema 초안을 작성합니다. |
 | `spec:commit` | `scc` | 확인 및 보관 | 사용자가 승인한 버전을 정식 번호로 보관하고, 인덱스를 갱신하며 로컬 Git 커밋을 생성합니다. |
@@ -100,15 +100,18 @@ sa-spec --version
 
 | 명령어 | 설명 |
 |---|---|
-| `sa-spec init [--full] [--lang <lang>]` | 워크스페이스 골격을 생성합니다 (`zh-TW`, `en`, `zh-CN`, `ja`, `ko` 지원, 기본값 `zh-TW`). |
+| `sa-spec init [--full] [--lang <lang>]` | 프로젝트 디렉토리에 `skills/`·`rules/`를 노출하지 않고 깔끔한 워크스페이스 골격을 생성합니다 (`--full`은 하위 호환용, 5개 언어 지원). |
 | `sa-spec new [--id REQ-001] --name login [--branch]` | 요구사항 템플릿 폴더를 생성합니다. `--id` 생략 시 다중 사용자 초안 브랜치(`feat/<name>`)로 생성됩니다. |
 | `sa-spec finalize --name login` | 초안 요구사항에 최신 연속 번호를 할당하고 폴더명 변경, `{{REQ_ID}}` 치환 및 인덱스를 자동 재구축합니다. |
+| `sa-spec instructions [stage] [--with-rules] [--json]` | 현재 워크스페이스 상태 및 단계별(`init` / `propose` / `analyze` / `commit` / `pdf`) 내장 분석 규범을 출력합니다. |
+| `sa-spec rules [name\|all] [--list] [--json]` | 패키지에 내장된 보조 규칙 문서를 조회하거나 목록을 출력합니다. |
+| `sa-spec templates [name] [--list] [--json]` | 패키지에 내장된 문서 및 PlantUML 템플릿 목록/내용을 조회합니다. |
 | `sa-spec pdf <target> [--split] [--output out.pdf]` | 지정한 `.md` 파일 또는 요구사항(`REQ-001`)을 통합 또는 개별 PDF로 변환합니다 (`--all` 전체 내보내기). |
 | `sa-spec reindex` | `project/REQ-*` 디렉토리를 스캔하여 번호순으로 정렬된 `project/index.md`를 동적으로 재생성합니다. |
-| `sa-spec check` | 필수 파일과 시스템 사양 상태를 검증합니다. |
+| `sa-spec check` | 필수 파일, 일련번호 중복 및 구버전 `skills/`·`rules/` 잔존 여부를 검증합니다. |
 | `sa-spec status` | 요구사항 및 시스템 사양 현황을 확인합니다. |
 | `sa-spec doctor` | 워크스페이스 무결성 및 필수 의존 파일을 진단합니다. |
-| `sa-spec upgrade [--dry-run]` | 기존 프로젝트의 언어 설정을 유지하면서 규칙과 스킬을 최신 버전으로 업그레이드합니다. |
+| `sa-spec upgrade [--dry-run] [--keep-legacy]` | `AGENTS.md`를 업데이트하고 구버전 패키지 관리 `skills/`·`rules/`를 삭제(사용자 정의 파일 및 언어 설정 보존)하며 구버전 `uml.puml`을 마이그레이션합니다. 별칭: `sa-spec update`. |
 
 ---
 

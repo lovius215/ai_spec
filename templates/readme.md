@@ -23,8 +23,8 @@
 # 1. Global installation via npm
 npm install -g @loviusc/sa-spec
 
-# 2. Initialize project specification rules (supports zh-TW, en, zh-CN, ja, ko)
-sa-spec init --full
+# 2. Initialize clean project spec workspace (supports zh-TW, en, zh-CN, ja, ko)
+sa-spec init
 ```
 
 **🤖 Core AI Workflow in Chat (VS Code / Claude / Antigravity / Cursor):**
@@ -242,35 +242,26 @@ sa-spec help
 sa-spec init
 ```
 
-這會建立最小文件骨架：
+這會建立乾淨的文件骨架：
 
 ```text
 AGENTS.md
 readme.md
-skills/
-  system-analysis/
-    SKILL.md
 project/
   index.md
   system-spec.md
 ```
 
-若想同時建立完整規則文件：
-
-```bash
-sa-spec init --full
-```
+完整分析規範（原 `SKILL.md`）與補充規則（`spec`、`uml-style`、`wireframe`、`db-table`、`estimation`、`system-spec`、`file-style`、`history`、`review`）皆已內建於 `@loviusc/sa-spec` CLI 中，AI 與開發者可透過 `sa-spec instructions`、`sa-spec rules` 與 `sa-spec templates` 即時讀取；**專案目錄內不會出現 `skills/` 與 `rules/` 資料夾**，保持規格專案整潔，並確保規範隨套件更新即時生效。
 
 `spec:init` 規則會檢查 Git 狀態；若目前資料夾還不是 Git repository，會自動執行 `git init`。
 
-### `init` 與 `init --full` 差異
+### `init` 與 `--full` 相容說明
 
-| 指令 | 會建立什麼 | 適合情境 |
+| 指令 | 會建立什麼 | 說明 |
 |---|---|---|
-| `sa-spec init` | 最小文件骨架：`AGENTS.md`、`readme.md`、`skills/system-analysis/SKILL.md`、`project/index.md`、`project/system-spec.md`。 | 想快速開始整理需求，先保持規則簡單。 |
-| `sa-spec init --full` | 最小文件骨架，加上 `rules/` 內的 SRS、審核、UML、DB Table、估算、檔案格式等補充規則。 | 想讓 AI 產出的文件格式更一致，或團隊需要比較完整的檢查依據。 |
-
-`rules/` 是補充規則，不是強制流程。即使使用 `sa-spec init --full` 建立完整規則，用戶也可以先不使用或之後自行刪除 `rules/`；基本流程仍會依 `AGENTS.md` 與 `skills/system-analysis/SKILL.md` 運作。
+| `sa-spec init` | 乾淨工作區骨架：`AGENTS.md`、`readme.md`、`project/index.md`、`project/system-spec.md`。 | 推薦用法；完整系統分析規範與補充規則改由 CLI 內建動態提供。 |
+| `sa-spec init --full` | 同上（為向下相容保留參數，不額外建立 `skills/` 與 `rules/`）。 | 既有腳本或習慣指令可繼續執行，完整規則同樣透過 `sa-spec instructions` / `sa-spec rules` 取得。 |
 
 簡單範例：
 
@@ -281,27 +272,24 @@ sa-spec init
 sa-spec check
 ```
 
-若後來發現需要更完整的審核與文件規則，可以在同一個資料夾補上：
-
-```bash
-sa-spec init --full
-```
-
-既有檔案不會被覆蓋；已存在的檔案會顯示為 `SKIPPED`，缺少的規則檔才會被建立。
+既有檔案不會被覆蓋；已存在的檔案會顯示為 `SKIPPED`。若想升級舊版已包含 `skills/` 與 `rules/` 的專案，執行 `sa-spec upgrade`（可先加 `--dry-run` 預覽）即可更新 `AGENTS.md` 並自動清除套件內建管理的舊版 `skills/` 與 `rules/` 檔案（專案內自訂的非預設檔案會保留並發出提示）。
 
 ## CLI 指令
 
 | 指令 | 用途 |
 |---|---|
-| `sa-spec init [--full] [--lang zh-TW|en|zh-CN|ja|ko]` | 建立文件骨架與規則文件（支援 5 種語言，預設 `zh-TW`）。 |
+| `sa-spec init [--full] [--lang zh-TW|en|zh-CN|ja|ko]` | 建立乾淨的專案文件骨架（支援 5 種語言，預設 `zh-TW`；所有規範改由 CLI 內建提供，不建立 `skills/` 與 `rules/`）。 |
 | `sa-spec new [--id REQ-001] --name login [--branch]` | 建立需求資料夾與空白文件模板（未帶 `--id` 時啟用多人草稿模式，可選 `--branch` 自動建立並切換至 `feat/<name>` 分支）。 |
 | `sa-spec finalize --name login` | 將草稿需求定號歸檔為最新序號（自動計算最新號碼、重命名目錄、批次置換 `{{REQ_ID}}` 並重建索引）。 |
+| `sa-spec instructions [init\|propose\|analyze\|commit\|pdf] [--with-rules] [--json]` | 輸出目前工作區狀態、對應階段步驟與套件內建完整系統分析規範（供 AI 動態讀取）。 |
+| `sa-spec rules [name\|all] [--list] [--json]` | 讀取或列出套件內建補充規則（`spec`、`uml-style`、`wireframe`、`db-table`、`estimation`、`system-spec`、`file-style`、`history`、`review`）。 |
+| `sa-spec templates [name] [--list] [--json]` | 讀取或列出套件內建規格與圖表範本（`srs`、`openapi`、`db-schema`、`handoff`、`history`、`uml-main`、`uml-wireframe` 等）。 |
 | `sa-spec pdf <target> [--split] [--output out.pdf]` | 將指定 `.md` 轉為同名 `.pdf`，或將需求編號/目錄（如 `REQ-001`）整包合併匯出成一份完整規格書 PDF（加 `--split` 則各檔獨立轉出，`--all` 匯出全專案）。 |
 | `sa-spec reindex` | 掃描 `project/REQ-*` 目錄，依序號重新生成乾淨無衝突的 `project/index.md`。 |
-| `sa-spec check` | 檢查基本文件是否存在。 |
+| `sa-spec check` | 檢查基本文件是否存在，並提示是否殘留舊版 `skills/` 或 `rules/`。 |
 | `sa-spec status` | 顯示系統規格與需求索引狀態。 |
 | `sa-spec doctor` | 檢查必要檔案是否存在。 |
-| `sa-spec upgrade [--dry-run]` | 將既有專案升級為最新版本：同步最新 AGENTS 與規則文件，並將既有需求中的 `uml.puml` 自動遷移為 `uml/main.puml`。 |
+| `sa-spec upgrade [--dry-run] [--keep-legacy]` | 將既有專案升級為最新版本：更新 `AGENTS.md`、自動刪除舊版套件管理的 `skills/` 與 `rules/`（可用 `--keep-legacy` 保留），並將既有需求中的 `uml.puml` 自動遷移為 `uml/main.puml`。（別名：`sa-spec update`） |
 
 `sa-spec new` 是快速建空白模板的輔助工具。正式需求流程仍建議使用 `spec:init`、`spec:propose`、`spec:analyze`、`spec:commit`。
 
@@ -339,10 +327,11 @@ Markdown、PlantUML、YAML、GitLens 這類套件可以提升閱讀與檢查體�
 
 | 類型 | 指令範例 | 使用位置 | 用途 |
 |---|---|---|---|
-| CLI | `sa-spec init --full` | 終端機或 VS Code Terminal | 建立文件骨架與規則檔。 |
+| CLI | `sa-spec init` | 終端機或 VS Code Terminal | 建立乾淨的文件工作區骨架。 |
 | CLI | `sa-spec check` | 終端機或 VS Code Terminal | 檢查必要文件是否存在。 |
 | CLI | `sa-spec status` | 終端機或 VS Code Terminal | 查看系統規格與需求索引狀態。 |
-| AI 工作流程 | `spec:init` / `sci` | VS Code AI 對話側邊欄 | 載入規則並確認工作區狀態。 |
+| CLI | `sa-spec instructions sca` | 終端機或 AI 代理工具 | 動態取得階段步驟與內建分析規範。 |
+| AI 工作流程 | `spec:init` / `sci` | VS Code AI 對話側邊欄 | 載入內建規則並確認工作區狀態。 |
 | AI 工作流程 | `spec:propose` / `scp` | VS Code AI 對話側邊欄 | 整理使用者提出的需求。 |
 | AI 工作流程 | `spec:analyze` / `sca` | VS Code AI 對話側邊欄 | 檢查衝突並產出待確認草稿。 |
 | AI 工作流程 | `spec:commit` / `scc` | VS Code AI 對話側邊欄 | 歸檔已確認版本並建立本機 Git commit。 |
@@ -353,7 +342,7 @@ Markdown、PlantUML、YAML、GitLens 這類套件可以提升閱讀與檢查體�
 ```bash
 mkdir my-spec
 cd my-spec
-sa-spec init --full
+sa-spec init
 code .
 ```
 
@@ -372,7 +361,7 @@ spec:commit  # 或簡寫 scc
 
 | 指令 | 簡寫 | 用途 |
 |---|---|---|
-| `spec:init` | `sci` | 初始化並載入 `AGENTS.md`、`skills/system-analysis/SKILL.md` 與必要規則。 |
+| `spec:init` | `sci` | 初始化並透過 `sa-spec instructions init` 載入內建完整規範與必要規則。 |
 | `spec:propose` | `scp` | 使用者提出需求後，整理需求摘要、目標、初步流程與待確認事項。 |
 | `spec:analyze` | `sca` | 檢查是否與既有需求衝突；無衝突才產出 SRS、UML、OpenAPI、DB Schema 草稿。 |
 | `spec:commit` | `scc` | 使用者確認無衝突版本後，將版本歸檔到 `project/`，並建立本機 Git commit。 |
@@ -495,7 +484,7 @@ sa-spec reindex
    * **CLI 指令**：可直接指定語系參數，例如 `sa-spec init --lang en`。
    * **AI 工作流**：在對話中輸入 `spec:init`（或 `sci`）時，若未指定語言，**AI 必須主動列出 5 種語言選單詢問使用者**，選定後寫入 `project/system-spec.md` 作為全專案唯一的真理之源（Single Source of Truth）。
 2. **全專案語言單一純粹（Single-Language Purity）**：
-   * 選定語言後，全專案的所有產出（`srs.md`、`openapi.yaml`、`db-schema.md`、`handoff.md`、`history.md` 與 `rules/`）必須 100% 統一使用該語言，禁止在同一專案內出現語言混雜。
+   * 選定語言後，全專案的所有產出（`srs.md`、`openapi.yaml`、`db-schema.md`、`handoff.md`、`history.md`）必須 100% 統一使用該語言，禁止在同一專案內出現語言混雜。
 3. **專有名詞保留原生英文（Technical Terms Exception）**：
    * 在非英語系模式（繁中、簡中、日文、韓文）下，業界公認標準之技術術語、協定、資料格式與元件名稱（例如：`REST API`、`Webhook`、`JWT`、`OAuth 2.0`、`Payload`、`Idempotency Key`、`Redis`、`UUID` 等），**一律強制維持原生英文**，嚴禁生硬直譯。
 4. **升級保護（Upgrade Inheritance）**：
@@ -510,7 +499,7 @@ sa-spec reindex
 ```bash
 mkdir pomodoro-spec
 cd pomodoro-spec
-sa-spec init --full
+sa-spec init
 ```
 
 確認狀態：
@@ -520,7 +509,7 @@ sa-spec check
 sa-spec status
 ```
 
-預期會看到 `AGENTS.md`、`skills/system-analysis/SKILL.md`、`project/index.md`、`project/system-spec.md` 都存在。
+預期會看到 `AGENTS.md`、`project/index.md`、`project/system-spec.md` 都存在。
 
 ### 2. 啟動 AI 流程
 
@@ -748,6 +737,12 @@ git push origin master
 - 一次最多問 3 個待確認問題，優先詢問會影響範圍、資料、權限、API、DB 或驗收的問題。
 
 ## 更新紀錄
+
+### v0.2.8
+- **OpenSpec 風格 CLI 內建規範架構（隱藏工作區 `skills/` 與 `rules/`）**：
+  - **乾淨初始化架構**：執行 `sa-spec init`（含 `--full` 向下相容參數）建立的工作區不再產生 `skills/` 與 `rules/` 資料夾，僅保留 `AGENTS.md`、`readme.md` 與 `project/`，保持規格專案整潔並避免規範副本與套件更新脫鉤。
+  - **新增動態規範與範本指令**：新增 `sa-spec instructions [init|propose|analyze|commit|pdf] [--with-rules] [--json]`、`sa-spec rules [name|all] [--list] [--json]` 與 `sa-spec templates [name] [--list] [--json]`，即時由全域套件輸出工作區上下文、系統分析技能與補充規則。
+  - **舊版工作區升級自動清理**：執行 `sa-spec upgrade`（新增別名 `sa-spec update`）時，會更新 `AGENTS.md`（保留既有 `<claude-mem-context>`）、自動刪除舊版由套件產生的 `skills/` 與 `rules/`（自訂檔案會保留並發出 `WARNING` 提示，亦支援 `--dry-run` 與 `--keep-legacy`），並保護套件原始碼主目錄不被誤刪。
 
 ### v0.2.7
 - **新增 Markdown 轉 PDF 指令（`spec:pdf` / `spd` / `sa-spec pdf`）與跨平台獨立安裝腳本**：

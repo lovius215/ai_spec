@@ -26,7 +26,7 @@ AI 工作流使用五个标准指令（支持简写别名）：
 
 | 标准指令 | 简写 | 阶段 | 说明 |
 |---|---|---|---|
-| `spec:init` | `sci` | 初始化 | 加载 `AGENTS.md`、系统分析规则与指定语言的规范文件。 |
+| `spec:init` | `sci` | 初始化 | 加载 `AGENTS.md` 与 CLI 内置规范（`sa-spec instructions init`），并锁定项目主要语言。 |
 | `spec:propose` | `scp` | 提出需求 | 整理需求摘要、目标、初步流程与待确认事项，不修改已有规格。 |
 | `spec:analyze` | `sca` | 分析与起草 | 检查新需求是否与既有需求、API、DB 发生冲突；无冲突才产出 SRS、UML、OpenAPI 与 DB Schema 草案。 |
 | `spec:commit` | `scc` | 确认归档 | 用户确认后正式定号归档，更新索引与系统总表，并自动创建本地 Git commit。 |
@@ -100,15 +100,18 @@ sa-spec --version
 
 | 指令 | 说明 |
 |---|---|
-| `sa-spec init [--full] [--lang <lang>]` | 初始化工作台骨架（支持 `zh-TW`、`en`、`zh-CN`、`ja`、`ko`，默认 `zh-TW`）。 |
+| `sa-spec init [--full] [--lang <lang>]` | 初始化干净的工作区骨架，不在项目目录暴露 `skills/` 与 `rules/`（`--full` 仅作兼容保留，规范统一由 CLI 内置提供；支持 5 种语言）。 |
 | `sa-spec new [--id REQ-001] --name login [--branch]` | 创建需求模板文件夹。省略 `--id` 时自动切入多人协作草稿分支（`feat/<name>`）。 |
 | `sa-spec finalize --name login` | 将草稿需求正式定号归档为最新序号，自动重命名目录、替换 `{{REQ_ID}}` 并重构索引。 |
+| `sa-spec instructions [stage] [--with-rules] [--json]` | 输出当前工作区上下文、阶段步骤与内置完整分析规范（`init` / `propose` / `analyze` / `commit` / `pdf`）。 |
+| `sa-spec rules [name\|all] [--list] [--json]` | 读取或列出套件内置补充规则文档。 |
+| `sa-spec templates [name] [--list] [--json]` | 读取或列出套件内置文档与 PlantUML 模板。 |
 | `sa-spec pdf <target> [--split] [--output out.pdf]` | 将指定 `.md` 或需求（如 `REQ-001`）合并或拆分导出为 PDF（`--all` 导出全项目）。 |
 | `sa-spec reindex` | 扫描 `project/REQ-*` 目录，按序数字顺序动态重新生成 `project/index.md`。 |
-| `sa-spec check` | 检查项目必要文件与规格完整性。 |
+| `sa-spec check` | 检查项目必要文件、编号唯一性，并提示旧版 `skills/` 或 `rules/` 迁移。 |
 | `sa-spec status` | 查看系统规格与需求总览状态。 |
 | `sa-spec doctor` | 诊断工作区环境与必要文件依赖。 |
-| `sa-spec upgrade [--dry-run]` | 将规则与技能升级至最新版，自动保留原语言与历史上下文。 |
+| `sa-spec upgrade [--dry-run] [--keep-legacy]` | 更新 `AGENTS.md`，自动移除旧版套件托管的 `skills/` 与 `rules/`（保留自定义文件与原语言），并迁移旧版 `uml.puml`。别名：`sa-spec update`。 |
 
 ---
 
