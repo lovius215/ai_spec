@@ -1074,6 +1074,8 @@ test("#22 templates --lang validation, i18n edge cases, finalize conflict/failur
   const mergeConflictRes = runCli(conflictDir, ["finalize", "--name", "side"]);
   assert.equal(mergeConflictRes.status, 1);
   assert.match(mergeConflictRes.stderr, /\[Git 警告\] 合併至 master 發生衝突/);
+  assert.equal(execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: conflictDir, encoding: "utf8" }).trim(), "feat/side");
+  assert.equal(fs.existsSync(path.join(conflictDir, ".git", "MERGE_HEAD")), false);
 
   // 6. zh-CN upgrade avoids false wireframe warning when handoff declares 无 UI 界面需求
   const zhCnDir = makeTempDir();
@@ -1537,5 +1539,47 @@ test("#26 remaining fs.existsSync guards: init path-type conflicts, skills/rules
     assert.match(upgRes.stdout, /線框圖/);
   } finally {
     fs.rmSync(upgDir, { recursive: true, force: true });
+  }
+});
+
+test("#27 PDF renderHtmlToPdf path/status guards, --browser validation, and --split --output rejection", () => {
+  const { renderHtmlToPdf } = require("../src/pdf");
+  const pdfTmp = fs.mkdtempSync(path.join(os.tmpdir(), "sa-spec-27-pdf-"));
+  try {
+    // 1. Invalid --browser path fails explicitly instead of silently falling back
+    const badBrowserRes = renderHtmlToPdf("<h1>Hi</h1>", path.join(pdfTmp, "out.pdf"), path.join(pdfTmp, "missing-chrome"));
+    assert.equal(badBrowserRes.ok, false);
+    assert.match(badBrowserRes.error, /指定的瀏覽器路徑不存在或不是檔案/);
+
+    // 2. Output path pointing to an existing directory is rejected
+    const outDir = path.join(pdfTmp, "existing-dir");
+    fs.mkdirSync(outDir);
+    const dirOutRes = renderHtmlToPdf("<h1>Hi</h1>", outDir);
+    assert.equal(dirOutRes.ok, false);
+    assert.match(dirOutRes.error, /輸出路徑為目錄而非 PDF 檔案/);
+
+    // 3. Failing browser executable does not falsely succeed when an older PDF file exists
+    const fakeBrowser = path.join(pdfTmp, "fail-browser.sh");
+    fs.writeFileSync(fakeBrowser, "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+    const stalePdf = path.join(pdfTmp, "stale.pdf");
+    fs.writeFileSync(stalePdf, "%PDF-1.4\nstale\n", "utf8");
+    const origPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      const failRes = renderHtmlToPdf("<h1>Hi</h1>", stalePdf, fakeBrowser);
+      assert.equal(failRes.ok, false);
+      assert.equal(fs.readFileSync(stalePdf, "utf8"), "%PDF-1.4\nstale\n");
+    } finally {
+      process.env.PATH = origPath;
+    }
+
+    // 4. CLI rejects --split combined with --output
+    assert.equal(runCli(pdfTmp, ["init", "--lang", "en"]).status, 0);
+    assert.equal(runCli(pdfTmp, ["new", "--id", "REQ-001", "--name", "demo"]).status, 0);
+    const splitOutRes = runCli(pdfTmp, ["pdf", "REQ-001", "--split", "--output", "out.pdf"]);
+    assert.notEqual(splitOutRes.status, 0);
+    assert.match(splitOutRes.stderr, /--split 與 --output 不能同時使用/);
+  } finally {
+    fs.rmSync(pdfTmp, { recursive: true, force: true });
   }
 });

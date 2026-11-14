@@ -649,10 +649,14 @@ ${bodyHtml}
 }
 
 function findHeadlessBrowser(customBrowserPath) {
-  if (customBrowserPath && fs.existsSync(customBrowserPath)) {
+  if (customBrowserPath && fs.existsSync(customBrowserPath) && fs.statSync(customBrowserPath).isFile()) {
     return customBrowserPath;
   }
-  if (process.env.SA_SPEC_BROWSER && fs.existsSync(process.env.SA_SPEC_BROWSER)) {
+  if (
+    process.env.SA_SPEC_BROWSER &&
+    fs.existsSync(process.env.SA_SPEC_BROWSER) &&
+    fs.statSync(process.env.SA_SPEC_BROWSER).isFile()
+  ) {
     return process.env.SA_SPEC_BROWSER;
   }
 
@@ -702,12 +706,29 @@ function findHeadlessBrowser(customBrowserPath) {
 }
 
 function renderHtmlToPdf(htmlContent, outputPdfPath, customBrowserPath) {
+  if (
+    customBrowserPath &&
+    (!fs.existsSync(customBrowserPath) || !fs.statSync(customBrowserPath).isFile())
+  ) {
+    return {
+      ok: false,
+      error: `指定的瀏覽器路徑不存在或不是檔案: ${customBrowserPath}`
+    };
+  }
+
   const browser = findHeadlessBrowser(customBrowserPath);
   const absPdfPath = path.resolve(outputPdfPath);
+  if (fs.existsSync(absPdfPath) && fs.statSync(absPdfPath).isDirectory()) {
+    return {
+      ok: false,
+      error: `輸出路徑為目錄而非 PDF 檔案: ${absPdfPath}`
+    };
+  }
   fs.mkdirSync(path.dirname(absPdfPath), { recursive: true });
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sa-spec-pdf-"));
   const tmpHtmlPath = path.join(tmpDir, "spec.html");
+  const tmpPdfPath = path.join(tmpDir, "output.pdf");
   fs.writeFileSync(tmpHtmlPath, htmlContent, "utf8");
 
   try {
@@ -722,7 +743,7 @@ function renderHtmlToPdf(htmlContent, outputPdfPath, customBrowserPath) {
         "--no-default-browser-check",
         `--user-data-dir=${profileDir}`,
         "--no-pdf-header-footer",
-        `--print-to-pdf=${absPdfPath}`,
+        `--print-to-pdf=${tmpPdfPath}`,
         fileUrl
       ];
 
@@ -732,14 +753,18 @@ function renderHtmlToPdf(htmlContent, outputPdfPath, customBrowserPath) {
         timeout: 30000
       });
 
-      if (res.status !== 0 || !fs.existsSync(absPdfPath)) {
+      if (res.status !== 0 || !fs.existsSync(tmpPdfPath) || !fs.statSync(tmpPdfPath).isFile()) {
+        if (fs.existsSync(tmpPdfPath) && fs.statSync(tmpPdfPath).isFile()) {
+          fs.unlinkSync(tmpPdfPath);
+        }
         res = spawnSync(browser, ["--headless", ...commonFlags], {
           encoding: "utf8",
           timeout: 30000
         });
       }
 
-      if (fs.existsSync(absPdfPath)) {
+      if (res.status === 0 && fs.existsSync(tmpPdfPath) && fs.statSync(tmpPdfPath).isFile()) {
+        fs.copyFileSync(tmpPdfPath, absPdfPath);
         return { ok: true, engine: path.basename(browser), pdfPath: absPdfPath };
       }
     }
@@ -749,11 +774,12 @@ function renderHtmlToPdf(htmlContent, outputPdfPath, customBrowserPath) {
     const wkWhich = spawnSync(whichCmd, ["wkhtmltopdf"], { encoding: "utf8" });
     if (wkWhich.status === 0 && wkWhich.stdout.trim()) {
       const wkBin = wkWhich.stdout.trim().split(/\r?\n/)[0].trim();
-      const wkRes = spawnSync(wkBin, ["--enable-local-file-access", tmpHtmlPath, absPdfPath], {
+      const wkRes = spawnSync(wkBin, ["--enable-local-file-access", tmpHtmlPath, tmpPdfPath], {
         encoding: "utf8",
         timeout: 30000
       });
-      if (wkRes.status === 0 && fs.existsSync(absPdfPath)) {
+      if (wkRes.status === 0 && fs.existsSync(tmpPdfPath) && fs.statSync(tmpPdfPath).isFile()) {
+        fs.copyFileSync(tmpPdfPath, absPdfPath);
         return { ok: true, engine: "wkhtmltopdf", pdfPath: absPdfPath };
       }
     }

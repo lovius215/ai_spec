@@ -680,8 +680,10 @@ function finalizeReq(args) {
             ` 全部歸檔流程完成！已自動領取新號 ${nextId} 並自動合併回主分支 ${mainBranch}${remote ? ` 且推送至 ${remote}` : ""}。`
           );
         } else {
+          spawnSync("git", ["merge", "--abort"], { cwd, encoding: "utf8" });
+          spawnSync("git", ["checkout", currentBranch], { cwd, encoding: "utf8" });
           console.error(
-            `[Git 警告] 合併至 ${mainBranch} 發生衝突，請手動確認衝突狀況：\n${(mergeRes.stderr || mergeRes.stdout || "").trim()}`
+            `[Git 警告] 合併至 ${mainBranch} 發生衝突，已中止合併並切回 ${currentBranch}，請手動確認衝突狀況：\n${(mergeRes.stderr || mergeRes.stdout || "").trim()}`
           );
           process.exitCode = 1;
         }
@@ -1407,6 +1409,10 @@ function runPdf(args = []) {
 
   const positional = getPositionalArgs(args, ["--output", "--browser"]);
   const target = positional[0];
+  if (split && output) {
+    fail("錯誤: --split 與 --output 不能同時使用（--split 會為每個 Markdown 檔案分別產生對應的 PDF）。");
+    return;
+  }
   if (!all && !target) {
     fail(
       "Usage: sa-spec pdf <file.md|REQ-001|name> [--split] [--output out.pdf] [--browser <path>] [--online-uml | --no-uml-render]\n       sa-spec pdf --all [--split] [--online-uml | --no-uml-render]"
