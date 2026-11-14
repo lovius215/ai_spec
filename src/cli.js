@@ -9,6 +9,7 @@ const {
 } = require("./pdf");
 const {
   SUPPORTED_LANGS,
+  formatLocalDate,
   getLangStrings,
   detectProjectLanguage,
   extractStatusFromContent,
@@ -262,8 +263,24 @@ function writeReqArtifact(langCode, relType, targetRelPath, replacements) {
   return ensureFileFromTemplate(path.join("project", "req", relType), targetRelPath, replacements);
 }
 
+function resolveReqIdOrFail(rawId) {
+  const trimmed = String(rawId || "").trim();
+  const match = trimmed.match(/^(?:REQ-)?(\d+)$/i);
+  if (!match) {
+    fail(`錯誤: 無效的需求編號 "${rawId}"。請使用 REQ-001 格式（例如 --id REQ-001）。`);
+    return null;
+  }
+  const num = parseInt(match[1], 10);
+  if (!Number.isFinite(num) || num <= 0) {
+    fail(`錯誤: 需求編號 "${rawId}" 必須為大於 0 的數字（例如 --id REQ-001）。`);
+    return null;
+  }
+  const width = Math.max(3, match[1].length);
+  return `REQ-${String(num).padStart(width, "0")}`;
+}
+
 function createReqTemplate(args, label = "new") {
-  const id = getOption(args, "--id");
+  const rawId = getOption(args, "--id");
   const name = getOption(args, "--name");
   const explicitSlug = getOption(args, "--slug");
 
@@ -271,6 +288,9 @@ function createReqTemplate(args, label = "new") {
     fail("Usage: sa-spec new [--id REQ-001] --name login [--slug login] [--branch]");
     return;
   }
+
+  const id = rawId ? resolveReqIdOrFail(rawId) : null;
+  if (rawId && !id) return;
 
   const slug = resolveSlugOrFail(name, explicitSlug);
   if (!slug) return;
@@ -693,31 +713,41 @@ function reindexProject(options = {}) {
 }
 
 function ensureIndexRow(id, name, langCode = "zh-TW") {
-  const indexPath = path.join(cwd, "project", "index.md");
+  const indexRel = path.join("project", "index.md");
+  const indexPath = path.join(cwd, indexRel);
   if (!fs.existsSync(indexPath)) {
-    return { action: "skip", target: path.join("project", "index.md") };
+    return { action: "skip", target: indexRel };
   }
 
   const content = fs.readFileSync(indexPath, "utf8");
-  if (content.includes(`| ${id} |`)) {
-    return { action: "skip", target: path.join("project", "index.md") };
+  const rows = parseIndexRows(content);
+  const upperId = String(id).toUpperCase();
+  if (rows.some((r) => String(r.id || "").trim().toUpperCase() === upperId)) {
+    return { action: "skip", target: indexRel };
   }
 
   const t = getLangStrings(langCode);
   const now = formatLocalDateTime(new Date());
-  const row = `| ${escapeIndexCell(id)} | ${escapeIndexCell(name)} | ${t.tbd} | ${t.pending} | ${now} | ${now} |`;
-  const nextContent = content.endsWith("\n") ? `${content}${row}\n` : `${content}\n${row}\n`;
-  fs.writeFileSync(indexPath, nextContent, "utf8");
-  return { action: "update", target: path.join("project", "index.md") };
+  rows.push({
+    id: upperId,
+    title: name,
+    description: t.tbd,
+    status: t.pending,
+    createdAt: now,
+    updatedAt: now
+  });
+  rows.sort((a, b) => {
+    const na = parseInt((String(a.id).match(/\d+/) || ["0"])[0], 10);
+    const nb = parseInt((String(b.id).match(/\d+/) || ["0"])[0], 10);
+    return na - nb;
+  });
+  fs.writeFileSync(indexPath, buildIndexMarkdown(langCode, rows), "utf8");
+  return { action: "update", target: indexRel };
 }
 
 function formatLocalDateTime(date) {
   const pad = (value) => String(value).padStart(2, "0");
-  return (
-    [date.getFullYear(), pad(date.getMonth() + 1), pad(date.getDate())].join("-") +
-    " " +
-    [pad(date.getHours()), pad(date.getMinutes())].join(":")
-  );
+  return `${formatLocalDate(date)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function ensureDir(relativeDir) {

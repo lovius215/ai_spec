@@ -382,6 +382,11 @@ const LANG_COPY = {
   }
 };
 
+function formatLocalDate(date = new Date()) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 function normalizeLangKey(langCode) {
   if (!langCode) return "zh-tw";
   const key = String(langCode).toLowerCase().trim();
@@ -671,7 +676,7 @@ function buildLocalizedReqFileContent(langCode, relType, replacements = {}) {
         "",
         t.historyHeader,
         "|---|---|---|---|---|---|",
-        `| v0.1 | ${new Date().toISOString().slice(0, 10)} | ${t.draft} | ${t.tbd} | SRS, UML, OpenAPI, DB | ${t.pending} |`,
+        `| v0.1 | ${formatLocalDate()} | ${t.draft} | ${t.tbd} | SRS, UML, OpenAPI, DB | ${t.pending} |`,
         ""
       ].join("\n");
     case "uml/main.puml": {
@@ -1037,6 +1042,7 @@ function extractSrsMetadata(srsContent) {
 
 module.exports = {
   SUPPORTED_LANGS,
+  formatLocalDate,
   normalizeLangKey,
   getLangStrings,
   detectProjectLanguage,

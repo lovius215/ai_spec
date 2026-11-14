@@ -5,7 +5,7 @@ const os = require("os");
 const path = require("path");
 const { spawnSync, execFileSync } = require("child_process");
 const { encodePlantUml, buildHtmlDocument, buildMergedRequirementMarkdown } = require("../src/pdf");
-const { parseIndexRows } = require("../src/i18n");
+const { parseIndexRows, formatLocalDate } = require("../src/i18n");
 const { getPositionalArgs } = require("../src/instructions");
 
 const ROOT_DIR = path.resolve(__dirname, "..");
@@ -826,4 +826,63 @@ test("#19 legacy 5-column index migration, nested code fences, AGENTS --lang doc
   assert.equal(finFail.status, 0);
   assert.doesNotMatch(finFail.stdout, /已直接於主分支 .* 建立提交完成/);
   assert.match(finFail.stderr, /\[Git 警告\] 主分支 .* 提交未建立/);
+});
+
+test("#20 --id normalization, sorted ensureIndexRow, local history date, and checkIndexSync detection", (t) => {
+  const dir = makeTempDir();
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  assert.equal(runCli(dir, ["init", "--lang", "zh-TW"]).status, 0);
+
+  // 1. Invalid --id should be rejected cleanly
+  const badId = runCli(dir, ["new", "--id", "bad-id", "--name", "demo"]);
+  assert.notEqual(badId.status, 0);
+  assert.match(badId.stderr, /無效的需求編號/);
+
+  const zeroId = runCli(dir, ["new", "--id", "0", "--name", "demo"]);
+  assert.notEqual(zeroId.status, 0);
+  assert.match(zeroId.stderr, /必須為大於 0 的數字/);
+
+  // 2. --id req-2 and --id 1 normalize to REQ-002 / REQ-001 and keep index sorted by number
+  assert.equal(runCli(dir, ["new", "--id", "req-2", "--name", "second"]).status, 0);
+  assert.equal(fs.existsSync(path.join(dir, "project", "REQ-002-second", "srs.md")), true);
+
+  assert.equal(runCli(dir, ["new", "--id", "1", "--name", "first"]).status, 0);
+  assert.equal(fs.existsSync(path.join(dir, "project", "REQ-001-first", "srs.md")), true);
+
+  const indexContent = fs.readFileSync(path.join(dir, "project", "index.md"), "utf8");
+  const rows = parseIndexRows(indexContent);
+  assert.deepEqual(
+    rows.map((r) => r.id),
+    ["REQ-001", "REQ-002"]
+  );
+
+  // 3. history.md uses local date (formatLocalDate()) rather than UTC date
+  const historyContent = fs.readFileSync(path.join(dir, "project", "REQ-001-first", "history.md"), "utf8");
+  assert.ok(historyContent.includes(`| v0.1 | ${formatLocalDate()} |`), "history.md should record local YYYY-MM-DD");
+
+  // Clean workspace passes check including 索引同步檢查: OK
+  const cleanCheck = runCli(dir, ["check"]);
+  assert.equal(cleanCheck.status, 0, cleanCheck.stdout);
+  assert.match(cleanCheck.stdout, /索引同步檢查: OK/);
+
+  // 4. Out-of-sync index.md (orphan row + missing directory row) triggers check failure and recovers after reindex
+  fs.rmSync(path.join(dir, "project", "REQ-002-second"), { recursive: true, force: true });
+  const req3Dir = path.join(dir, "project", "REQ-003-manual");
+  fs.cpSync(path.join(dir, "project", "REQ-001-first"), req3Dir, { recursive: true });
+  for (const rel of ["srs.md", "openapi.yaml", "db-schema.md", "handoff.md", "history.md", "uml/main.puml", "uml/wireframe.puml"]) {
+    const p = path.join(req3Dir, rel);
+    fs.writeFileSync(p, fs.readFileSync(p, "utf8").replace(/REQ-001/g, "REQ-003"), "utf8");
+  }
+
+  const outOfSyncCheck = runCli(dir, ["check"]);
+  assert.equal(outOfSyncCheck.status, 1);
+  assert.match(outOfSyncCheck.stdout, /索引同步檢查: WARNING/);
+  assert.match(outOfSyncCheck.stdout, /漏列: REQ-003/);
+  assert.match(outOfSyncCheck.stdout, /找不到對應目錄: REQ-002/);
+
+  assert.equal(runCli(dir, ["reindex"]).status, 0);
+  const resyncedCheck = runCli(dir, ["check"]);
+  assert.equal(resyncedCheck.status, 0, resyncedCheck.stdout);
+  assert.match(resyncedCheck.stdout, /索引同步檢查: OK/);
 });

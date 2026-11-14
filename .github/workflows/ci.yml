@@ -40,5 +40,8 @@ jobs:
       - name: Verify CLI doctor
         run: node bin/sa-spec.js doctor
 
+      - name: Verify CLI strict check
+        run: node bin/sa-spec.js check --strict
+
       - name: Verify CLI upgrade dry-run
         run: node bin/sa-spec.js upgrade --dry-run

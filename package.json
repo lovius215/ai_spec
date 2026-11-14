@@ -17,6 +17,9 @@
   "bin": {
     "sa-spec": "bin/sa-spec.js"
   },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "files": [
     "bin/",
     "src/",

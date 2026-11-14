@@ -1,6 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const { extractSpecVersion, extractStatusFromContent } = require("./i18n");
+const { extractSpecVersion, extractStatusFromContent, parseIndexRows } = require("./i18n");
 
 const REQUIRED_DELIVERABLES = [
   "srs.md",
@@ -91,6 +91,46 @@ function checkDuplicateReqIds(cwd) {
   }
 
   console.log("序號唯一性: OK");
+  return true;
+}
+
+function checkIndexSync(cwd) {
+  const projectDir = path.join(cwd, "project");
+  const indexPath = path.join(projectDir, "index.md");
+  if (!fs.existsSync(projectDir) || !fs.existsSync(indexPath)) {
+    return true;
+  }
+
+  const entries = fs.readdirSync(projectDir, { withFileTypes: true });
+  const dirIds = new Set();
+  for (const entry of entries) {
+    if (entry.isDirectory() && entry.name.startsWith("REQ-")) {
+      const m = entry.name.match(/^(REQ-\d+)/i);
+      if (m) {
+        dirIds.add(m[1].toUpperCase());
+      }
+    }
+  }
+
+  const rows = parseIndexRows(fs.readFileSync(indexPath, "utf8"));
+  const indexedIds = new Set(rows.map((r) => String(r.id || "").trim().toUpperCase()).filter(Boolean));
+
+  const missingInIndex = Array.from(dirIds).filter((id) => !indexedIds.has(id)).sort();
+  const orphanInIndex = Array.from(indexedIds).filter((id) => !dirIds.has(id)).sort();
+
+  if (missingInIndex.length > 0 || orphanInIndex.length > 0) {
+    console.log("索引同步檢查: WARNING (project/index.md 與實際 REQ-* 目錄不同步)");
+    if (missingInIndex.length > 0) {
+      console.log(`  - 目錄已存在但 index.md 漏列: ${missingInIndex.join(", ")}`);
+    }
+    if (orphanInIndex.length > 0) {
+      console.log(`  - index.md 有紀錄但找不到對應目錄: ${orphanInIndex.join(", ")}`);
+    }
+    console.log("  修復建議：請執行 sa-spec reindex 重建索引。");
+    return false;
+  }
+
+  console.log("索引同步檢查: OK");
   return true;
 }
 
@@ -261,8 +301,9 @@ function runCheck(cwd, isSourceRepoFlag, packageVersion, showStatusFn, args = []
     console.log("提示: 偵測到舊版專案內置 skills/ 或 rules/，建議執行 sa-spec upgrade 移除並改用套件內建規範。");
   }
   const dupOk = checkDuplicateReqIds(cwd);
+  const indexSyncOk = checkIndexSync(cwd);
   const contentIssues = validateRequirementsContent(cwd);
-  if (!dupOk || contentIssues.length > 0) {
+  if (!dupOk || !indexSyncOk || contentIssues.length > 0) {
     process.exitCode = 1;
   }
   if (strict && (verRes.status !== "ok" || hasLegacySkills || hasLegacyRules)) {
@@ -276,6 +317,7 @@ module.exports = {
   checkRequiredPaths,
   checkSpecVersion,
   checkDuplicateReqIds,
+  checkIndexSync,
   validateSingleRequirementDir,
   validateRequirementsContent,
   runDoctor,
