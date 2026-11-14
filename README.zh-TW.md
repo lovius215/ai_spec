@@ -252,7 +252,7 @@ project/
   system-spec.md
 ```
 
-完整分析規範（原 `SKILL.md`）與補充規則（`spec`、`uml-style`、`wireframe`、`db-table`、`estimation`、`system-spec`、`file-style`、`history`、`review`）皆已內建於 `@loviusc/sa-spec` CLI 中，AI 與開發者可透過 `sa-spec instructions`、`sa-spec rules` 與 `sa-spec templates` 即時讀取；**專案目錄內不會出現 `skills/` 與 `rules/` 資料夾**，保持規格專案整潔，並確保規範隨套件更新即時生效。
+完整分析規範（原 `SKILL.md`）與補充規則（`spec`、`uml-style`、`wireframe`、`db-table`、`estimation`、`system-spec`、`file-style`、`history`、`review`）皆已內建於 `@loviusc/sa-spec` CLI 中，AI 與開發者可透過 `sa-spec instructions`、`sa-spec rules` 與 `sa-spec templates` 即時讀取；**專案目錄內不會出現 `skills/` 與 `rules/` 資料夾**，保持規格專案整潔並避免規範副本與套件更新脫鉤（註：`@loviusc/sa-spec` 為公開開源套件，隱藏資料夾僅為維持工作區整潔，並非將規範加密保密）。
 
 `spec:init` 規則會檢查 Git 狀態；若目前資料夾還不是 Git repository，會自動執行 `git init`。
 
@@ -279,14 +279,14 @@ sa-spec check
 | 指令 | 用途 |
 |---|---|
 | `sa-spec init [--full] [--lang zh-TW|en|zh-CN|ja|ko]` | 建立乾淨的專案文件骨架（支援 5 種語言，預設 `zh-TW`；所有規範改由 CLI 內建提供，不建立 `skills/` 與 `rules/`）。 |
-| `sa-spec new [--id REQ-001] --name login [--branch]` | 建立需求資料夾與空白文件模板（未帶 `--id` 時啟用多人草稿模式，可選 `--branch` 自動建立並切換至 `feat/<name>` 分支）。 |
-| `sa-spec finalize --name login` | 將草稿需求定號歸檔為最新序號（自動計算最新號碼、重命名目錄、批次置換 `{{REQ_ID}}` 並重建索引）。 |
+| `sa-spec new [--id REQ-001] --name login [--slug login] [--branch]` | 建立需求資料夾與對應語言模板（若名稱為中文/日文/韓文，請搭配 `--slug <ascii-slug>`；未帶 `--id` 時啟用多人草稿模式，可選 `--branch` 切換至 `feat/<slug>`）。 |
+| `sa-spec finalize --name login [--slug login] [--no-merge \| --pr]` | 將草稿需求定號歸檔為最新序號（支援 `--no-merge` / `--pr` 或於 `system-spec.md` 設定 `合併策略：pr` 改走 PR 流程，並具備遠端撞號防護）。 |
 | `sa-spec instructions [init\|propose\|analyze\|commit\|pdf] [--with-rules] [--json]` | 輸出目前工作區狀態、對應階段步驟與套件內建完整系統分析規範（供 AI 動態讀取）。 |
 | `sa-spec rules [name\|all] [--list] [--json]` | 讀取或列出套件內建補充規則（`spec`、`uml-style`、`wireframe`、`db-table`、`estimation`、`system-spec`、`file-style`、`history`、`review`）。 |
 | `sa-spec templates [name] [--list] [--json]` | 讀取或列出套件內建規格與圖表範本（`srs`、`openapi`、`db-schema`、`handoff`、`history`、`uml-main`、`uml-wireframe` 等）。 |
-| `sa-spec pdf <target> [--split] [--output out.pdf]` | 將指定 `.md` 轉為同名 `.pdf`，或將需求編號/目錄（如 `REQ-001`）整包合併匯出成一份完整規格書 PDF（加 `--split` 則各檔獨立轉出，`--all` 匯出全專案）。 |
-| `sa-spec reindex` | 掃描 `project/REQ-*` 目錄，依序號重新生成乾淨無衝突的 `project/index.md`。 |
-| `sa-spec check` | 檢查基本文件是否存在，並提示是否殘留舊版 `skills/` 或 `rules/`。 |
+| `sa-spec pdf <target> [--split] [--output out.pdf] [--no-uml-render]` | 將指定 `.md` 或需求目錄匯出為 PDF（自動將 PlantUML 轉繪為 SVG 圖表，無法轉繪時自動退回程式碼區塊；加 `--no-uml-render` 可跳過轉繪）。 |
+| `sa-spec reindex` | 掃描 `project/REQ-*` 目錄，依專案鎖定語言與序號重新生成 `project/index.md`。 |
+| `sa-spec check` | 檢查核心檔案、規範版本鎖定、重複序號、以及已歸檔需求的交付物完整度（單檔單圖 `.puml`、`{{REQ_ID}}` 殘留、`handoff.md` 必備章節、`openapi.yaml` 結構）。 |
 | `sa-spec status` | 顯示系統規格與需求索引狀態。 |
 | `sa-spec doctor` | 檢查必要檔案是否存在。 |
 | `sa-spec upgrade [--dry-run] [--keep-legacy]` | 將既有專案升級為最新版本：更新 `AGENTS.md`、自動刪除舊版套件管理的 `skills/` 與 `rules/`（可用 `--keep-legacy` 保留），並將既有需求中的 `uml.puml` 自動遷移為 `uml/main.puml`。（別名：`sa-spec update`） |

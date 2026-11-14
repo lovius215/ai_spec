@@ -31,7 +31,8 @@
     "README*.md"
   ],
   "scripts": {
-    "check": "node --check src/cli.js && node --check src/pdf.js && node --check bin/sa-spec.js"
+    "check": "node --check src/cli.js && node --check src/pdf.js && node --check src/i18n.js && node --check src/git.js && node --check src/validator.js && node --check src/instructions.js && node --check bin/sa-spec.js",
+    "test": "node --test test/*.test.js"
   },
   "keywords": [
     "system-analysis",

@@ -1,8 +1,79 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const zlib = require("zlib");
 const { spawnSync } = require("child_process");
 const { pathToFileURL } = require("url");
+
+const PLANTUML_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_";
+
+function encodePlantUml6bit(b) {
+  return PLANTUML_ALPHABET[b & 0x3f] || "?";
+}
+
+function appendPlantUml3Bytes(b1, b2, b3) {
+  const c1 = b1 >> 2;
+  const c2 = ((b1 & 0x3) << 4) | (b2 >> 4);
+  const c3 = ((b2 & 0xf) << 2) | (b3 >> 6);
+  const c4 = b3 & 0x3f;
+  return (
+    encodePlantUml6bit(c1) +
+    encodePlantUml6bit(c2) +
+    encodePlantUml6bit(c3) +
+    encodePlantUml6bit(c4)
+  );
+}
+
+function encodePlantUml(source) {
+  const deflated = zlib.deflateRawSync(Buffer.from(String(source || ""), "utf8"), { level: 9 });
+  let out = "";
+  for (let i = 0; i < deflated.length; i += 3) {
+    if (i + 2 === deflated.length) {
+      out += appendPlantUml3Bytes(deflated[i], deflated[i + 1], 0);
+    } else if (i + 1 === deflated.length) {
+      out += appendPlantUml3Bytes(deflated[i], 0, 0);
+    } else {
+      out += appendPlantUml3Bytes(deflated[i], deflated[i + 1], deflated[i + 2]);
+    }
+  }
+  return out;
+}
+
+function renderPlantUmlToSvg(source, options = {}) {
+  if (options.noUmlRender) return null;
+
+  // 1. Prefer local plantuml CLI for fast offline rendering
+  const whichCmd = process.platform === "win32" ? "where" : "which";
+  const localBin = spawnSync(whichCmd, ["plantuml"], { encoding: "utf8" });
+  if (localBin.status === 0 && localBin.stdout.trim()) {
+    const res = spawnSync("plantuml", ["-tsvg", "-pipe", "-charset", "UTF-8"], {
+      input: source,
+      encoding: "utf8",
+      timeout: 10000
+    });
+    if (res.status === 0 && res.stdout && res.stdout.includes("<svg")) {
+      const svgMatch = res.stdout.match(/<svg[\s\S]*<\/svg>/i);
+      if (svgMatch) return svgMatch[0];
+    }
+  }
+
+  // 2. Fallback to PlantUML server SVG endpoint if network rendering is enabled
+  if (process.env.SA_SPEC_NO_UML_NET === "1" || options.offlineUml) {
+    return null;
+  }
+  const baseUrl = (options.umlServerUrl || process.env.SA_SPEC_PLANTUML_SERVER || "https://www.plantuml.com/plantuml").replace(/\/+$/, "");
+  const encoded = encodePlantUml(source);
+  const curlRes = spawnSync("curl", ["-fsSL", "--max-time", "4", `${baseUrl}/svg/${encoded}`], {
+    encoding: "utf8",
+    timeout: 5000
+  });
+  if (curlRes.status === 0 && curlRes.stdout && curlRes.stdout.includes("<svg")) {
+    const svgMatch = curlRes.stdout.match(/<svg[\s\S]*<\/svg>/i);
+    if (svgMatch) return svgMatch[0];
+  }
+
+  return null;
+}
 
 function escapeHtml(str) {
   return String(str)
@@ -67,7 +138,7 @@ function getTableAlignments(sepLine) {
   });
 }
 
-function markdownToHtmlBody(markdown) {
+function markdownToHtmlBody(markdown, options = {}) {
   const lines = String(markdown).replace(/\r\n/g, "\n").split("\n");
   const out = [];
   let i = 0;
@@ -100,10 +171,19 @@ function markdownToHtmlBody(markdown) {
         i++;
       }
       if (i < lines.length) i++; // skip closing fence
+      const rawCode = codeLines.join("\n");
+      const lowerLang = lang.toLowerCase();
+      if (lowerLang === "plantuml" || lowerLang === "puml") {
+        const svg = renderPlantUmlToSvg(rawCode, options);
+        if (svg) {
+          out.push(`<div class="uml-diagram">${svg}</div>`);
+          continue;
+        }
+      }
       const langLabel = lang ? `<div class="code-lang">${escapeHtml(lang)}</div>` : "";
       out.push(
         `<div class="code-block">${langLabel}<pre><code class="language-${escapeHtml(lang)}">${escapeHtml(
-          codeLines.join("\n")
+          rawCode
         )}</code></pre></div>`
       );
       continue;
@@ -234,8 +314,8 @@ function markdownToHtmlBody(markdown) {
   return out.join("\n");
 }
 
-function buildHtmlDocument(title, markdownContent) {
-  const bodyHtml = markdownToHtmlBody(markdownContent);
+function buildHtmlDocument(title, markdownContent, options = {}) {
+  const bodyHtml = markdownToHtmlBody(markdownContent, options);
   return `<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -403,6 +483,20 @@ function buildHtmlDocument(title, markdownContent) {
       page-break-before: always;
       break-before: page;
     }
+    .uml-diagram {
+      margin: 10pt 0 14pt 0;
+      padding: 10pt;
+      border: 1px solid #e5e7eb;
+      border-radius: 5pt;
+      background-color: #ffffff;
+      text-align: center;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .uml-diagram svg {
+      max-width: 100%;
+      height: auto;
+    }
     a {
       color: #2563eb;
       text-decoration: none;
@@ -537,7 +631,7 @@ function renderHtmlToPdf(htmlContent, outputPdfPath, customBrowserPath) {
   }
 }
 
-function convertMarkdownFileToPdf(mdFilePath, outputPdfPath, customBrowserPath) {
+function convertMarkdownFileToPdf(mdFilePath, outputPdfPath, customBrowserPath, options = {}) {
   const absMdPath = path.resolve(mdFilePath);
   if (!fs.existsSync(absMdPath)) {
     return { ok: false, error: `找不到檔案: ${mdFilePath}` };
@@ -547,7 +641,7 @@ function convertMarkdownFileToPdf(mdFilePath, outputPdfPath, customBrowserPath) 
   const targetPdf = outputPdfPath
     ? path.resolve(outputPdfPath)
     : path.join(path.dirname(absMdPath), `${title}.pdf`);
-  const html = buildHtmlDocument(title, content);
+  const html = buildHtmlDocument(title, content, options);
   return renderHtmlToPdf(html, targetPdf, customBrowserPath);
 }
 
@@ -601,5 +695,7 @@ module.exports = {
   buildHtmlDocument,
   convertMarkdownFileToPdf,
   buildMergedRequirementMarkdown,
-  renderHtmlToPdf
+  renderHtmlToPdf,
+  encodePlantUml,
+  renderPlantUmlToSvg
 };

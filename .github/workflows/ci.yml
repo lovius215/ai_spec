@@ -31,6 +31,9 @@ jobs:
       - name: Syntax check
         run: npm run check
 
+      - name: Run test suite
+        run: npm test
+
       - name: Verify CLI help
         run: node bin/sa-spec.js help
 
