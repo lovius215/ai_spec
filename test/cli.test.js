@@ -886,3 +886,89 @@ test("#20 --id normalization, sorted ensureIndexRow, local history date, and che
   assert.equal(resyncedCheck.status, 0, resyncedCheck.stdout);
   assert.match(resyncedCheck.stdout, /索引同步檢查: OK/);
 });
+
+test("#21 finalize stages system-spec.md, safe renumber regex & --name REQ-xxx, table backtick pipes, draft status, and readme templates", (t) => {
+  const dir = makeTempDir();
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  execFileSync("git", ["init", "-b", "master"], { cwd: dir });
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: dir });
+  execFileSync("git", ["config", "user.name", "Test User"], { cwd: dir });
+
+  assert.equal(runCli(dir, ["init", "--lang", "zh-TW"]).status, 0);
+  assert.match(fs.readFileSync(path.join(dir, "readme.md"), "utf8"), /sa-spec templates/);
+  for (const lang of ["zh-TW", "en", "zh-CN", "ja", "ko"]) {
+    const readmeTpl = runCli(dir, ["templates", "readme", "--lang", lang]);
+    assert.equal(readmeTpl.status, 0, readmeTpl.stderr);
+    assert.match(readmeTpl.stdout, /sa-spec templates/);
+  }
+
+  execFileSync("git", ["add", "-A"], { cwd: dir });
+  execFileSync("git", ["commit", "-m", "chore: init workspace"], { cwd: dir });
+
+  // 1. Draft shows up in status & instructions --json
+  assert.equal(runCli(dir, ["new", "--name", "auth", "--branch"]).status, 0);
+  const draftStatus = runCli(dir, ["status"]);
+  assert.equal(draftStatus.status, 0);
+  assert.match(draftStatus.stdout, /進行中草稿: 1 \(auth\)/);
+
+  // Modify project/system-spec.md before finalize -> should be staged & committed cleanly without blocking auto-merge
+  const sysSpecPath = path.join(dir, "project", "system-spec.md");
+  fs.writeFileSync(sysSpecPath, `${fs.readFileSync(sysSpecPath, "utf8")}\n## 系統模組\n- Auth\n`, "utf8");
+
+  const finAuth = runCli(dir, ["finalize", "--name", "auth"]);
+  assert.equal(finAuth.status, 0, finAuth.stderr);
+  assert.doesNotMatch(finAuth.stderr, /工作區仍有未提交的變更/);
+  assert.equal(execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: dir, encoding: "utf8" }).trim(), "master");
+  assert.match(fs.readFileSync(sysSpecPath, "utf8"), /## 系統模組/);
+  assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd: dir, encoding: "utf8" }).trim(), "");
+
+  // 2. --name REQ-001 matches REQ-001-pay and safe regex keeps REQ-0010 intact when re-numbering to REQ-002
+  const dir2 = makeTempDir();
+  t.after(() => fs.rmSync(dir2, { recursive: true, force: true }));
+  execFileSync("git", ["init", "-b", "master"], { cwd: dir2 });
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: dir2 });
+  execFileSync("git", ["config", "user.name", "Test User"], { cwd: dir2 });
+  assert.equal(runCli(dir2, ["init", "--lang", "en"]).status, 0);
+  execFileSync("git", ["add", "-A"], { cwd: dir2 });
+  execFileSync("git", ["commit", "-m", "init workspace"], { cwd: dir2 });
+
+  // Branch feat/pay before master takes REQ-001
+  execFileSync("git", ["branch", "feat/pay"], { cwd: dir2 });
+  assert.equal(runCli(dir2, ["new", "--id", "REQ-001", "--name", "base"]).status, 0);
+  execFileSync("git", ["add", "-A"], { cwd: dir2 });
+  execFileSync("git", ["commit", "-m", "base req-001"], { cwd: dir2 });
+
+  // Side branch has an earlier manually-numbered REQ-001-pay that mentions REQ-0010
+  execFileSync("git", ["checkout", "feat/pay"], { cwd: dir2 });
+  assert.equal(runCli(dir2, ["new", "--id", "REQ-001", "--name", "pay"]).status, 0);
+  const paySrs = path.join(dir2, "project", "REQ-001-pay", "srs.md");
+  fs.writeFileSync(paySrs, "# REQ-001 pay SRS\n\n- Status: Pending\n\nSee also REQ-0010.\n", "utf8");
+  const finPay = runCli(dir2, ["finalize", "--name", "REQ-001", "--no-merge"]);
+  assert.equal(finPay.status, 0, finPay.stderr);
+  assert.equal(fs.existsSync(path.join(dir2, "project", "REQ-002-pay", "srs.md")), true);
+  const renumberedSrs = fs.readFileSync(path.join(dir2, "project", "REQ-002-pay", "srs.md"), "utf8");
+  assert.match(renumberedSrs, /# REQ-002 pay SRS/);
+  assert.match(renumberedSrs, /See also REQ-0010\./);
+
+  // 3. Markdown table protects pipes inside backticks & supports double-backtick inline code
+  const mdTable = [
+    "| Field | Type | Note |",
+    "|---|---|---|",
+    "| strategy | `auto-merge | pr` | ``use `backtick` safely`` |"
+  ].join("\n");
+  const html = buildHtmlDocument("Table Code Pipe Test", mdTable, { noUmlRender: true, lang: "en" });
+  assert.match(html, /<td[^>]*><code>auto-merge \| pr<\/code><\/td>/);
+  assert.match(html, /<td[^>]*><code>use `backtick` safely<\/code><\/td>/);
+
+  // 4. Draft with only history.md is detected by instructions --json
+  const dir3 = makeTempDir();
+  t.after(() => fs.rmSync(dir3, { recursive: true, force: true }));
+  assert.equal(runCli(dir3, ["init"]).status, 0);
+  fs.mkdirSync(path.join(dir3, "project", "hist-only"), { recursive: true });
+  fs.writeFileSync(path.join(dir3, "project", "hist-only", "history.md"), "# {{REQ_ID}}\n| v0.1 |\n", "utf8");
+  const instJson = runCli(dir3, ["instructions", "--json"]);
+  assert.equal(instJson.status, 0, instJson.stderr);
+  const parsed = JSON.parse(instJson.stdout);
+  assert.deepEqual(parsed.context.drafts, ["hist-only"]);
+});

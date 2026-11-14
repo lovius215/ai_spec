@@ -318,6 +318,7 @@ module.exports = {
   checkSpecVersion,
   checkDuplicateReqIds,
   checkIndexSync,
+  isDraftSpecDir,
   validateSingleRequirementDir,
   validateRequirementsContent,
   runDoctor,

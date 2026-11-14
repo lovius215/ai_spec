@@ -135,7 +135,10 @@ function parseInline(text) {
     return `\x00TOK_${idx}\x00`;
   };
 
-  let processed = String(text).replace(/`([^`]+)`/g, (_, code) => holdToken(`<code>${escapeHtml(code)}</code>`));
+  let processed = String(text).replace(/(`+)([\s\S]+?)\1/g, (_, ticks, code) => {
+    const cleaned = ticks.length > 1 && /^ [\s\S]* $/.test(code) ? code.slice(1, -1) : code;
+    return holdToken(`<code>${escapeHtml(cleaned)}</code>`);
+  });
 
   processed = processed.replace(/<br\s*\/?>/gi, "\x00BR\x00");
   processed = escapeHtml(processed);
@@ -161,7 +164,11 @@ function parseInline(text) {
 
 function parseTableRow(line) {
   const placeholder = "\x00PIPE\x00";
-  const protectedLine = String(line).trim().replace(/\\\|/g, placeholder);
+  const escapedProtected = String(line).trim().replace(/\\\|/g, placeholder);
+  const protectedLine = escapedProtected.replace(
+    /(`+)([\s\S]+?)\1/g,
+    (_, ticks, code) => `${ticks}${code.replace(/\|/g, placeholder)}${ticks}`
+  );
   const trimmed = protectedLine.replace(/^\|/, "").replace(/\|$/, "");
   return trimmed.split("|").map((cell) => cell.replace(/\x00PIPE\x00/g, "|").trim());
 }

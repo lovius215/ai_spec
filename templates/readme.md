@@ -11,5 +11,6 @@
 
 - `sa-spec instructions <init|propose|analyze|commit|pdf>`：讀取對應階段流程與完整分析規範
 - `sa-spec rules [name|all]`：查詢內建補充規則
+- `sa-spec templates [name] [--lang <code>]`：讀取內建規格範本
 - `sa-spec check`：檢查專案結構、規範版本、需求交付物完整性與重複序號
 - `sa-spec pdf <REQ-001|file.md>`：匯出規格書 PDF

@@ -35,7 +35,7 @@ const {
   getLatestMaxReqId,
   remoteBranchHasReqId
 } = require("./git");
-const { runDoctor, runCheck } = require("./validator");
+const { runDoctor, runCheck, isDraftSpecDir } = require("./validator");
 const { runInstructions, runRules, runTemplatesList, getOption, getPositionalArgs } = require("./instructions");
 
 const cwd = process.cwd();
@@ -196,6 +196,18 @@ function showStatus(showHeading = true) {
 
   const rows = parseIndexRows(fs.readFileSync(indexPath, "utf8"));
   console.log(`需求總數: ${rows.length}`);
+
+  const projectDir = path.join(cwd, "project");
+  const drafts = fs.existsSync(projectDir)
+    ? fs
+        .readdirSync(projectDir, { withFileTypes: true })
+        .filter((e) => e.isDirectory() && isDraftSpecDir(path.join(projectDir, e.name), e.name))
+        .map((e) => e.name)
+        .sort()
+    : [];
+  if (drafts.length > 0) {
+    console.log(`進行中草稿: ${drafts.length} (${drafts.join(", ")})`);
+  }
 
   if (rows.length === 0) {
     console.log("目前尚無需求。");
@@ -411,6 +423,7 @@ function finalizeReq(args) {
         (e) =>
           e.isDirectory() &&
           (e.name.toUpperCase() === rawName.toUpperCase() ||
+            e.name.toUpperCase().startsWith(`${rawName.toUpperCase()}-`) ||
             (e.name.startsWith("REQ-") && e.name.toLowerCase().endsWith(`-${slug}`)))
       )
       .sort((a, b) => {
@@ -421,10 +434,8 @@ function finalizeReq(args) {
     const reqMatch = reqMatches[0];
     if (reqMatch) {
       sourceDir = path.join(projectDir, reqMatch.name);
-      cleanSlug = reqMatch.name.replace(/^REQ-\d+-/i, "");
-      if (cleanSlug.toUpperCase().startsWith("REQ-")) {
-        cleanSlug = slug;
-      }
+      const stripped = reqMatch.name.replace(/^REQ-\d+-?/i, "");
+      cleanSlug = stripped || slug;
     }
   }
 
@@ -476,7 +487,8 @@ function finalizeReq(args) {
       const content = fs.readFileSync(filePath, "utf8");
       let updated = content.split("{{REQ_ID}}").join(nextId);
       if (oldReqId && oldReqId !== nextId) {
-        updated = updated.split(oldReqId).join(nextId);
+        const oldIdRegex = new RegExp(`\\b${oldReqId}(?!\\d)`, "gi");
+        updated = updated.replace(oldIdRegex, nextId);
       }
       if (updated !== content) {
         fs.writeFileSync(filePath, updated, "utf8");
@@ -490,7 +502,11 @@ function finalizeReq(args) {
   const finalRel = path.posix.join("project", finalDirName);
   const oldRel = sourceDir !== finalDir ? path.posix.join("project", oldDirName) : null;
   const stageFinalizePaths = () => {
-    spawnSync("git", ["add", "-A", "--", finalRel, "project/index.md"], { cwd, encoding: "utf8" });
+    const pathsToAdd = [finalRel, "project/index.md"];
+    if (fs.existsSync(path.join(cwd, "project", "system-spec.md"))) {
+      pathsToAdd.push("project/system-spec.md");
+    }
+    spawnSync("git", ["add", "-A", "--", ...pathsToAdd], { cwd, encoding: "utf8" });
     if (oldRel) {
       const trackedOld = spawnSync("git", ["ls-files", "--", oldRel], { cwd, encoding: "utf8" });
       if (trackedOld.status === 0 && (trackedOld.stdout || "").trim()) {
@@ -596,7 +612,7 @@ function finalizeReq(args) {
     }
   } else {
     console.log("建議接下來執行：");
-    console.log(`  git add -A -- ${finalRel} project/index.md`);
+    console.log(`  git add -A -- ${finalRel} project/index.md project/system-spec.md`);
     console.log(`  git commit -m "docs(${nextId}): ${rawName} - 規格確認歸檔"`);
   }
 }

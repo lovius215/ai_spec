@@ -80,6 +80,7 @@ const LANG_COPY = {
     readmeCmds: [
       "`sa-spec instructions <init|propose|analyze|commit|pdf>`：讀取對應階段流程與完整分析規範",
       "`sa-spec rules [name|all]`：查詢內建補充規則",
+      "`sa-spec templates [name] [--lang <code>]`：讀取內建規格範本",
       "`sa-spec check`：檢查專案結構、規範版本、需求交付物完整性與重複序號",
       "`sa-spec pdf <REQ-001|file.md>`：匯出規格書 PDF"
     ]
@@ -154,6 +155,7 @@ const LANG_COPY = {
     readmeCmds: [
       "`sa-spec instructions <init|propose|analyze|commit|pdf>`: Load live workspace context and stage instructions",
       "`sa-spec rules [name|all]`: Read built-in analysis rule documents",
+      "`sa-spec templates [name] [--lang <code>]`: Read built-in specification and UML templates",
       "`sa-spec check`: Validate workspace structure, spec version, requirement completeness, and duplicate IDs",
       "`sa-spec pdf <REQ-001|file.md>`: Export specification PDF"
     ]
@@ -228,6 +230,7 @@ const LANG_COPY = {
     readmeCmds: [
       "`sa-spec instructions <init|propose|analyze|commit|pdf>`：获取当前工作区上下文与阶段规范",
       "`sa-spec rules [name|all]`：查询内置补充规则",
+      "`sa-spec templates [name] [--lang <code>]`：读取内置规格模板",
       "`sa-spec check`：校验项目结构、规范版本、交付物完整性与编号唯一性",
       "`sa-spec pdf <REQ-001|file.md>`：导出规格书 PDF"
     ]
@@ -302,6 +305,7 @@ const LANG_COPY = {
     readmeCmds: [
       "`sa-spec instructions <init|propose|analyze|commit|pdf>`: ワークスペース状態と手順を取得",
       "`sa-spec rules [name|all]`: 組み込みルールを参照",
+      "`sa-spec templates [name] [--lang <code>]`: 組み込みテンプレートを読み込む",
       "`sa-spec check`: 構成、仕様バージョン、成果物整合性、番号重複を検証",
       "`sa-spec pdf <REQ-001|file.md>`: 仕様書 PDF を出力"
     ]
@@ -376,6 +380,7 @@ const LANG_COPY = {
     readmeCmds: [
       "`sa-spec instructions <init|propose|analyze|commit|pdf>`: 현재 워크스페이스 컨텍스트와 단계별 지침 조회",
       "`sa-spec rules [name|all]`: 내장 규칙 조회",
+      "`sa-spec templates [name] [--lang <code>]`: 내장 문서 템플릿 조회",
       "`sa-spec check`: 필수 구조, 사양 버전, 산출물 무결성 및 중복 번호 검증",
       "`sa-spec pdf <REQ-001|file.md>`: 사양서 PDF 내보내기"
     ]

@@ -20,6 +20,7 @@ const {
   detectMainBranch,
   getDefaultRemote
 } = require("./git");
+const { isDraftSpecDir } = require("./validator");
 
 const STAGE_ALIASES = {
   init: "init",
@@ -227,15 +228,12 @@ function collectWorkspaceContext(cwd, isSourceRepoFlag, packageVersion) {
   const drafts = [];
   if (fs.existsSync(projectDir)) {
     for (const entry of fs.readdirSync(projectDir, { withFileTypes: true })) {
-      if (!entry.isDirectory() || entry.name.startsWith("REQ-") || entry.name === "req") continue;
-      const dirAbs = path.join(projectDir, entry.name);
-      const hasDraftArtifact = ["srs.md", "handoff.md", "openapi.yaml", "db-schema.md"].some((file) =>
-        fs.existsSync(path.join(dirAbs, file))
-      );
-      if (hasDraftArtifact) {
+      if (!entry.isDirectory()) continue;
+      if (isDraftSpecDir(path.join(projectDir, entry.name), entry.name)) {
         drafts.push(entry.name);
       }
     }
+    drafts.sort();
   }
 
   const gitInside = isGitWorkingTree(cwd);
