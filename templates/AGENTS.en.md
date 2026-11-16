@@ -35,6 +35,7 @@ Five commands with shorthand aliases (fully equivalent):
 
 # Hard Constraints
 
+- **Task Brief & Dual Checklists**: Before starting any work, the AI must explain the task goal and scope, present a concrete Task Checklist, and execute items in order; before finishing, it must prepare and verify both a **Process Checklist** and a **Business Checklist**.
 - **i18n Lock**: Support `zh-TW`, `en`, `zh-CN`, `ja`, `ko`. Once locked in `project/system-spec.md`, keep 100% of requirement documents in that language while keeping standard technical terms (`REST API`, `Webhook`, `JWT`, `OAuth 2.0`, `Payload`, `Idempotency`, `Redis`) in native English.
 - **No Hallucinations**: Never invent unconfirmed business rules, roles, permissions, flows, APIs, or DB columns.
 - **Conflict Check First**: `spec:analyze` must inspect all existing `project/REQ-*` requirements first. On conflict, list conflicts and up to 3 clarifying questions, stop drafting, and modify nothing.

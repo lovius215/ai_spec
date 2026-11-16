@@ -1586,3 +1586,51 @@ test("#27 PDF renderHtmlToPdf path/status guards, --browser validation, and --sp
     fs.rmSync(pdfTmp, { recursive: true, force: true });
   }
 });
+
+test("#28 instructions, rules, SKILL, and localized AGENTS enforce task brief, task checklist, and process/business checklists", () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sa-spec-28-checklist-"));
+  try {
+    assert.equal(runCli(tmpDir, ["init", "--lang", "zh-TW"]).status, 0);
+    const agentsZhTw = fs.readFileSync(path.join(tmpDir, "AGENTS.md"), "utf8");
+    assert.match(agentsZhTw, /任務清單/);
+    assert.match(agentsZhTw, /流程檢查清單/);
+    assert.match(agentsZhTw, /業務檢查清單/);
+
+    const overviewJsonRes = runCli(tmpDir, ["instructions", "--json"]);
+    assert.equal(overviewJsonRes.status, 0, overviewJsonRes.stderr);
+    const overview = JSON.parse(overviewJsonRes.stdout);
+    assert.ok(Array.isArray(overview.executionProtocol) && overview.executionProtocol.length >= 3);
+    assert.equal(overview.stages.length, 5);
+    for (const s of overview.stages) {
+      assert.ok(Array.isArray(s.tasks) && s.tasks.length > 0, `${s.stage} missing tasks`);
+      assert.ok(Array.isArray(s.processChecklist) && s.processChecklist.length > 0, `${s.stage} missing processChecklist`);
+      assert.ok(Array.isArray(s.businessChecklist) && s.businessChecklist.length > 0, `${s.stage} missing businessChecklist`);
+    }
+
+    for (const stageName of ["init", "propose", "analyze", "commit", "pdf"]) {
+      const stageJsonRes = runCli(tmpDir, ["instructions", stageName, "--json"]);
+      assert.equal(stageJsonRes.status, 0, stageJsonRes.stderr);
+      const parsed = JSON.parse(stageJsonRes.stdout);
+      assert.ok(Array.isArray(parsed.executionProtocol) && parsed.executionProtocol.length >= 3);
+      assert.ok(Array.isArray(parsed.tasks) && parsed.tasks.length > 0);
+      assert.ok(Array.isArray(parsed.processChecklist) && parsed.processChecklist.length > 0);
+      assert.ok(Array.isArray(parsed.businessChecklist) && parsed.businessChecklist.length > 0);
+      assert.match(parsed.skillDocument, /流程上檢查清單/);
+      assert.match(parsed.skillDocument, /業務上檢查清單/);
+    }
+
+    const analyzeTextRes = runCli(tmpDir, ["instructions", "analyze"]);
+    assert.equal(analyzeTextRes.status, 0, analyzeTextRes.stderr);
+    assert.match(analyzeTextRes.stdout, /## 任務執行原則 \(Execution Protocol\)/);
+    assert.match(analyzeTextRes.stdout, /## 任務清單 \(Task Checklist - analyze\)/);
+    assert.match(analyzeTextRes.stdout, /## 流程檢查清單 \(Process Checklist\)/);
+    assert.match(analyzeTextRes.stdout, /## 業務檢查清單 \(Business Checklist\)/);
+
+    const reviewRes = runCli(tmpDir, ["rules", "review"]);
+    assert.equal(reviewRes.status, 0, reviewRes.stderr);
+    assert.match(reviewRes.stdout, /流程檢查清單（Process Checklist）/);
+    assert.match(reviewRes.stdout, /業務檢查清單（Business Checklist）/);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});

@@ -911,6 +911,7 @@ const AGENTS_LOCALIZED = {
 
 # 重要限制
 
+- **任务说明与双重检查原则**：AI 做事前必须先向用户说明本次任务目标与范围，列出具体「任务清单（Task Checklist）」并按清单顺序逐项执行；任务完成前必须准备并逐项核对「流程检查清单（Process Checklist）」与「业务检查清单（Business Checklist）」。
 - **全项目语言单一纯粹**：所有需求文档（\`srs.md\`、\`uml/\`、\`openapi.yaml\`、\`db-schema.md\`、\`handoff.md\`、\`history.md\`）必须 **100% 使用简体中文**，业界公认英文技术术语（REST API、Webhook、JWT、OAuth 2.0、Payload、Idempotency、Redis 等）保留英文原文。
 - 未经用户确认，不得将文档标记为「已审核」或擅自虚构未确认的业务规则。
 - Git 提交信息格式：\`docs(REQ-001): 需求名称 - 简短需求说明\`。
@@ -949,6 +950,7 @@ const AGENTS_LOCALIZED = {
 
 # 重要な制約
 
+- **タスク説明と二重チェック原則**：AI は作業開始前に必ず今回のタスク目的と範囲を説明し、具体的なタスクチェックリスト（Task Checklist）を提示して順に実行します。完了前には「プロセスチェックリスト（Process Checklist）」と「業務チェックリスト（Business Checklist）」の双方を用意し確認してください。
 - **単一言語の徹底**：すべての要件ドキュメント（\`srs.md\`、\`uml/\`、\`openapi.yaml\`、\`db-schema.md\`、\`handoff.md\`、\`history.md\`）は **100% 日本語** で統一し、REST API、Webhook、JWT、OAuth 2.0、Payload、Idempotency、Redis 等の標準技術用語のみ英語表記を維持してください。
 - ユーザー確認前に「承認済み（已審核 / Approved）」とマークしたり、未確認の業務ルールを推測で補完したりすることは禁止です。
 - Git コミットメッセージ形式：\`docs(REQ-001): 要件名 - 簡潔な説明\`。
@@ -987,6 +989,7 @@ const AGENTS_LOCALIZED = {
 
 # 주요 제한 사항
 
+- **작업 설명 및 이중 체크리스트 원칙**: AI는 작업 시작 전에 반드시 이번 작업의 목표와 범위를 설명하고, 구체적인 작업 체크리스트(Task Checklist)를 제시한 뒤 순서대로 수행해야 합니다. 완료 전에는 **프로세스 체크리스트(Process Checklist)**와 **비즈니스 체크리스트(Business Checklist)**를 각각 준비해 검증해야 합니다.
 - **단일 언어 일관성**: 모든 요구사항 문서(\`srs.md\`, \`uml/\`, \`openapi.yaml\`, \`db-schema.md\`, \`handoff.md\`, \`history.md\`)는 **100% 한국어**로 작성하며, REST API, Webhook, JWT, OAuth 2.0, Payload, Idempotency, Redis 등 표준 기술 용어만 영문 원어를 유지합니다.
 - 사용자 승인 없이 문서를 승인됨 상태로 표시하거나 미확인 비즈니스 규칙을 임의로 가정하지 마세요.
 - Git 커밋 메시지 형식: \`docs(REQ-001): 요구사항 이름 - 간략한 설명\`.
