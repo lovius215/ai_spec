@@ -627,7 +627,7 @@ function buildLocalizedReqFileContent(langCode, relType, replacements = {}) {
         `- ${t.tbd}`,
         "",
         `## ${s.relatedDocs}`,
-        "- `uml/main.puml`",
+        "- `uml/sequence.puml`",
         "- `openapi.yaml`",
         "- `db-schema.md`",
         "- `handoff.md`",
@@ -668,7 +668,7 @@ function buildLocalizedReqFileContent(langCode, relType, replacements = {}) {
             return [
               `## ${h}`,
               "- `srs.md`",
-              "- `uml/main.puml`",
+              "- `uml/sequence.puml`",
               "- `openapi.yaml`",
               "- `db-schema.md`",
               ""
@@ -691,6 +691,7 @@ function buildLocalizedReqFileContent(langCode, relType, replacements = {}) {
         `| v0.1 | ${formatLocalDate()} | ${t.draft} | ${t.tbd} | SRS, UML, OpenAPI, DB | ${t.pending} |`,
         ""
       ].join("\n");
+    case "uml/sequence.puml":
     case "uml/main.puml": {
       const umlCopy = getUmlCopy(langCode);
       const displayName = reqName ? ` ${reqName}` : "";
@@ -932,7 +933,7 @@ const AGENTS_LOCALIZED = {
 
 各要件のアーカイブには以下を必ず含めます：
 - \`srs.md\`: 要件定義書（SRS）
-- \`uml/\`: UML 図ディレクトリ（1 ファイル 1 図を厳守し、\`main.puml\` 等へ分割。UI がある場合は \`uml/wireframe.puml\` に \`@startsalt\` ワイヤーフレームを作成）
+- \`uml/\`: UML 図ディレクトリ（1 ファイル 1 図を厳守し、\`sequence.puml\` 等へ分割。UI がある場合は \`uml/wireframe.puml\` に \`@startsalt\` ワイヤーフレームを作成）
 - \`openapi.yaml\`: OpenAPI 3.0.3 ドラフト
 - \`db-schema.md\`: DB Schema ドラフト
 - \`handoff.md\`: 開発ハンドオフサマリー

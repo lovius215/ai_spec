@@ -57,7 +57,7 @@ project/
   REQ-001-login/
     srs.md
     uml/
-      main.puml
+      sequence.puml
     openapi.yaml
     db-schema.md
     handoff.md
@@ -291,7 +291,7 @@ sa-spec check
 | `sa-spec hooks [install\|remove\|status] [--force]` | 安裝、移除或查詢 Git `pre-commit` hook（於每次 `git commit` 前自動執行 `sa-spec check --strict`，並保護既有自訂 hook）。 |
 | `sa-spec status` | 顯示系統規格與需求索引狀態。 |
 | `sa-spec doctor` | 檢查必要檔案是否存在。 |
-| `sa-spec upgrade [--dry-run] [--keep-legacy]` | 將既有專案升級為最新版本：更新 `AGENTS.md`、自動刪除舊版套件管理的 `skills/` 與 `rules/`（可用 `--keep-legacy` 保留），並將既有需求中的 `uml.puml` 自動遷移為 `uml/main.puml`。（別名：`sa-spec update`） |
+| `sa-spec upgrade [--dry-run] [--keep-legacy]` | 將既有專案升級為最新版本：更新 `AGENTS.md`、自動刪除舊版套件管理的 `skills/` 與 `rules/`（可用 `--keep-legacy` 保留），並將既有需求中的 `uml.puml` 自動遷移為 `uml/sequence.puml`。（別名：`sa-spec update`） |
 
 `sa-spec new` 是快速建空白模板的輔助工具。正式需求流程仍建議使用 `spec:init`、`spec:propose`、`spec:analyze`、`spec:commit`。
 

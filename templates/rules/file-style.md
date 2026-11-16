@@ -20,7 +20,7 @@
 - 每個需求資料夾固定包含：
   - `srs.md`：需求規格（含畫面與行為規格，涉及畫面時搭配 `uml/wireframe.puml`）。
   - `history.md`：需求歷程。
-  - `uml/`：UML 圖目錄，依面向拆分為獨立 `.puml` 檔（如 `main.puml`、`sequence.puml`、`wireframe.puml`，單檔單圖，禁止單檔混放多圖）。
+  - `uml/`：UML 圖目錄，依圖型與面向拆分為獨立 `.puml` 檔（如 `sequence.puml`、`activity.puml`、`state.puml`、`wireframe.puml`，單檔單圖，禁止單檔混放多圖）。
   - `openapi.yaml`：OpenAPI 3.0.3 介面契約草稿。
   - `db-schema.md`：DB Schema 草稿。
   - `handoff.md`：給 OpenSpec 或其他 AI 開發工具的開發交接摘要。
@@ -34,7 +34,7 @@ project/
     srs.md
     history.md
     uml/
-      main.puml
+      sequence.puml
       sequence.puml
       wireframe.puml
     openapi.yaml

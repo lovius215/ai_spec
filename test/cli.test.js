@@ -118,7 +118,7 @@ test("#3 & #7 check detects version mismatch, multi-diagram puml, leftover {{REQ
   // Introduce multi-diagram puml + leftover placeholder + broken handoff -> non-zero exit code
   const reqDir = path.join(dir, "project", "REQ-001-login");
   fs.writeFileSync(
-    path.join(reqDir, "uml", "main.puml"),
+    path.join(reqDir, "uml", "sequence.puml"),
     "@startuml\nA -> B\n@enduml\n@startuml\nC -> D\n@enduml\n",
     "utf8"
   );
@@ -283,7 +283,7 @@ test("#11 init --lang ja localizes AGENTS.md and UML, instructions emits directi
   const newRes = runCli(dir, ["new", "--name", "カート決済", "--slug", "cart-checkout"]);
   assert.equal(newRes.status, 0, newRes.stderr);
 
-  const mainPuml = fs.readFileSync(path.join(dir, "project", "cart-checkout", "uml", "main.puml"), "utf8");
+  const mainPuml = fs.readFileSync(path.join(dir, "project", "cart-checkout", "uml", "sequence.puml"), "utf8");
   assert.match(mainPuml, /主要シーケンス図/);
   assert.match(mainPuml, /ユーザー/);
   assert.match(mainPuml, /カート決済/);
@@ -880,7 +880,7 @@ test("#20 --id normalization, sorted ensureIndexRow, local history date, and che
   fs.rmSync(path.join(dir, "project", "REQ-002-second"), { recursive: true, force: true });
   const req3Dir = path.join(dir, "project", "REQ-003-manual");
   fs.cpSync(path.join(dir, "project", "REQ-001-first"), req3Dir, { recursive: true });
-  for (const rel of ["srs.md", "openapi.yaml", "db-schema.md", "handoff.md", "history.md", "uml/main.puml", "uml/wireframe.puml"]) {
+  for (const rel of ["srs.md", "openapi.yaml", "db-schema.md", "handoff.md", "history.md", "uml/sequence.puml", "uml/wireframe.puml"]) {
     const p = path.join(req3Dir, rel);
     fs.writeFileSync(p, fs.readFileSync(p, "utf8").replace(/REQ-001/g, "REQ-003"), "utf8");
   }
@@ -1449,14 +1449,14 @@ test("#25 third-pass audit: strict init --lang, SRS placeholder/heading metadata
     assert.equal(finNext.status, 0, finNext.stderr || finNext.stdout);
     assert.equal(fs.existsSync(path.join(edgeDir, "project", "REQ-003-next-feature")), true);
 
-    // Replace uml/main.puml with a directory -> check reports both file type error and no valid .puml
-    const mainPumlPath = path.join(edgeDir, "project", "REQ-003-next-feature", "uml", "main.puml");
+    // Replace uml/sequence.puml with a directory -> check reports both file type error and no valid .puml
+    const mainPumlPath = path.join(edgeDir, "project", "REQ-003-next-feature", "uml", "sequence.puml");
     fs.unlinkSync(mainPumlPath);
     fs.mkdirSync(mainPumlPath);
     fs.unlinkSync(path.join(edgeDir, "project", "REQ-003-next-feature", "uml", "wireframe.puml"));
     const pumlDirCheck = runCli(edgeDir, ["check"]);
     assert.notEqual(pumlDirCheck.status, 0);
-    assert.match(pumlDirCheck.stdout, /uml\/main\.puml 必須為檔案而非目錄/);
+    assert.match(pumlDirCheck.stdout, /uml\/sequence\.puml 必須為檔案而非目錄/);
     assert.match(pumlDirCheck.stdout, /uml\/ 目錄內沒有任何 \.puml 檔案/);
 
     // Replace srs.md with a directory -> reindex and upgrade survive cleanly without EISDIR crash
@@ -1894,7 +1894,7 @@ test("#31 OpenAPI 3.0.3 & PlantUML syntax pre-checks, cross-REQ impact index, pd
       ].join("\n"),
       "utf8"
     );
-    fs.writeFileSync(path.join(req1Dir, "uml", "main.puml"), "@startuml\n' empty diagram\n@enduml\n", "utf8");
+    fs.writeFileSync(path.join(req1Dir, "uml", "sequence.puml"), "@startuml\n' empty diagram\n@enduml\n", "utf8");
     fs.writeFileSync(
       path.join(req1Dir, "uml", "flow.puml"),
       "@startuml\npackage Auth {\n  [Login]\n@enduml\n",
@@ -1912,7 +1912,7 @@ test("#31 OpenAPI 3.0.3 & PlantUML syntax pre-checks, cross-REQ impact index, pd
 
     // 2. Valid overlapping OpenAPI & DB tables across REQ-001 and REQ-002 -> impact & instructions analyze report collisions
     fs.rmSync(path.join(req1Dir, "uml", "flow.puml"), { force: true });
-    fs.writeFileSync(path.join(req1Dir, "uml", "main.puml"), "@startuml\nAlice -> Bob: Auth\n@enduml\n", "utf8");
+    fs.writeFileSync(path.join(req1Dir, "uml", "sequence.puml"), "@startuml\nAlice -> Bob: Auth\n@enduml\n", "utf8");
     const validApi = [
       "openapi: 3.0.3",
       "info:",

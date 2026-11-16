@@ -372,7 +372,7 @@ function createReqTemplate(args, label = "new") {
       ensureDir(reqDir),
       ensureDir(umlDir),
       writeReqArtifact(langConfig.code, "srs.md", path.join(reqDir, "srs.md"), replacements),
-      writeReqArtifact(langConfig.code, "uml/main.puml", path.join(umlDir, "main.puml"), replacements),
+      writeReqArtifact(langConfig.code, "uml/sequence.puml", path.join(umlDir, "sequence.puml"), replacements),
       writeReqArtifact(langConfig.code, "uml/wireframe.puml", path.join(umlDir, "wireframe.puml"), replacements),
       writeReqArtifact(langConfig.code, "openapi.yaml", path.join(reqDir, "openapi.yaml"), replacements),
       writeReqArtifact(langConfig.code, "db-schema.md", path.join(reqDir, "db-schema.md"), replacements),
@@ -394,7 +394,7 @@ function createReqTemplate(args, label = "new") {
     ensureDir(reqDir),
     ensureDir(umlDir),
     writeReqArtifact(langConfig.code, "srs.md", path.join(reqDir, "srs.md"), replacements),
-    writeReqArtifact(langConfig.code, "uml/main.puml", path.join(umlDir, "main.puml"), replacements),
+    writeReqArtifact(langConfig.code, "uml/sequence.puml", path.join(umlDir, "sequence.puml"), replacements),
     writeReqArtifact(langConfig.code, "uml/wireframe.puml", path.join(umlDir, "wireframe.puml"), replacements),
     writeReqArtifact(langConfig.code, "openapi.yaml", path.join(reqDir, "openapi.yaml"), replacements),
     writeReqArtifact(langConfig.code, "db-schema.md", path.join(reqDir, "db-schema.md"), replacements),
@@ -1110,7 +1110,7 @@ function upgradeProject(args = []) {
         const oldUmlAbsPath = path.join(cwd, oldUmlRelPath);
         const newUmlRelDir = path.join(reqRelDir, "uml");
         const newUmlAbsDir = path.join(cwd, newUmlRelDir);
-        const newMainUmlRelPath = path.join(newUmlRelDir, "main.puml");
+        const newMainUmlRelPath = path.join(newUmlRelDir, "sequence.puml");
         const newMainUmlAbsPath = path.join(cwd, newMainUmlRelPath);
 
         if (isExistingFile(oldUmlAbsPath)) {

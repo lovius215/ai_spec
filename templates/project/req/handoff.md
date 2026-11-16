@@ -4,7 +4,7 @@
 
 ## 來源文件
 - `srs.md`
-- `uml/main.puml`
+- `uml/sequence.puml`
 - `openapi.yaml`
 - `db-schema.md`
 

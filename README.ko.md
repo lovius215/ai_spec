@@ -39,7 +39,7 @@ project/
   REQ-001-login/
     srs.md           # 소프트웨어 요구사항 명세서 (SRS)
     uml/
-      main.puml      # 독립 PlantUML 다이어그램 (파일당 1개 다이어그램 원칙)
+      sequence.puml  # 독립 PlantUML 다이어그램 (파일당 1개 다이어그램 원칙)
     openapi.yaml     # OpenAPI 3.0 사양 초안
     db-schema.md     # 데이터베이스 스키마 및 마이그레이션 정의
     handoff.md       # AI 개발 도구 인수인계 요약 (OpenSpec / Claude Code 진입점)

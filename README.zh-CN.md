@@ -39,7 +39,7 @@ project/
   REQ-001-login/
     srs.md           # 软件需求规格说明书 (SRS)
     uml/
-      main.puml      # 独立 PlantUML 图（单文件单图原则）
+      sequence.puml  # 独立 PlantUML 图（单文件单图原则）
     openapi.yaml     # OpenAPI 3.0 接口草案
     db-schema.md     # 数据库表结构与变更说明
     handoff.md       # AI 开发者交接摘要 (面向 OpenSpec / Claude Code)

@@ -39,7 +39,7 @@ project/
   REQ-001-login/
     srs.md           # ソフトウェア要件仕様書 (SRS)
     uml/
-      main.puml      # 独立した PlantUML 図（1ファイル1図の原則）
+      sequence.puml  # 独立した PlantUML 図（1ファイル1図の原則）
     openapi.yaml     # OpenAPI 3.0 ドラフト
     db-schema.md     # データベーススキーマ仕様書
     handoff.md       # AI 開発ツール向け引き継ぎ要約 (OpenSpec / Claude Code エントリポイント)

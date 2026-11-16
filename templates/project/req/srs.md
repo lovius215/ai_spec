@@ -31,7 +31,7 @@
 - 待補充。
 
 ## 相關文件
-- `uml/main.puml`
+- `uml/sequence.puml`
 - `openapi.yaml`
 - `db-schema.md`
 - `handoff.md`

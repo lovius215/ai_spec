@@ -15,7 +15,7 @@
 每個需求歸檔時固定包含：
 
 - `srs.md`：需求規格。
-- `uml/`：UML 圖目錄（依面向拆分為獨立 `.puml` 檔，如 `main.puml`、`sequence.puml` 等，禁止單檔混放多圖）。
+- `uml/`：UML 圖目錄（依圖型與面向拆分為獨立 `.puml` 檔，如 `sequence.puml`、`activity.puml`、`state.puml` 等，禁止單檔混放多圖）。
 - `openapi.yaml`：OpenAPI 草稿。
 - `db-schema.md`：DB Schema 草稿。
 - `handoff.md`：給 OpenSpec 或其他 AI 開發工具的開發交接摘要。
@@ -61,7 +61,7 @@
   4. **自動合併回主分支並推送**：若目前處於 feature 分支（`feat/<name>`），AI 必須自動切換回主分支（優先偵測 `main` 或 `master`），拉取/檢查最新狀態並自動合併該 feature 分支 (`git checkout master && git merge feat/<name>`)，隨後在主分支重新生成 `project/index.md` 索引；若有設定 remote，**必須自動將主分支推送至 remote**（`git push <remote> <mainBranch>`）。
 - 多人協作與 Git-Flow 模式（延遲綁定序號與自動合併）：支援多人平行開發。執行 `spec:propose`（或 `scp`）時，若目前處於 master/main 分支，AI 必須自動依需求名稱建立並切換至專屬 feature branch（如 `feat/<name>`），檢查若有設定 Git remote 則立即將新分支推上 remote（`git push -u <remote> feat/<name>`），並在 `project/<name>/` 建立草稿目錄，內部使用 `{{REQ_ID}}` 佔位，無需使用者手動敲 CLI；執行 `spec:analyze` 前應先確保取得 master 最新規格以防漏檢衝突；執行 `spec:commit` 歸檔時先推分支到 remote，再向 master 確認最新可用序號定號，自動將目錄定名為正式 `REQ-xxx`、替換內部佔位符、完成提交、自動合併回 master 並推上 remote，避免多人合併時的序號競爭與索引衝突。
 - 文件未經使用者確認，不得標示為 `已審核`。
-- `uml/` 內的 UML 圖不限單一 UML 圖型；`spec:analyze` 必須依需求選擇最能說明流程、互動、狀態、資料關係或介面佈局的圖表，例如活動圖、循序圖、使用案例圖、狀態圖、類別圖；**若需求涉及前端 UI 或使用者操作畫面，必須在 `uml/wireframe.puml` 產出線框圖（使用 PlantUML Salt 語法：`@startsalt ... @endsalt`）**；純後端需求則在 `handoff.md` 明確標記「無 UI 介面需求」。**嚴禁將多張圖混在同一個檔案中**，必須在需求資料夾下的 `uml/` 目錄拆分成獨立的 `.puml` 檔案（例如 `uml/main.puml`、`uml/sequence.puml`、`uml/wireframe.puml`），且每個檔案只能包含一組 `@start...` 與 `@end...`，以避免 PlantUML 渲染或預覽失敗。
+- `uml/` 內的 UML 圖不限單一 UML 圖型；`spec:analyze` 必須依需求選擇最能說明流程、互動、狀態、資料關係或介面佈局的圖表，例如活動圖、循序圖、使用案例圖、狀態圖、類別圖；**若需求涉及前端 UI 或使用者操作畫面，必須在 `uml/wireframe.puml` 產出線框圖（使用 PlantUML Salt 語法：`@startsalt ... @endsalt`）**；純後端需求則在 `handoff.md` 明確標記「無 UI 介面需求」。**嚴禁將多張圖混在同一個檔案中**，必須在需求資料夾下的 `uml/` 目錄拆分成獨立的 `.puml` 檔案（例如 `uml/sequence.puml`、`uml/activity.puml`、`uml/wireframe.puml`），且每個檔案只能包含一組 `@start...` 與 `@end...`，以避免 PlantUML 渲染或預覽失敗。
 - 一次最多問 3 個待確認問題，優先詢問會影響範圍、資料、權限、API、DB 或驗收的問題。
 
 # 衝突檢查重點
@@ -104,7 +104,7 @@ project/
   REQ-001-name/
     srs.md
     uml/
-      main.puml
+      sequence.puml
     openapi.yaml
     db-schema.md
     handoff.md

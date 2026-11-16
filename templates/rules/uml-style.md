@@ -2,7 +2,7 @@
 
 ## 格式
 - UML 圖一律使用 PlantUML。
-- PlantUML 檔案副檔名使用 `.puml`，放置於需求的 `uml/` 資料夾中（例如 `uml/main.puml`、`uml/sequence.puml`）。
+- PlantUML 檔案副檔名使用 `.puml`，放置於需求的 `uml/` 資料夾中，並以圖型命名（例如 `uml/sequence.puml`、`uml/activity.puml`、`uml/state.puml`）。
 - **嚴禁將多張圖混在同一個檔案中**：每個 `.puml` 檔案僅能包含單一組 `@start...` 與 `@end...` 區塊（例如 `@startuml`...`@enduml` 或 `@startsalt`...`@endsalt`），避免 PlantUML 預覽或渲染工具解析失敗或無法開啟。
 - 若需求涉及多個面向（例如業務流程、循序互動、狀態轉換），必須依圖型或面向拆分成獨立的 `.puml` 檔案。
 - 圖表內容依 `project/system-spec.md` 鎖定之主要語言描述（支援 `zh-TW`、`en`、`zh-CN`、`ja`、`ko`），同一專案內維持單一語言，標準技術術語保留英文。

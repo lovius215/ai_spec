@@ -15,7 +15,7 @@ This workspace uses `@loviusc/sa-spec` with CLI-bundled specifications. **No `sk
 Each archived requirement directory must include:
 
 - `srs.md`: Software Requirements Specification.
-- `uml/`: PlantUML diagrams directory (one diagram per `.puml` file, e.g., `main.puml`, `sequence.puml`; never mix multiple `@start...@end` blocks in one file).
+- `uml/`: PlantUML diagrams directory (one diagram per `.puml` file named by diagram type, e.g., `sequence.puml`, `activity.puml`, `state.puml`; never mix multiple `@start...@end` blocks in one file).
 - `openapi.yaml`: OpenAPI 3.x contract draft.
 - `db-schema.md`: Database schema draft.
 - `handoff.md`: Developer handoff brief for OpenSpec or other AI coding tools.

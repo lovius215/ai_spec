@@ -39,7 +39,7 @@ project/
   REQ-001-login/
     srs.md           # Software Requirements Specification
     uml/
-      main.puml      # Standalone PlantUML diagrams (single-diagram-per-file)
+      sequence.puml  # Standalone PlantUML diagrams (single-diagram-per-file)
     openapi.yaml     # OpenAPI 3.0 specification draft
     db-schema.md     # Database schema and migration draft
     handoff.md       # AI developer handoff brief (OpenSpec / Claude Code entry point)

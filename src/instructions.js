@@ -124,7 +124,7 @@ const STAGE_CONFIG = {
       "history",
       "review"
     ],
-    recommendedTemplates: ["srs", "openapi", "db-schema", "handoff", "history", "uml-main", "uml-wireframe"],
+    recommendedTemplates: ["srs", "openapi", "db-schema", "handoff", "history", "uml-sequence", "uml-wireframe"],
     steps: [
       "先確認已同步主分支最新規格（如有 remote 先執行 git fetch），避免多人平行開發漏檢衝突。",
       "讀取 project/index.md、project/system-spec.md 與所有 project/REQ-*/{srs.md,openapi.yaml,db-schema.md,handoff.md,uml/*.puml}，檢查目標流程、角色權限、API、DB 與驗收條件衝突。",
@@ -221,7 +221,7 @@ const TEMPLATE_DEFINITIONS = [
   { name: "db-schema", path: path.join("project", "req", "db-schema.md"), description: "DB Schema 範本" },
   { name: "handoff", path: path.join("project", "req", "handoff.md"), description: "AI 開發交接摘要範本" },
   { name: "history", path: path.join("project", "req", "history.md"), description: "需求版本歷程範本" },
-  { name: "uml-main", path: path.join("project", "req", "uml", "main.puml"), description: "PlantUML 主流程圖範本" },
+  { name: "uml-sequence", path: path.join("project", "req", "uml", "sequence.puml"), description: "PlantUML 循序圖範本" },
   { name: "uml-wireframe", path: path.join("project", "req", "uml", "wireframe.puml"), description: "PlantUML Salt UI 線框圖範本" }
 ];
 
@@ -640,7 +640,8 @@ function buildLocalizedTemplateByName(name, langConfig, templatesDir) {
     "db-schema": "db-schema.md",
     handoff: "handoff.md",
     history: "history.md",
-    "uml-main": "uml/main.puml",
+    "uml-sequence": "uml/sequence.puml",
+    "uml-main": "uml/sequence.puml",
     "uml-wireframe": "uml/wireframe.puml"
   };
   if (name === "AGENTS") {
@@ -699,7 +700,11 @@ function runTemplatesList({ cwd = process.cwd(), templatesDir, args = [], fail }
     return;
   }
 
-  const normalized = target.replace(/\\/g, "/").toLowerCase();
+  const rawNormalized = target.replace(/\\/g, "/").toLowerCase();
+  const normalized =
+    rawNormalized === "uml-main" || rawNormalized === "project/req/uml/main.puml"
+      ? "uml-sequence"
+      : rawNormalized;
   const matched = entries.find(
     (entry) => entry.name.toLowerCase() === normalized || entry.path.toLowerCase() === normalized
   );
