@@ -5,7 +5,8 @@ const {
   buildHtmlDocument,
   convertMarkdownFileToPdf,
   buildMergedRequirementMarkdown,
-  renderHtmlToPdf
+  renderHtmlToPdf,
+  renderHtmlToFile
 } = require("./pdf");
 const {
   SUPPORTED_LANGS,
@@ -38,7 +39,7 @@ const {
   installPreCommitHook,
   removePreCommitHook
 } = require("./git");
-const { runDoctor, runCheck, isDraftSpecDir, isExistingDir, isExistingFile, isReqDirName } = require("./validator");
+const { runDoctor, runCheck, isDraftSpecDir, isExistingDir, isExistingFile, isReqDirName, buildImpactIndex } = require("./validator");
 const { runInstructions, runRules, runTemplatesList, getOption, getPositionalArgs } = require("./instructions");
 
 const cwd = process.cwd();
@@ -105,6 +106,9 @@ function main() {
         return;
       case "hooks":
         runHooks(args.slice(1));
+        return;
+      case "impact":
+        runImpact(args.slice(1));
         return;
       case "version":
       case "--version":
@@ -1370,6 +1374,7 @@ function exportReqDirToPdf(reqAbsDir, options = {}) {
   const { split = false, output = null, browser = null, pdfOptions = {} } = options;
   const dirName = path.basename(reqAbsDir);
   const results = [];
+  const ext = pdfOptions.htmlOnly ? ".html" : ".pdf";
 
   if (!split) {
     const merged = buildMergedRequirementMarkdown(reqAbsDir, pdfOptions);
@@ -1378,16 +1383,18 @@ function exportReqDirToPdf(reqAbsDir, options = {}) {
       return results;
     }
 
-    const defaultOut = path.join(reqAbsDir, `${dirName}.pdf`);
-    const targetPdf = output ? path.resolve(cwd, output) : defaultOut;
+    const defaultOut = path.join(reqAbsDir, `${dirName}${ext}`);
+    const targetOut = output ? path.resolve(cwd, output) : defaultOut;
     const html = buildHtmlDocument(merged.title, merged.markdown, pdfOptions);
-    const res = renderHtmlToPdf(html, targetPdf, browser);
-    const relPdf = path.relative(cwd, targetPdf);
+    const res = pdfOptions.htmlOnly
+      ? renderHtmlToFile(html, targetOut)
+      : renderHtmlToPdf(html, targetOut, browser);
+    const relOut = path.relative(cwd, targetOut);
 
     if (res.ok) {
-      results.push({ action: "create", target: relPdf, message: `整包規格書匯出完成 (${res.engine})` });
+      results.push({ action: "create", target: relOut, message: `整包規格書匯出完成 (${res.engine})` });
     } else {
-      results.push({ action: "warn", target: relPdf, message: res.error });
+      results.push({ action: "warn", target: relOut, message: res.error });
     }
     return results;
   }
@@ -1396,13 +1403,13 @@ function exportReqDirToPdf(reqAbsDir, options = {}) {
   for (const fileName of mdFiles) {
     const mdAbs = path.join(reqAbsDir, fileName);
     if (!fs.existsSync(mdAbs)) continue;
-    const pdfAbs = mdAbs.replace(/\.md$/i, ".pdf");
-    const res = convertMarkdownFileToPdf(mdAbs, pdfAbs, browser, pdfOptions);
-    const relPdf = path.relative(cwd, pdfAbs);
+    const outAbs = mdAbs.replace(/\.md$/i, ext);
+    const res = convertMarkdownFileToPdf(mdAbs, outAbs, browser, pdfOptions);
+    const relOut = path.relative(cwd, outAbs);
     if (res.ok) {
-      results.push({ action: "create", target: relPdf, message: `匯出完成 (${res.engine})` });
+      results.push({ action: "create", target: relOut, message: `匯出完成 (${res.engine})` });
     } else {
-      results.push({ action: "warn", target: relPdf, message: res.error });
+      results.push({ action: "warn", target: relOut, message: res.error });
     }
   }
   return results;
@@ -1411,12 +1418,13 @@ function exportReqDirToPdf(reqAbsDir, options = {}) {
 function runPdf(args = []) {
   const split = args.includes("--split");
   const all = args.includes("--all");
+  const htmlOnly = args.includes("--html");
   const noUmlRender = args.includes("--no-uml-render");
   const onlineUml = args.includes("--online-uml");
   const output = getOption(args, "--output");
   const browser = getOption(args, "--browser");
   const langConfig = detectProjectLanguage(cwd);
-  const pdfOptions = { noUmlRender, onlineUml, lang: langConfig.code };
+  const pdfOptions = { htmlOnly, noUmlRender, onlineUml, lang: langConfig.code };
 
   const positional = getPositionalArgs(args, ["--output", "--browser"]);
   const target = positional[0];
@@ -1430,7 +1438,7 @@ function runPdf(args = []) {
   }
   if (!all && !target) {
     fail(
-      "Usage: sa-spec pdf <file.md|REQ-001|name> [--split] [--output out.pdf] [--browser <path>] [--online-uml | --no-uml-render]\n       sa-spec pdf --all [--split] [--online-uml | --no-uml-render]"
+      "Usage: sa-spec pdf <file.md|REQ-001|name> [--split] [--html] [--output out.pdf] [--browser <path>] [--online-uml | --no-uml-render]\n       sa-spec pdf --all [--split] [--html] [--online-uml | --no-uml-render]"
     );
     return;
   }
@@ -1468,17 +1476,18 @@ function runPdf(args = []) {
   const directFileAbs = path.resolve(cwd, target);
   if (fs.existsSync(directFileAbs) && fs.statSync(directFileAbs).isFile()) {
     const res = convertMarkdownFileToPdf(directFileAbs, output, browser, pdfOptions);
-    const defaultPdfAbs = path.join(
+    const defaultOutExt = htmlOnly ? ".html" : ".pdf";
+    const defaultOutAbs = path.join(
       path.dirname(directFileAbs),
-      `${path.basename(directFileAbs, path.extname(directFileAbs))}.pdf`
+      `${path.basename(directFileAbs, path.extname(directFileAbs))}${defaultOutExt}`
     );
-    const targetPdf = output
+    const targetOut = output
       ? path.relative(cwd, path.resolve(cwd, output))
-      : path.relative(cwd, defaultPdfAbs);
+      : path.relative(cwd, defaultOutAbs);
     if (res.ok) {
-      results.push({ action: "create", target: targetPdf, message: `單檔轉換完成 (${res.engine})` });
+      results.push({ action: "create", target: targetOut, message: `單檔轉換完成 (${res.engine})` });
     } else {
-      results.push({ action: "warn", target: targetPdf, message: res.error });
+      results.push({ action: "warn", target: targetOut, message: res.error });
       process.exitCode = 1;
     }
     printResultList("pdf", results);
@@ -1537,6 +1546,38 @@ function runHooks(args = []) {
   fail(`不支援的 hooks 子指令 "${action}"。可用子指令: install, remove, status`);
 }
 
+function runImpact(args = []) {
+  const asJson = args.includes("--json");
+  const index = buildImpactIndex(cwd);
+  if (asJson) {
+    console.log(JSON.stringify(index, null, 2));
+    return;
+  }
+  console.log("sa-spec impact");
+  if (index.requirements.length === 0) {
+    console.log("目前 project/ 內尚無需求或草稿目錄。");
+    return;
+  }
+  for (const r of index.requirements) {
+    const tag = r.isDraft ? `${r.dir} (草稿)` : r.dir;
+    console.log(`- ${tag}${r.status ? ` [${r.status}]` : ""}`);
+    console.log(`  API: ${r.apis.join(", ") || "無"}`);
+    console.log(`  DB : ${r.tables.join(", ") || "無"}`);
+  }
+  if (index.apiCollisions.length > 0) {
+    console.log("\n潛在 API 端點重疊:");
+    for (const c of index.apiCollisions) {
+      console.log(`  - ${c.endpoint}: ${c.dirs.join(", ")}`);
+    }
+  }
+  if (index.tableCollisions.length > 0) {
+    console.log("\n潛在 DB 資料表重疊:");
+    for (const c of index.tableCollisions) {
+      console.log(`  - ${c.table}: ${c.dirs.join(", ")}`);
+    }
+  }
+}
+
 function showHelp() {
   console.log(`sa-spec
 
@@ -1548,8 +1589,9 @@ Usage:
   sa-spec rules [name|all] [--list] [--json]
   sa-spec templates [name] [--lang <code>] [--list] [--json]
   sa-spec template <system-spec|req> [options]
-  sa-spec pdf <file.md|REQ-001|name> [--split] [--output out.pdf] [--browser <path>] [--online-uml | --no-uml-render]
-  sa-spec pdf --all [--split] [--browser <path>] [--online-uml | --no-uml-render]
+  sa-spec pdf <file.md|REQ-001|name> [--split] [--html] [--output out.pdf] [--browser <path>] [--online-uml | --no-uml-render]
+  sa-spec pdf --all [--split] [--html] [--browser <path>] [--online-uml | --no-uml-render]
+  sa-spec impact [--json]
   sa-spec hooks [install|remove|status] [--force]
   sa-spec reindex
   sa-spec check [--strict] [--json] [--allow-multi-req]

@@ -1859,3 +1859,100 @@ test("#30 harness upgrades: check --json structured feedback, YAML structure che
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test("#31 OpenAPI 3.0.3 & PlantUML syntax pre-checks, cross-REQ impact index, pdf --html, and doctor env report", () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sa-spec-31-lint-impact-"));
+  try {
+    assert.equal(runCli(tmpDir, ["init", "--lang", "zh-TW"]).status, 0);
+    const docRes = runCli(tmpDir, ["doctor"]);
+    assert.equal(docRes.status, 0, docRes.stderr);
+    assert.match(docRes.stdout, /PDF 瀏覽器:/);
+    assert.match(docRes.stdout, /PlantUML CLI:/);
+
+    assert.equal(runCli(tmpDir, ["new", "--id", "REQ-001", "--name", "auth"]).status, 0);
+    assert.equal(runCli(tmpDir, ["new", "--id", "REQ-002", "--name", "order"]).status, 0);
+
+    const req1Dir = path.join(tmpDir, "project", "REQ-001-auth");
+    const req2Dir = path.join(tmpDir, "project", "REQ-002-order");
+
+    // 1. OpenAPI contract + PlantUML syntax errors detected via check --json
+    fs.writeFileSync(
+      path.join(req1Dir, "openapi.yaml"),
+      [
+        "openapi: 3.0.3",
+        "info:",
+        "  title: Auth",
+        "  version: 0.1.0",
+        "paths:",
+        "  users:",
+        "    post:",
+        "      requestBody:",
+        "        content:",
+        "          application/json:",
+        "            schema:",
+        "              $ref: '#/components/schemas/MissingReq'"
+      ].join("\n"),
+      "utf8"
+    );
+    fs.writeFileSync(path.join(req1Dir, "uml", "main.puml"), "@startuml\n' empty diagram\n@enduml\n", "utf8");
+    fs.writeFileSync(
+      path.join(req1Dir, "uml", "flow.puml"),
+      "@startuml\npackage Auth {\n  [Login]\n@enduml\n",
+      "utf8"
+    );
+
+    const badCheckRes = runCli(tmpDir, ["check", "--json"]);
+    assert.notEqual(badCheckRes.status, 0);
+    const badParsed = JSON.parse(badCheckRes.stdout);
+    assert.ok(badParsed.issues.some((i) => i.rule === "OPENAPI_CONTRACT_INVALID" && /必須以 "\/" 開頭/.test(i.message)));
+    assert.ok(badParsed.issues.some((i) => i.rule === "OPENAPI_CONTRACT_INVALID" && /缺少 responses/.test(i.message)));
+    assert.ok(badParsed.issues.some((i) => i.rule === "OPENAPI_CONTRACT_INVALID" && /MissingReq/.test(i.message)));
+    assert.ok(badParsed.issues.some((i) => i.rule === "PLANTUML_SYNTAX_INVALID" && /圖表內容為空/.test(i.message)));
+    assert.ok(badParsed.issues.some((i) => i.rule === "PLANTUML_SYNTAX_INVALID" && /大括號不成對/.test(i.message)));
+
+    // 2. Valid overlapping OpenAPI & DB tables across REQ-001 and REQ-002 -> impact & instructions analyze report collisions
+    fs.rmSync(path.join(req1Dir, "uml", "flow.puml"), { force: true });
+    fs.writeFileSync(path.join(req1Dir, "uml", "main.puml"), "@startuml\nAlice -> Bob: Auth\n@enduml\n", "utf8");
+    const validApi = [
+      "openapi: 3.0.3",
+      "info:",
+      "  title: Shared",
+      "  version: 0.1.0",
+      "paths:",
+      "  /api/users:",
+      "    get:",
+      "      responses:",
+      "        '200':",
+      "          description: ok"
+    ].join("\n");
+    fs.writeFileSync(path.join(req1Dir, "openapi.yaml"), validApi, "utf8");
+    fs.writeFileSync(path.join(req2Dir, "openapi.yaml"), validApi, "utf8");
+    fs.writeFileSync(path.join(req1Dir, "db-schema.md"), "# DB\n\n## users\n\n- id\n", "utf8");
+    fs.writeFileSync(path.join(req2Dir, "db-schema.md"), "# DB\n\n## Table: users\n\n- id\n", "utf8");
+
+    const impactRes = runCli(tmpDir, ["impact", "--json"]);
+    assert.equal(impactRes.status, 0, impactRes.stderr);
+    const impact = JSON.parse(impactRes.stdout);
+    assert.equal(impact.requirements.length, 2);
+    assert.ok(impact.apiCollisions.some((c) => c.endpoint === "GET /api/users" && c.dirs.length === 2));
+    assert.ok(impact.tableCollisions.some((c) => c.table === "users" && c.dirs.length === 2));
+
+    const instAnalyzeRes = runCli(tmpDir, ["instructions", "analyze", "--json"]);
+    assert.equal(instAnalyzeRes.status, 0, instAnalyzeRes.stderr);
+    const instAnalyze = JSON.parse(instAnalyzeRes.stdout);
+    assert.ok(instAnalyze.impactIndex && instAnalyze.impactIndex.apiCollisions.length === 1);
+
+    // 3. Browserless pdf --html export works without Chrome
+    const htmlMergedRes = runCli(tmpDir, ["pdf", "REQ-001", "--html"]);
+    assert.equal(htmlMergedRes.status, 0, htmlMergedRes.stderr);
+    const outMergedHtml = path.join(req1Dir, "REQ-001-auth.html");
+    assert.equal(fs.existsSync(outMergedHtml), true);
+    assert.match(fs.readFileSync(outMergedHtml, "utf8"), /<html/i);
+
+    const htmlSingleRes = runCli(tmpDir, ["pdf", "project/REQ-001-auth/srs.md", "--html"]);
+    assert.equal(htmlSingleRes.status, 0, htmlSingleRes.stderr);
+    assert.equal(fs.existsSync(path.join(req1Dir, "srs.html")), true);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});

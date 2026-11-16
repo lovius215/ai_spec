@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
 const { extractSpecVersion, extractStatusFromContent, parseIndexRows } = require("./i18n");
+const { detectPdfEnvironment } = require("./pdf");
 
 const REQUIRED_DELIVERABLES = [
   "srs.md",
@@ -234,6 +235,29 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
         const endCount = (pumlText.match(/@end\w+/gi) || []).length;
         if (startCount !== 1 || endCount !== 1) {
           issues.push(`uml/${f} 違反單檔單圖原則 (@start=${startCount}, @end=${endCount})`);
+        } else {
+          const bodyMatch = pumlText.match(/@start\w+[^\r\n]*\r?\n([\s\S]*?)\r?\n@end\w+/i);
+          const bodyText = bodyMatch ? bodyMatch[1] : "";
+          const strippedComments = bodyText
+            .replace(/\/'[\s\S]*?'\//g, "")
+            .split(/\r?\n/)
+            .filter((line) => {
+              const t = line.trim();
+              if (!t || t.startsWith("'")) return false;
+              if (/^(?:title|skinparam)\b/i.test(t) && !t.includes("{")) return false;
+              return true;
+            })
+            .join("\n");
+          if (!strippedComments.trim()) {
+            issues.push(`uml/${f} 圖表內容為空，請補上具體 UML 內容`);
+          } else {
+            const withoutStrings = strippedComments.replace(/"(?:\\.|[^"\\])*"/g, "");
+            const openBraces = (withoutStrings.match(/\{/g) || []).length;
+            const closeBraces = (withoutStrings.match(/\}/g) || []).length;
+            if (openBraces !== closeBraces) {
+              issues.push(`uml/${f} 大括號不成對 ({=${openBraces}, }=${closeBraces})`);
+            }
+          }
         }
       }
       if (validPumlCount === 0) {
@@ -322,6 +346,20 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
     }
     if (hasTabIndent) {
       issues.push("openapi.yaml 禁止使用 Tab 字元縮排（YAML 僅允許空格縮排）");
+    }
+
+    // OpenAPI 3.0.3 paths/methods/responses & internal $ref pre-check
+    if (!explicitNoApi && !hasTabIndent) {
+      const parsedApi = inspectOpenApiPathsAndRefs(openapiText);
+      for (const badPath of parsedApi.invalidPathKeys) {
+        issues.push(`openapi.yaml paths 路徑 "${badPath}" 必須以 "/" 開頭`);
+      }
+      for (const op of parsedApi.missingResponses) {
+        issues.push(`openapi.yaml 端點 ${op.method.toUpperCase()} ${op.path} 缺少 responses 定義`);
+      }
+      for (const ref of parsedApi.missingRefs) {
+        issues.push(`openapi.yaml 找不到 $ref 目標: #/components/${ref.section}/${ref.name}`);
+      }
     }
   }
 
@@ -425,11 +463,208 @@ function classifyRequirementIssue(reqDirName, msg) {
   } else if (msg.includes("API 端點") || msg.includes("已定義 API paths")) {
     rule = "CROSS_FILE_API_CONFLICT";
     fixHint = "同步更新 openapi.yaml 與 handoff.md 的 API 契約章節。";
+  } else if (msg.includes("圖表內容為空") || msg.includes("大括號不成對")) {
+    rule = "PLANTUML_SYNTAX_INVALID";
+    fixHint = `檢查 ${relDir}/uml/ 對應 .puml 檔案的區塊與括號配對。`;
+  } else if (msg.includes("缺少 responses 定義") || msg.includes("找不到 $ref 目標") || msg.includes("必須以 \"/\" 開頭")) {
+    rule = "OPENAPI_CONTRACT_INVALID";
+    fixHint = "檢查 openapi.yaml 的 paths 路徑、HTTP method responses 與 #/components/... $ref 定義。";
   } else if (msg.includes("YAML") || msg.includes("title 欄位") || msg.includes("openapi:")) {
     rule = "OPENAPI_YAML_INVALID";
     fixHint = "修正 openapi.yaml 縮排、欄位與結構（使用空格縮排並包含 openapi/info/paths）。";
   }
   return { reqDirName, msg, rule, file: inferFile(), fixHint };
+}
+
+const HTTP_METHOD_RE = /^(get|put|post|delete|options|head|patch|trace)$/i;
+
+function inspectOpenApiPathsAndRefs(openapiText) {
+  const lines = String(openapiText || "").split(/\r?\n/);
+  const endpoints = [];
+  const invalidPathKeys = [];
+  const missingResponses = [];
+
+  let inPaths = false;
+  let pathsIndent = -1;
+  let currentPathKey = null;
+  let pathKeyIndent = -1;
+  let currentMethod = null;
+  let methodIndent = -1;
+  let methodHasResponseOrRef = false;
+
+  const flushMethod = () => {
+    if (currentPathKey && currentMethod) {
+      endpoints.push(`${currentMethod.toUpperCase()} ${currentPathKey}`);
+      if (!methodHasResponseOrRef) {
+        missingResponses.push({ path: currentPathKey, method: currentMethod });
+      }
+    }
+    currentMethod = null;
+    methodIndent = -1;
+    methodHasResponseOrRef = false;
+  };
+
+  for (const rawLine of lines) {
+    if (!rawLine.trim() || /^\s*#/.test(rawLine)) continue;
+    const indent = (rawLine.match(/^( *)/) || ["", ""])[1].length;
+    const trimmed = rawLine.trim();
+
+    if (!inPaths) {
+      if (/^paths\s*:\s*(?:#.*)?$/.test(trimmed)) {
+        inPaths = true;
+        pathsIndent = indent;
+      }
+      continue;
+    }
+
+    if (indent <= pathsIndent) {
+      flushMethod();
+      inPaths = false;
+      continue;
+    }
+
+    if (pathKeyIndent === -1 || indent <= pathKeyIndent) {
+      flushMethod();
+      const m = trimmed.match(/^["']?([^"':]+)["']?\s*:/);
+      if (m) {
+        const key = m[1].trim();
+        pathKeyIndent = indent;
+        currentPathKey = key;
+        if (!key.startsWith("/") && !key.startsWith("x-")) {
+          invalidPathKeys.push(key);
+        }
+      }
+      continue;
+    }
+
+    if (currentPathKey && (methodIndent === -1 || indent <= methodIndent)) {
+      const m = trimmed.match(/^([a-zA-Z0-9_-]+)\s*:/);
+      if (m && HTTP_METHOD_RE.test(m[1])) {
+        flushMethod();
+        currentMethod = m[1].toLowerCase();
+        methodIndent = indent;
+        methodHasResponseOrRef = false;
+        continue;
+      }
+      if (m && /^\$ref\s*:/.test(trimmed)) {
+        // PathItem-level $ref
+        continue;
+      }
+    }
+
+    if (currentMethod && indent > methodIndent) {
+      if (/^responses\s*:/.test(trimmed)) {
+        methodHasResponseOrRef = true;
+      }
+    }
+  }
+  flushMethod();
+
+  // Check internal $ref targets: #/components/<section>/<name>
+  const missingRefs = [];
+  const refMatches = String(openapiText || "").matchAll(/#\/components\/([a-zA-Z0-9_-]+)\/([a-zA-Z0-9_.-]+)/g);
+  const seenRefs = new Set();
+  for (const rm of refMatches) {
+    const section = rm[1];
+    const name = rm[2];
+    const key = `${section}/${name}`;
+    if (seenRefs.has(key)) continue;
+    seenRefs.add(key);
+    const hasComponents = /^components\s*:/m.test(openapiText);
+    const hasSection = new RegExp(`^\\s+${section}\\s*:`, "m").test(openapiText);
+    const hasTarget = new RegExp(`^\\s+${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:`, "m").test(openapiText);
+    if (!hasComponents || !hasSection || !hasTarget) {
+      missingRefs.push({ section, name });
+    }
+  }
+
+  return { endpoints, invalidPathKeys, missingResponses, missingRefs };
+}
+
+function extractDbTables(dbText) {
+  const tables = new Set();
+  const ignoreHeadings = new Set([
+    "overview", "summary", "schema", "database", "db", "tables", "index", "indexes",
+    "constraints", "notes", "migrations", "migration", "changelog",
+    "總覽", "摘要", "資料庫", "資料表", "資料表設計", "索引", "約束", "關聯", "備註", "待確認",
+    "总览", "数据库", "数据表", "概要", "テーブル", "データベース", "개요", "데이터베이스", "테이블"
+  ]);
+
+  for (const rawLine of String(dbText || "").split(/\r?\n/)) {
+    const line = rawLine.trim();
+    const createMatch = line.match(/^CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"']?([a-zA-Z_][a-zA-Z0-9_.]*)[`"']?/i);
+    if (createMatch) {
+      tables.add(createMatch[1].replace(/^[^.]+\./, ""));
+      continue;
+    }
+    const headingMatch = line.match(/^#{2,3}\s+(?:Table\s*:\s*|資料表\s*[：:]\s*|数据表\s*[：:]\s*)?[`"']?([a-zA-Z_][a-zA-Z0-9_]*)[`"']?(?:\s|$|\()/i);
+    if (headingMatch) {
+      const name = headingMatch[1];
+      if (!ignoreHeadings.has(name.toLowerCase())) {
+        tables.add(name);
+      }
+    }
+  }
+  return Array.from(tables).sort();
+}
+
+function buildImpactIndex(cwd) {
+  const projectDir = path.join(cwd, "project");
+  if (!isExistingDir(projectDir)) {
+    return { requirements: [], apiCollisions: [], tableCollisions: [] };
+  }
+
+  const entries = fs
+    .readdirSync(projectDir, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && (isReqDirName(e.name) || isDraftSpecDir(path.join(projectDir, e.name), e.name)))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const apiMap = new Map();
+  const tableMap = new Map();
+  const requirements = [];
+
+  for (const entry of entries) {
+    const dirAbs = path.join(projectDir, entry.name);
+    const openapiPath = path.join(dirAbs, "openapi.yaml");
+    const dbPath = path.join(dirAbs, "db-schema.md");
+    const srsPath = path.join(dirAbs, "srs.md");
+
+    const apis = isExistingFile(openapiPath)
+      ? inspectOpenApiPathsAndRefs(fs.readFileSync(openapiPath, "utf8")).endpoints
+      : [];
+    const tables = isExistingFile(dbPath)
+      ? extractDbTables(fs.readFileSync(dbPath, "utf8"))
+      : [];
+    const status = isExistingFile(srsPath)
+      ? extractStatusFromContent(fs.readFileSync(srsPath, "utf8")) || ""
+      : "";
+
+    for (const api of apis) {
+      if (!apiMap.has(api)) apiMap.set(api, []);
+      apiMap.get(api).push(entry.name);
+    }
+    for (const tbl of tables) {
+      if (!tableMap.has(tbl)) tableMap.set(tbl, []);
+      tableMap.get(tbl).push(entry.name);
+    }
+
+    requirements.push({
+      dir: entry.name,
+      isDraft: !isReqDirName(entry.name),
+      status,
+      apis,
+      tables
+    });
+  }
+
+  const apiCollisions = Array.from(apiMap.entries())
+    .filter(([, dirs]) => dirs.length > 1)
+    .map(([endpoint, dirs]) => ({ endpoint, dirs }));
+  const tableCollisions = Array.from(tableMap.entries())
+    .filter(([, dirs]) => dirs.length > 1)
+    .map(([table, dirs]) => ({ table, dirs }));
+
+  return { requirements, apiCollisions, tableCollisions };
 }
 
 function checkMultiReqScopeLock(cwd, options = {}) {
@@ -531,6 +766,9 @@ function runDoctor(cwd, packageVersion) {
   if (ok) {
     checkSpecVersion(cwd, packageVersion);
   }
+  const env = detectPdfEnvironment();
+  console.log(`PDF 瀏覽器: ${env.browser ? `OK (${path.basename(env.browser)})` : env.wkhtmltopdf ? "OK (wkhtmltopdf)" : "NOT FOUND (可使用 sa-spec pdf --html 或設定 SA_SPEC_BROWSER)"}`);
+  console.log(`PlantUML CLI: ${env.plantuml ? `OK (${env.plantuml})` : "NOT FOUND (預設離線程式碼區塊；需線上轉繪請加 --online-uml)"}`);
   return ok;
 }
 
@@ -691,6 +929,7 @@ module.exports = {
   isDraftSpecDir,
   validateSingleRequirementDir,
   validateRequirementsContent,
+  buildImpactIndex,
   runDoctor,
   runCheck
 };

@@ -797,6 +797,33 @@ function renderHtmlToPdf(htmlContent, outputPdfPath, customBrowserPath) {
   }
 }
 
+function detectPdfEnvironment() {
+  const browser = findHeadlessBrowser();
+  const whichCmd = process.platform === "win32" ? "where" : "which";
+  const wkWhich = spawnSync(whichCmd, ["wkhtmltopdf"], { encoding: "utf8" });
+  const wkhtmltopdf = wkWhich.status === 0 && wkWhich.stdout.trim()
+    ? wkWhich.stdout.trim().split(/\r?\n/)[0].trim()
+    : null;
+  const pumlWhich = spawnSync(whichCmd, ["plantuml"], { encoding: "utf8" });
+  const plantuml = pumlWhich.status === 0 && pumlWhich.stdout.trim()
+    ? pumlWhich.stdout.trim().split(/\r?\n/)[0].trim()
+    : null;
+  return { browser, wkhtmltopdf, plantuml };
+}
+
+function renderHtmlToFile(htmlContent, outputHtmlPath) {
+  const absHtmlPath = path.resolve(outputHtmlPath);
+  if (fs.existsSync(absHtmlPath) && fs.statSync(absHtmlPath).isDirectory()) {
+    return {
+      ok: false,
+      error: `輸出路徑為目錄而非 HTML 檔案: ${absHtmlPath}`
+    };
+  }
+  fs.mkdirSync(path.dirname(absHtmlPath), { recursive: true });
+  fs.writeFileSync(absHtmlPath, htmlContent, "utf8");
+  return { ok: true, engine: "html", pdfPath: absHtmlPath };
+}
+
 function convertMarkdownFileToPdf(mdFilePath, outputPdfPath, customBrowserPath, options = {}) {
   const absMdPath = path.resolve(mdFilePath);
   if (!fs.existsSync(absMdPath) || !fs.statSync(absMdPath).isFile()) {
@@ -804,11 +831,15 @@ function convertMarkdownFileToPdf(mdFilePath, outputPdfPath, customBrowserPath, 
   }
   const content = fs.readFileSync(absMdPath, "utf8");
   const title = path.basename(absMdPath, path.extname(absMdPath));
-  const targetPdf = outputPdfPath
+  const defaultExt = options.htmlOnly ? ".html" : ".pdf";
+  const targetOut = outputPdfPath
     ? path.resolve(outputPdfPath)
-    : path.join(path.dirname(absMdPath), `${title}.pdf`);
+    : path.join(path.dirname(absMdPath), `${title}${defaultExt}`);
   const html = buildHtmlDocument(title, content, options);
-  return renderHtmlToPdf(html, targetPdf, customBrowserPath);
+  if (options.htmlOnly) {
+    return renderHtmlToFile(html, targetOut);
+  }
+  return renderHtmlToPdf(html, targetOut, customBrowserPath);
 }
 
 const MERGED_PDF_LABELS = {
@@ -883,6 +914,8 @@ module.exports = {
   convertMarkdownFileToPdf,
   buildMergedRequirementMarkdown,
   renderHtmlToPdf,
+  renderHtmlToFile,
+  detectPdfEnvironment,
   encodePlantUml,
   renderPlantUmlToSvg,
   sanitizeSvg,

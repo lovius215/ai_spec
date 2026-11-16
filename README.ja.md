@@ -106,7 +106,8 @@ sa-spec --version
 | `sa-spec instructions [stage] [--with-rules] [--json]` | 現在のワークスペース状態、言語指示ディレクティブ、各段階の組み込み規範を出力します。 |
 | `sa-spec rules [name\|all] [--list] [--json]` | パッケージに組み込まれた補助ルールの一覧表示または内容参照を行います。 |
 | `sa-spec templates [name] [--lang <code>] [--list] [--json]` | プロジェクト言語または `--lang` に合わせてローカライズされたテンプレートを表示します。 |
-| `sa-spec pdf <target> [--split] [--output out.pdf] [--browser <path>] [--online-uml \| --no-uml-render]` | 指定した `.md` または要件（`REQ-001`）を PDF 出力します（デフォルトはローカル `plantuml` のみ使用し外部送信しません。オンライン描画時は `--online-uml` を指定）。 |
+| `sa-spec pdf <target> [--split] [--html] [--output out.pdf] [--browser <path>] [--online-uml \| --no-uml-render]` | 指定した `.md` または要件（`REQ-001`）を PDF 出力します（`--html` でブラウザ不要のスタンドアロン HTML 出力も可・デフォルトはローカル `plantuml` のみ）。 |
+| `sa-spec impact [--json]` | `project/` をスキャンし、要件間の API / DB 影響マトリクスと重複候補を軽量出力します（`instructions analyze` にも自動統合）。 |
 | `sa-spec reindex` | `project/REQ-*` をスキャンし、SRS のタイトル・概要を抽出して `project/index.md` を再構築します。 |
 | `sa-spec check [--strict] [--json] [--allow-multi-req]` | 必須ファイル・番号重複・ドキュメント間整合性・OpenAPI YAML 構造・成果物完全性を検証します（`--json` で機械可読な修正ヒントを出力、`--strict` ではバージョン不一致・旧 `skills/`/`rules/`・複数 `REQ-*` 同時変更も失敗扱い、`--allow-multi-req` で許可）。 |
 | `sa-spec hooks [install\|remove\|status] [--force]` | コミット前に `sa-spec check --strict` を自動実行する Git `pre-commit` hook を導入・削除・確認します（既存のカスタム hook は保護）。 |

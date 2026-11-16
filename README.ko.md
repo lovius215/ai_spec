@@ -106,7 +106,8 @@ sa-spec --version
 | `sa-spec instructions [stage] [--with-rules] [--json]` | 현재 워크스페이스 상태, 언어 지시문 및 단계별 내장 분석 규범을 출력합니다. |
 | `sa-spec rules [name\|all] [--list] [--json]` | 패키지에 내장된 보조 규칙 문서를 조회하거나 목록을 출력합니다. |
 | `sa-spec templates [name] [--lang <code>] [--list] [--json]` | 프로젝트 언어 또는 `--lang`에 맞춰 현지화된 문서 및 PlantUML 템플릿을 조회합니다. |
-| `sa-spec pdf <target> [--split] [--output out.pdf] [--browser <path>] [--online-uml \| --no-uml-render]` | 지정한 `.md` 또는 요구사항(`REQ-001`)을 PDF로 변환합니다(기본값은 외부 서버 전송 없이 로컬 `plantuml`만 사용, 온라인 렌더링 시 `--online-uml` 지정). |
+| `sa-spec pdf <target> [--split] [--html] [--output out.pdf] [--browser <path>] [--online-uml \| --no-uml-render]` | 지정한 `.md` 또는 요구사항(`REQ-001`)을 PDF로 변환합니다(`--html`로 브라우저 없는 독립 HTML 출력 지원, 기본값은 로컬 `plantuml`만 사용). |
+| `sa-spec impact [--json]` | `project/`를 스캔해 요구사항 간 API / DB 영향 매트릭스와 중복 충돌 후보를 경량 출력합니다(`instructions analyze`에도 자동 포함). |
 | `sa-spec reindex` | `project/REQ-*`를 스캔하고 SRS 제목·요약을 추출해 `project/index.md`를 동적으로 재구축합니다. |
 | `sa-spec check [--strict] [--json] [--allow-multi-req]` | 필수 파일, 중복 번호, 문서 간 정합성, OpenAPI YAML 구조, 산출물 무결성을 검증합니다(`--json`으로 구조화된 수정 힌트 출력, `--strict`는 버전 불일치·구버전 `skills/`/`rules/`·다중 `REQ-*` 동시 수정도 실패 처리하며 `--allow-multi-req`로 허용 가능). |
 | `sa-spec hooks [install\|remove\|status] [--force]` | 커밋 전 `sa-spec check --strict`를 자동 실행하는 Git `pre-commit` hook을 설치·제거·조회합니다(기존 커스텀 hook 보호). |

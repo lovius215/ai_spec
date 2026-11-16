@@ -284,7 +284,8 @@ sa-spec check
 | `sa-spec instructions [init\|propose\|analyze\|commit\|pdf] [--with-rules] [--json]` | 輸出目前工作區狀態、對應階段步驟與套件內建完整系統分析規範（供 AI 動態讀取）。 |
 | `sa-spec rules [name\|all] [--list] [--json]` | 讀取或列出套件內建補充規則（`spec`、`uml-style`、`wireframe`、`db-table`、`estimation`、`system-spec`、`file-style`、`history`、`review`）。 |
 | `sa-spec templates [name] [--lang <code>] [--list] [--json]` | 讀取或列出套件內建規格與圖表範本（依專案語言或 `--lang` 輸出對應語系的 `srs`、`db-schema`、`handoff`、`history`、`uml-main`、`uml-wireframe` 等）。 |
-| `sa-spec pdf <target> [--split] [--output out.pdf] [--browser <path>] [--online-uml \| --no-uml-render]` | 將指定 `.md` 或需求目錄匯出為 PDF（優先使用本機 `plantuml` 轉繪 SVG；預設不外傳至公開網路伺服器，需線上轉繪請加 `--online-uml` 或設定 `SA_SPEC_PLANTUML_SERVER`，無法轉繪時退回程式碼區塊）。 |
+| `sa-spec pdf <target> [--split] [--html] [--output out.pdf] [--browser <path>] [--online-uml \| --no-uml-render]` | 將指定 `.md` 或需求目錄匯出為 PDF（或加 `--html` 輸出不依賴瀏覽器的獨立 HTML；優先使用本機 `plantuml` 轉繪 SVG，預設不外傳公開伺服器）。 |
+| `sa-spec impact [--json]` | 掃描 `project/` 產出跨需求 API / DB 輕量影響矩陣並偵測潛在重疊碰撞（亦自動注入 `sa-spec instructions analyze`）。 |
 | `sa-spec reindex` | 掃描 `project/REQ-*` 目錄，依專案鎖定語言與序號重新生成 `project/index.md`（自動從 `srs.md` 擷取標題與 `## 摘要`）。 |
 | `sa-spec check [--strict] [--json] [--allow-multi-req]` | 檢查核心檔案、規範版本鎖定、重複序號、跨文件契約一致性、YAML 結構與交付物完整度（加 `--json` 輸出結構化規則碼與修復建議；加 `--strict` 時版本不一致、舊版 `skills/`/`rules/` 或同時修改多個既有 `REQ-*` 目錄皆回傳 exit code `1`，可用 `--allow-multi-req` 放行跨需求變更）。 |
 | `sa-spec hooks [install\|remove\|status] [--force]` | 安裝、移除或查詢 Git `pre-commit` hook（於每次 `git commit` 前自動執行 `sa-spec check --strict`，並保護既有自訂 hook）。 |

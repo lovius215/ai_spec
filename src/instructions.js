@@ -20,7 +20,7 @@ const {
   detectMainBranch,
   getDefaultRemote
 } = require("./git");
-const { isDraftSpecDir, isExistingDir, isExistingFile } = require("./validator");
+const { isDraftSpecDir, isExistingDir, isExistingFile, buildImpactIndex } = require("./validator");
 
 const STAGE_ALIASES = {
   init: "init",
@@ -471,6 +471,8 @@ function runInstructions({ cwd, templatesDir, isSourceRepoFlag, packageVersion, 
       }))
     : [];
 
+  const impactIndex = stage.stage === "analyze" ? buildImpactIndex(cwd) : null;
+
   if (asJson) {
     const payload = {
       stage: stage.stage,
@@ -481,6 +483,7 @@ function runInstructions({ cwd, templatesDir, isSourceRepoFlag, packageVersion, 
         id: reqId || null
       },
       context,
+      ...(impactIndex ? { impactIndex } : {}),
       executionProtocol: EXECUTION_PROTOCOL,
       ...(languageDirective ? { languageDirective } : {}),
       steps: stage.steps,
@@ -509,6 +512,28 @@ function runInstructions({ cwd, templatesDir, isSourceRepoFlag, packageVersion, 
     "",
     "## 目前工作區狀態",
     ...formatContextLines(context),
+    ...(impactIndex
+      ? [
+          "",
+          "## 跨需求輕量影響索引 (API / DB Impact Matrix)",
+          ...(impactIndex.requirements.length === 0
+            ? ["- 目前尚無既有需求或草稿的 API / DB 紀錄。"]
+            : [
+                "| 需求目錄 | 狀態 | API Endpoints | DB Tables |",
+                "|---|---|---|---|",
+                ...impactIndex.requirements.map(
+                  (r) =>
+                    `| \`${r.dir}\` | ${r.status || (r.isDraft ? "草稿" : "-")} | ${r.apis.join(", ") || "-"} | ${r.tables.join(", ") || "-"} |`
+                )
+              ]),
+          ...(impactIndex.apiCollisions.length > 0
+            ? ["", `- 潛在 API 重疊: ${impactIndex.apiCollisions.map((c) => `${c.endpoint} (${c.dirs.join(", ")})`).join("；")}`]
+            : []),
+          ...(impactIndex.tableCollisions.length > 0
+            ? [`- 潛在 DB Table 重疊: ${impactIndex.tableCollisions.map((c) => `${c.table} (${c.dirs.join(", ")})`).join("；")}`]
+            : [])
+        ]
+      : []),
     "",
     `## 階段重點步驟 (${stage.stage})`,
     ...stage.steps.map((step, index) => `${index + 1}. ${step}`),
