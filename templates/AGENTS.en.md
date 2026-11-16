@@ -8,7 +8,7 @@ This workspace uses `@loviusc/sa-spec` with CLI-bundled specifications. **No `sk
 
 - `sa-spec instructions <init|propose|analyze|commit|pdf> [--with-rules] [--json]`: Load live workspace state, stage steps, and full analysis guidelines.
 - `sa-spec rules [name|all] [--list] [--json]`: Read built-in supplementary rules (`spec`, `uml-style`, `wireframe`, `db-table`, `estimation`, `system-spec`, `file-style`, `history`, `review`).
-- `sa-spec templates [name] [--lang <code>] [--list] [--json]`: Read built-in templates (`srs`, `openapi`, `db-schema`, `handoff`, `history`, `uml-main`, `uml-wireframe`, `system-spec`, `index`).
+- `sa-spec templates [name] [--lang <code>] [--list] [--json]`: Read built-in templates (`srs`, `openapi`, `db-schema`, `handoff`, `history`, `uml-sequence`, `uml-wireframe`, `system-spec`, `index`).
 
 # Core Deliverables
 

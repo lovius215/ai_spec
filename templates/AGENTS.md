@@ -8,7 +8,7 @@
 
 - `sa-spec instructions <init|propose|analyze|commit|pdf> [--with-rules] [--json]`：取得目前工作區狀態、該階段執行步驟與完整分析規範。
 - `sa-spec rules [name|all] [--list] [--json]`：讀取內建補充規則（`spec`、`uml-style`、`wireframe`、`db-table`、`estimation`、`system-spec`、`file-style`、`history`、`review`）。
-- `sa-spec templates [name] [--lang <code>] [--list] [--json]`：讀取內建規格範本（`srs`、`openapi`、`db-schema`、`handoff`、`history`、`uml-main`、`uml-wireframe`、`system-spec`、`index`）。
+- `sa-spec templates [name] [--lang <code>] [--list] [--json]`：讀取內建規格範本（`srs`、`openapi`、`db-schema`、`handoff`、`history`、`uml-sequence`、`uml-wireframe`、`system-spec`、`index`）。
 
 # 核心交付物
 
