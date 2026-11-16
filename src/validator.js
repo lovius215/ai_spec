@@ -276,6 +276,58 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
     }
   }
 
+  // Cross-file contradiction checks (UI vs wireframe, SRS vs handoff status, OpenAPI vs handoff API)
+  const wireframeAbs = path.join(umlDir, "wireframe.puml");
+  const hasWireframeFile = isExistingFile(wireframeAbs);
+  if (hasWireframeFile) {
+    const wireframeText = fs.readFileSync(wireframeAbs, "utf8");
+    if (!/@startsalt\b/i.test(wireframeText) || !/@endsalt\b/i.test(wireframeText)) {
+      issues.push("uml/wireframe.puml 必須使用 PlantUML Salt 語法 (@startsalt ... @endsalt)");
+    }
+  }
+
+  if (handoffText !== undefined) {
+    const uiSectionMatch = handoffText.match(
+      /##\s*[^\n]*(?:UI|畫面|界面|画面|화면|Wireframe)[^\n]*\n([\s\S]*?)(?=\n##\s+|$)/i
+    );
+    const uiSectionLines = (uiSectionMatch ? uiSectionMatch[1] : handoffText)
+      .split(/\r?\n/)
+      .filter((line) => !/uml\/wireframe\.puml/i.test(line));
+    const handoffExplicitNoUi = /(?:無\s*UI|无\s*UI|純後端|纯后端|無介面|无界面|No UI|UI 要件なし|画面なし|バックエンド専用|UI 요구사항 없음|UI 없음|화면 없음|백엔드 전용)/i.test(
+      uiSectionLines.join("\n")
+    );
+    if (handoffExplicitNoUi && hasWireframeFile) {
+      issues.push("handoff.md 標記無 UI 介面需求，但 uml/wireframe.puml 同時存在，請釐清是否需要 UI");
+    }
+
+    if (srsText !== undefined) {
+      const srsStatus = extractStatusFromContent(srsText);
+      const handoffStatus = extractStatusFromContent(handoffText);
+      const isPendingStatus = (st) => /^(?:待確認|草稿|Pending|Draft|待确认|未確認|확인 대기|초안)/i.test(String(st || "").trim());
+      const isApprovedStatus = (st) => /^(?:已審核|已核准|Approved|已审核|承認済み|승인됨)/i.test(String(st || "").trim());
+      if (srsStatus && handoffStatus && isPendingStatus(srsStatus) && isApprovedStatus(handoffStatus)) {
+        issues.push(`srs.md 狀態為「${srsStatus}」，但 handoff.md 已標示為「${handoffStatus}」，兩者狀態矛盾`);
+      }
+    }
+
+    if (openapiText !== undefined) {
+      const openapiNoApi = /(?:無\s*API|No API|無需\s*API|无\s*API|API\s*不要|API\s*불필요)/i.test(openapiText);
+      const hasOpenApiPaths = /^\s{1,4}\/[^\s:]*\s*:/m.test(openapiText);
+      const apiSectionMatch = handoffText.match(
+        /##\s*[^\n]*API[^\n]*\n([\s\S]*?)(?=\n##\s+|$)/i
+      );
+      const apiSectionBody = apiSectionMatch ? apiSectionMatch[1] : "";
+      const handoffNoApi = /(?:無\s*API|No API|無需\s*API|无\s*API|API\s*不要|API\s*불필요)/i.test(apiSectionBody);
+      const handoffHasConcreteEndpoint = /\b(?:GET|POST|PUT|PATCH|DELETE)\s+\/[^\s`)]+/i.test(apiSectionBody);
+
+      if (openapiNoApi && handoffHasConcreteEndpoint) {
+        issues.push("openapi.yaml 標記無 API，但 handoff.md 列出具體 API 端點，請保持一致");
+      } else if (hasOpenApiPaths && handoffNoApi) {
+        issues.push("openapi.yaml 已定義 API paths，但 handoff.md 標記無 API，請保持一致");
+      }
+    }
+  }
+
   return issues.map((msg) => ({ reqDirName, msg }));
 }
 

@@ -33,7 +33,10 @@ const {
   detectMainBranch,
   getCurrentBranch,
   getLatestMaxReqId,
-  remoteBranchHasReqId
+  remoteBranchHasReqId,
+  getPreCommitHookStatus,
+  installPreCommitHook,
+  removePreCommitHook
 } = require("./git");
 const { runDoctor, runCheck, isDraftSpecDir, isExistingDir, isExistingFile, isReqDirName } = require("./validator");
 const { runInstructions, runRules, runTemplatesList, getOption, getPositionalArgs } = require("./instructions");
@@ -100,6 +103,9 @@ function main() {
       case "pdf":
         runPdf(args.slice(1));
         return;
+      case "hooks":
+        runHooks(args.slice(1));
+        return;
       case "version":
       case "--version":
       case "-v":
@@ -137,6 +143,7 @@ function isSourceRepo() {
 
 function initProject(args = []) {
   const includeRules = args.includes("--full");
+  const installHooks = args.includes("--hooks");
   const langArg = getOption(args, "--lang");
   let langConfig = SUPPORTED_LANGS["zh-tw"];
   if (langArg) {
@@ -162,6 +169,10 @@ function initProject(args = []) {
       buildSystemSpecMarkdown(langConfig, version)
     )
   ];
+
+  if (installHooks) {
+    results.push(installPreCommitHook(cwd, { force: args.includes("--force") }));
+  }
 
   printResultList("init", results);
   console.log(`專案規格主要語言已設定為: ${langConfig.label}`);
@@ -1487,11 +1498,50 @@ function runPdf(args = []) {
   fail(`找不到指定的 Markdown 檔案或需求目錄: ${target}`);
 }
 
+function runHooks(args = []) {
+  const positional = getPositionalArgs(args);
+  const action = (positional[0] || "install").toLowerCase();
+  const force = args.includes("--force");
+
+  if (action === "status") {
+    const info = getPreCommitHookStatus(cwd);
+    const labelMap = {
+      not_git: "未初始化 Git repository",
+      missing: "尚未安裝 pre-commit hook",
+      installed: "已安裝 sa-spec pre-commit hook (commit 前自動執行 sa-spec check --strict)",
+      custom: "已存在自訂 pre-commit hook（非 sa-spec 管理）",
+      conflict: "pre-commit 目標路徑為目錄而非檔案"
+    };
+    console.log(`sa-spec hooks status: ${labelMap[info.status] || info.status}`);
+    return;
+  }
+
+  if (action === "install") {
+    const res = installPreCommitHook(cwd, { force });
+    printResultList("hooks", [res]);
+    if (res.action === "warn") {
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  if (action === "remove" || action === "uninstall") {
+    const res = removePreCommitHook(cwd);
+    printResultList("hooks", [res]);
+    if (res.action === "warn") {
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  fail(`不支援的 hooks 子指令 "${action}"。可用子指令: install, remove, status`);
+}
+
 function showHelp() {
   console.log(`sa-spec
 
 Usage:
-  sa-spec init [--full] [--lang zh-TW|en|zh-CN|ja|ko]
+  sa-spec init [--full] [--hooks] [--lang zh-TW|en|zh-CN|ja|ko]
   sa-spec new [--id REQ-001] --name login [--slug login] [--branch]
   sa-spec finalize --name login [--slug login] [--no-merge | --pr]
   sa-spec instructions [init|propose|analyze|commit|pdf] [--with-rules] [--json]
@@ -1500,6 +1550,7 @@ Usage:
   sa-spec template <system-spec|req> [options]
   sa-spec pdf <file.md|REQ-001|name> [--split] [--output out.pdf] [--browser <path>] [--online-uml | --no-uml-render]
   sa-spec pdf --all [--split] [--browser <path>] [--online-uml | --no-uml-render]
+  sa-spec hooks [install|remove|status] [--force]
   sa-spec reindex
   sa-spec check [--strict]
   sa-spec doctor

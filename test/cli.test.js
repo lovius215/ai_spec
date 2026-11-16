@@ -1634,3 +1634,108 @@ test("#28 instructions, rules, SKILL, and localized AGENTS enforce task brief, t
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test("#29 cross-file contradiction detection in check and Git pre-commit hook management", () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sa-spec-29-guardrails-"));
+  try {
+    const initRes = runCli(tmpDir, ["init", "--hooks", "--lang", "zh-TW"]);
+    assert.equal(initRes.status, 0, initRes.stderr);
+    const hookPath = path.join(tmpDir, ".git", "hooks", "pre-commit");
+    assert.equal(fs.existsSync(hookPath), true);
+    const hookText = fs.readFileSync(hookPath, "utf8");
+    assert.match(hookText, /sa-spec managed pre-commit hook/);
+    assert.match(hookText, /sa-spec check --strict/);
+
+    const statusRes = runCli(tmpDir, ["hooks", "status"]);
+    assert.equal(statusRes.status, 0, statusRes.stderr);
+    assert.match(statusRes.stdout, /已安裝 sa-spec pre-commit hook/);
+
+    const removeRes = runCli(tmpDir, ["hooks", "remove"]);
+    assert.equal(removeRes.status, 0, removeRes.stderr);
+    assert.equal(fs.existsSync(hookPath), false);
+
+    // Custom hook preservation
+    fs.writeFileSync(hookPath, "#!/bin/sh\necho custom\n", { mode: 0o755 });
+    const warnInstallRes = runCli(tmpDir, ["hooks", "install"]);
+    assert.notEqual(warnInstallRes.status, 0);
+    assert.match(warnInstallRes.stdout + warnInstallRes.stderr, /已存在自訂 pre-commit hook/);
+    assert.match(fs.readFileSync(hookPath, "utf8"), /echo custom/);
+
+    const warnRemoveRes = runCli(tmpDir, ["hooks", "remove"]);
+    assert.notEqual(warnRemoveRes.status, 0);
+    assert.equal(fs.existsSync(hookPath), true);
+
+    assert.equal(runCli(tmpDir, ["hooks", "install", "--force"]).status, 0);
+    assert.match(fs.readFileSync(hookPath, "utf8"), /sa-spec managed pre-commit hook/);
+
+    // Cross-file contradictions in check
+    assert.equal(runCli(tmpDir, ["new", "--id", "REQ-001", "--name", "contra"]).status, 0);
+    const reqDir = path.join(tmpDir, "project", "REQ-001-contra");
+    fs.writeFileSync(
+      path.join(reqDir, "srs.md"),
+      "# REQ-001 登入\n\n- 狀態：待確認\n\n## 摘要\n登入。\n\n## 功能需求\n登入。\n\n## 驗收條件\n通過。\n",
+      "utf8"
+    );
+    fs.writeFileSync(
+      path.join(reqDir, "uml", "wireframe.puml"),
+      "@startuml\nAlice -> Bob: Hi\n@enduml\n",
+      "utf8"
+    );
+    fs.writeFileSync(
+      path.join(reqDir, "openapi.yaml"),
+      "# 無 API\nopenapi: 3.0.3\ninfo:\n  title: Demo\n  version: 0.1.0\npaths: {}\n",
+      "utf8"
+    );
+    fs.writeFileSync(
+      path.join(reqDir, "handoff.md"),
+      [
+        "# Handoff",
+        "- 狀態：已審核",
+        "## 6. API 契約",
+        "- POST /api/login",
+        "## 7. DB 變更",
+        "- 無",
+        "## 8. UI / 畫面規格",
+        "- 無 UI 介面需求",
+        "## 9. 驗收條件",
+        "- 通過"
+      ].join("\n"),
+      "utf8"
+    );
+
+    const checkRes = runCli(tmpDir, ["check"]);
+    assert.notEqual(checkRes.status, 0);
+    assert.match(checkRes.stdout, /uml\/wireframe\.puml 必須使用 PlantUML Salt 語法/);
+    assert.match(checkRes.stdout, /handoff\.md 標記無 UI 介面需求，但 uml\/wireframe\.puml 同時存在/);
+    assert.match(checkRes.stdout, /srs\.md 狀態為「待確認」，但 handoff\.md 已標示為「已審核」/);
+    assert.match(checkRes.stdout, /openapi\.yaml 標記無 API，但 handoff\.md 列出具體 API 端點/);
+
+    // Reverse OpenAPI vs handoff contradiction
+    fs.writeFileSync(
+      path.join(reqDir, "openapi.yaml"),
+      "openapi: 3.0.3\ninfo:\n  title: Demo\n  version: 0.1.0\npaths:\n  /api/login:\n    post:\n      responses:\n        '200':\n          description: ok\n",
+      "utf8"
+    );
+    fs.writeFileSync(
+      path.join(reqDir, "handoff.md"),
+      [
+        "# Handoff",
+        "- 狀態：待確認",
+        "## 6. API 契約",
+        "- 無 API",
+        "## 7. DB 變更",
+        "- 無",
+        "## 8. UI / 畫面規格",
+        "- 參考 wireframe",
+        "## 9. 驗收條件",
+        "- 通過"
+      ].join("\n"),
+      "utf8"
+    );
+    const checkRevRes = runCli(tmpDir, ["check"]);
+    assert.notEqual(checkRevRes.status, 0);
+    assert.match(checkRevRes.stdout, /openapi\.yaml 已定義 API paths，但 handoff\.md 標記無 API/);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});

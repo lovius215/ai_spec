@@ -162,6 +162,115 @@ function remoteBranchHasReqId(cwd, remote, mainBranch, reqId) {
   });
 }
 
+const PRE_COMMIT_HOOK_MARKER = "# sa-spec managed pre-commit hook";
+
+function resolvePreCommitHookPath(cwd) {
+  const gitPathRes = spawnSync("git", ["rev-parse", "--git-path", "hooks/pre-commit"], {
+    cwd,
+    encoding: "utf8"
+  });
+  if (gitPathRes.status === 0 && gitPathRes.stdout && gitPathRes.stdout.trim()) {
+    return path.resolve(cwd, gitPathRes.stdout.trim());
+  }
+  return path.join(cwd, ".git", "hooks", "pre-commit");
+}
+
+function getPreCommitHookStatus(cwd) {
+  if (!isGitWorkingTree(cwd)) {
+    return { status: "not_git", hookPath: null };
+  }
+  const hookPath = resolvePreCommitHookPath(cwd);
+  if (!fs.existsSync(hookPath)) {
+    return { status: "missing", hookPath };
+  }
+  if (!fs.statSync(hookPath).isFile()) {
+    return { status: "conflict", hookPath };
+  }
+  const content = fs.readFileSync(hookPath, "utf8");
+  if (content.includes(PRE_COMMIT_HOOK_MARKER)) {
+    return { status: "installed", hookPath };
+  }
+  return { status: "custom", hookPath };
+}
+
+function installPreCommitHook(cwd, options = {}) {
+  const { force = false } = options;
+  if (!isGitWorkingTree(cwd)) {
+    return {
+      action: "skip",
+      target: ".git/hooks/pre-commit",
+      message: "尚未初始化 Git repository，略過安裝 pre-commit hook"
+    };
+  }
+
+  const hookPath = resolvePreCommitHookPath(cwd);
+  const relTarget = path.relative(cwd, hookPath) || ".git/hooks/pre-commit";
+  const current = getPreCommitHookStatus(cwd);
+
+  if (current.status === "conflict") {
+    return {
+      action: "warn",
+      target: relTarget,
+      message: "目標路徑已存在且為目錄，無法安裝 pre-commit hook"
+    };
+  }
+  if (current.status === "custom" && !force) {
+    return {
+      action: "warn",
+      target: relTarget,
+      message: "已存在自訂 pre-commit hook，為避免覆蓋已略過（可手動加入 sa-spec check --strict 或加上 --force）"
+    };
+  }
+
+  const hookScript = [
+    "#!/bin/sh",
+    PRE_COMMIT_HOOK_MARKER,
+    "if command -v sa-spec >/dev/null 2>&1; then",
+    "  sa-spec check --strict",
+    "elif [ -f \"./bin/sa-spec.js\" ] && command -v node >/dev/null 2>&1; then",
+    "  node \"./bin/sa-spec.js\" check --strict",
+    "fi",
+    ""
+  ].join("\n");
+
+  fs.mkdirSync(path.dirname(hookPath), { recursive: true });
+  fs.writeFileSync(hookPath, hookScript, { encoding: "utf8", mode: 0o755 });
+  try {
+    fs.chmodSync(hookPath, 0o755);
+  } catch (_) {}
+
+  return {
+    action: current.status === "installed" ? "update" : "create",
+    target: relTarget,
+    message: "已安裝 Git pre-commit hook（commit 前自動執行 sa-spec check --strict）"
+  };
+}
+
+function removePreCommitHook(cwd) {
+  const current = getPreCommitHookStatus(cwd);
+  if (current.status === "not_git" || current.status === "missing") {
+    return {
+      action: "skip",
+      target: ".git/hooks/pre-commit",
+      message: "未偵測到可移除的 sa-spec pre-commit hook"
+    };
+  }
+  const relTarget = path.relative(cwd, current.hookPath) || ".git/hooks/pre-commit";
+  if (current.status !== "installed") {
+    return {
+      action: "warn",
+      target: relTarget,
+      message: "現有 pre-commit hook 非 sa-spec 管理，已保留未移除"
+    };
+  }
+  fs.unlinkSync(current.hookPath);
+  return {
+    action: "remove",
+    target: relTarget,
+    message: "已移除 sa-spec pre-commit hook"
+  };
+}
+
 module.exports = {
   isGitWorkingTree,
   ensureGitRepository,
@@ -171,5 +280,8 @@ module.exports = {
   detectMainBranch,
   getCurrentBranch,
   getLatestMaxReqId,
-  remoteBranchHasReqId
+  remoteBranchHasReqId,
+  getPreCommitHookStatus,
+  installPreCommitHook,
+  removePreCommitHook
 };
