@@ -740,6 +740,12 @@ git push origin master
 
 ## 更新紀錄
 
+### v0.2.10
+- **語法層預檢、跨需求影響矩陣與無瀏覽器 HTML 匯出**：
+  - **OpenAPI 3.0.3 & PlantUML 語法預檢**：`sa-spec check` 新增檢查 `paths` 路徑前綴、HTTP method `responses` 必填、內部 `$ref` 存在性（`OPENAPI_CONTRACT_INVALID`），以及 `.puml` 空圖與大括號配對檢查（`PLANTUML_SYNTAX_INVALID`）。
+  - **跨需求輕量影響矩陣 (`sa-spec impact`)**：自動萃取各需求的 API Endpoints 與 DB Tables、偵測重疊碰撞，並自動注入 `sa-spec instructions analyze`，大幅降低多需求時的 AI Context 成本與漏檢率。
+  - **無頭／CI 環境支援**：新增 `sa-spec pdf <target> --html` 輸出獨立 HTML，並在 `sa-spec doctor` 主動回報本機 PDF 瀏覽器與 PlantUML CLI 可用狀態。
+
 ### v0.2.9
 - **任務雙重檢查規範與 Harness Engineering 硬護欄升級**：
   - **事前說明與雙重檢查清單**：`sa-spec instructions`、`SKILL.md`、`rules review` 與 5 語系 `AGENTS.md` 全面強制「做事前先說明任務＋任務清單（Task Checklist）＋流程檢查清單（Process Checklist）＋業務檢查清單（Business Checklist）」。
