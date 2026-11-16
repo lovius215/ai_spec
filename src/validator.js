@@ -298,20 +298,21 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
         if (indentLen > blockScalarIndent) continue;
         blockScalarIndent = null;
       }
-      const keyValMatch = line.match(/^[ ]*[^#\s][^:]*:[ \t]*(.*)$/);
+      const keyValMatch = line.match(/^([ ]*(?:-[ ]+)?)[^#\s][^:]*:[ \t]*(.*)$/);
       if (keyValMatch) {
-        const val = keyValMatch[1].replace(/\s+#.*$/, "").trim();
+        const keyStartIndent = keyValMatch[1].length;
+        const val = keyValMatch[2].replace(/\s+#.*$/, "").trim();
         if (/^[|>][+-]?\d*$/.test(val)) {
-          blockScalarIndent = indentLen;
+          blockScalarIndent = keyStartIndent;
           continue;
         }
         if (val && !/^[\[{&*]/.test(val)) {
-          // Scalar value on this line: next non-empty/non-comment line cannot indent deeper
+          // Scalar value on this line: next non-empty/non-comment line cannot indent deeper than key start
           for (let j = idx + 1; j < yamlLines.length; j++) {
             const nextLine = yamlLines[j];
             if (!nextLine.trim() || /^\s*#/.test(nextLine)) continue;
             const nextIndentLen = (nextLine.match(/^( *)/) || ["", ""])[1].length;
-            if (nextIndentLen > indentLen) {
+            if (nextIndentLen > keyStartIndent) {
               issues.push(`openapi.yaml YAML 結構異常：第 ${idx + 1} 行已設定純量值，第 ${j + 1} 行不可再增加子層縮排`);
             }
             break;
@@ -444,8 +445,8 @@ function checkMultiReqScopeLock(cwd, options = {}) {
 
   const touchedSet = new Set();
   for (const diffArgs of [
-    ["diff", "--name-only", "HEAD", "--", "project/"],
-    ["diff", "--cached", "--name-only", "--", "project/"]
+    ["-c", "core.quotepath=false", "diff", "--name-only", "HEAD", "--", "project/"],
+    ["-c", "core.quotepath=false", "diff", "--cached", "--name-only", "--", "project/"]
   ]) {
     const res = spawnSync("git", diffArgs, { cwd, encoding: "utf8" });
     if (res.status === 0 && res.stdout) {

@@ -1819,10 +1819,26 @@ test("#30 harness upgrades: check --json structured feedback, YAML structure che
     assert.equal(yamlParsed.ok, false);
     assert.ok(yamlParsed.issues.some((it) => it.rule === "OPENAPI_YAML_INVALID" && it.fixHint));
 
-    // Restore valid YAML, then modify BOTH committed REQ-001 and REQ-002 -> scope lock triggers on --strict
+    // Restore valid YAML (including sequence-of-objects like parameters), then modify BOTH committed REQ-001 and REQ-002 -> scope lock triggers on --strict
     fs.writeFileSync(
       req1Api,
-      "openapi: 3.0.3\ninfo:\n  title: Alpha\n  version: 0.1.0\npaths: {}\n",
+      [
+        "openapi: 3.0.3",
+        "info:",
+        "  title: Alpha",
+        "  version: 0.1.0",
+        "paths:",
+        "  /items/{id}:",
+        "    get:",
+        "      parameters:",
+        "        - name: id",
+        "          in: path",
+        "          required: true",
+        "      responses:",
+        "        '200':",
+        "          description: ok",
+        ""
+      ].join("\n"),
       "utf8"
     );
     fs.appendFileSync(path.join(tmpDir, "project", "REQ-002-beta", "srs.md"), "\n<!-- touched -->\n", "utf8");
