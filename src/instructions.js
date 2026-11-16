@@ -600,12 +600,12 @@ function getTemplatesPackageVersion(templatesDir) {
   try {
     const pkgPath = path.join(templatesDir, "..", "package.json");
     if (fs.existsSync(pkgPath)) {
-      return JSON.parse(fs.readFileSync(pkgPath, "utf8")).version || "0.2.8";
+      return JSON.parse(fs.readFileSync(pkgPath, "utf8")).version || "0.2.9";
     }
   } catch {
     // ignore read failure
   }
-  return "0.2.8";
+  return "0.2.9";
 }
 
 function buildLocalizedTemplateByName(name, langConfig, templatesDir) {

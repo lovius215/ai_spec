@@ -739,6 +739,13 @@ git push origin master
 
 ## 更新紀錄
 
+### v0.2.9
+- **任務雙重檢查規範與 Harness Engineering 硬護欄升級**：
+  - **事前說明與雙重檢查清單**：`sa-spec instructions`、`SKILL.md`、`rules review` 與 5 語系 `AGENTS.md` 全面強制「做事前先說明任務＋任務清單（Task Checklist）＋流程檢查清單（Process Checklist）＋業務檢查清單（Business Checklist）」。
+  - **跨文件矛盾與 OpenAPI YAML 結構檢查**：`sa-spec check` 新增 UI / 審核狀態（含 5 語系狀態詞）/ API 契約跨文件矛盾偵測，以及 OpenAPI YAML 縮排與必要欄位驗證。
+  - **結構化回饋與範圍鎖定**：新增 `sa-spec check --json`（輸出結構化 `rule` 與 `fixHint`）與多 `REQ-*` 範圍鎖定檢查（`--strict` 阻擋跨需求誤改，必要時可用 `--allow-multi-req` 放行）。
+  - **Git `pre-commit` Hook 與多項邊界防護**：新增 `sa-spec init --hooks` 與 `sa-spec hooks [install|remove|status]`；強化 PDF 暫存渲染與 `--browser` 驗證、合併衝突自動 `git merge --abort` 復原，以及全專案檔案／目錄型別（`EISDIR`/`ENOTDIR`）與大小寫 `REQ-*` 防撞檢查。
+
 ### v0.2.8
 - **OpenSpec 風格 CLI 內建規範架構（隱藏工作區 `skills/` 與 `rules/`）**：
   - **乾淨初始化架構**：執行 `sa-spec init`（含 `--full` 向下相容參數）建立的工作區不再產生 `skills/` 與 `rules/` 資料夾，僅保留 `AGENTS.md`、`readme.md` 與 `project/`，保持規格專案整潔並避免規範副本與套件更新脫鉤。
