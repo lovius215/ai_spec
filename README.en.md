@@ -108,7 +108,7 @@ sa-spec --version
 | `sa-spec templates [name] [--lang <code>] [--list] [--json]` | Reads or lists built-in document and PlantUML templates localized for the workspace language or `--lang`. |
 | `sa-spec pdf <target> [--split] [--output out.pdf] [--browser <path>] [--online-uml \| --no-uml-render]` | Converts a `.md` file or requirement (`REQ-001`) to a merged or split PDF (privacy-safe by default: uses local `plantuml`, or `--online-uml` / `SA_SPEC_PLANTUML_SERVER` if explicitly requested). |
 | `sa-spec reindex` | Scans `project/REQ-*` directories and dynamically rebuilds `project/index.md` sorted by numerical ID with extracted SRS title and summary. |
-| `sa-spec check [--strict]` | Validates required files, duplicate IDs, cross-file consistency, deliverable integrity, and exits non-zero on errors (`--strict` also fails on spec version mismatch or legacy `skills/`/`rules/`). |
+| `sa-spec check [--strict] [--json] [--allow-multi-req]` | Validates required files, duplicate IDs, cross-file consistency, OpenAPI YAML structure, and deliverable integrity (`--json` emits machine-readable rule codes & fix hints; `--strict` also fails on version mismatch, legacy `skills/`/`rules/`, or unflagged multi-`REQ-*` edits unless `--allow-multi-req` is passed). |
 | `sa-spec hooks [install\|remove\|status] [--force]` | Installs, removes, or checks the Git `pre-commit` hook that automatically runs `sa-spec check --strict` before commits (preserving custom hooks unless `--force` is given). |
 | `sa-spec status` | Displays overview status of requirements and specs. |
 | `sa-spec doctor` | Diagnostic tool to verify workspace integrity. |

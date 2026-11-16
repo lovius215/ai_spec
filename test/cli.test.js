@@ -1785,3 +1785,61 @@ test("#29 cross-file contradiction detection in check and Git pre-commit hook ma
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test("#30 harness upgrades: check --json structured feedback, YAML structure check, and multi-REQ scope lock", () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sa-spec-30-harness-"));
+  try {
+    assert.equal(runCli(tmpDir, ["init", "--lang", "zh-TW"]).status, 0);
+    execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: tmpDir });
+    execFileSync("git", ["config", "user.name", "Tester"], { cwd: tmpDir });
+
+    assert.equal(runCli(tmpDir, ["new", "--id", "REQ-001", "--name", "alpha"]).status, 0);
+    assert.equal(runCli(tmpDir, ["new", "--id", "REQ-002", "--name", "beta"]).status, 0);
+    execFileSync("git", ["add", "-A"], { cwd: tmpDir });
+    execFileSync("git", ["commit", "-m", "baseline specs"], { cwd: tmpDir });
+
+    // Clean state passes check --strict --json
+    const cleanJsonRes = runCli(tmpDir, ["check", "--strict", "--json"]);
+    assert.equal(cleanJsonRes.status, 0, cleanJsonRes.stderr);
+    const cleanParsed = JSON.parse(cleanJsonRes.stdout);
+    assert.equal(cleanParsed.ok, true);
+    assert.equal(cleanParsed.scopeLock.ok, true);
+    assert.deepEqual(cleanParsed.issues, []);
+
+    // YAML tab indent + missing info + scalar-indent anomaly
+    const req1Api = path.join(tmpDir, "project", "REQ-001-alpha", "openapi.yaml");
+    fs.writeFileSync(
+      req1Api,
+      "openapi: 3.0.3\ninfo: BadScalar\n\tversion: 0.1.0\npaths: {}\n",
+      "utf8"
+    );
+    const yamlJsonRes = runCli(tmpDir, ["check", "--json"]);
+    assert.notEqual(yamlJsonRes.status, 0);
+    const yamlParsed = JSON.parse(yamlJsonRes.stdout);
+    assert.equal(yamlParsed.ok, false);
+    assert.ok(yamlParsed.issues.some((it) => it.rule === "OPENAPI_YAML_INVALID" && it.fixHint));
+
+    // Restore valid YAML, then modify BOTH committed REQ-001 and REQ-002 -> scope lock triggers on --strict
+    fs.writeFileSync(
+      req1Api,
+      "openapi: 3.0.3\ninfo:\n  title: Alpha\n  version: 0.1.0\npaths: {}\n",
+      "utf8"
+    );
+    fs.appendFileSync(path.join(tmpDir, "project", "REQ-002-beta", "srs.md"), "\n<!-- touched -->\n", "utf8");
+
+    const lockedRes = runCli(tmpDir, ["check", "--strict", "--json"]);
+    assert.notEqual(lockedRes.status, 0);
+    const lockedParsed = JSON.parse(lockedRes.stdout);
+    assert.equal(lockedParsed.scopeLock.ok, false);
+    assert.deepEqual(lockedParsed.scopeLock.modifiedReqDirs, ["REQ-001-alpha", "REQ-002-beta"]);
+    assert.ok(lockedParsed.issues.some((it) => it.rule === "SCOPE_LOCK_MULTI_REQ"));
+
+    // Explicit --allow-multi-req overrides scope lock
+    const allowedRes = runCli(tmpDir, ["check", "--strict", "--json", "--allow-multi-req"]);
+    assert.equal(allowedRes.status, 0, allowedRes.stderr);
+    const allowedParsed = JSON.parse(allowedRes.stdout);
+    assert.equal(allowedParsed.ok, true);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});

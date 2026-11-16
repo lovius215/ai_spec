@@ -108,7 +108,7 @@ sa-spec --version
 | `sa-spec templates [name] [--lang <code>] [--list] [--json]` | 프로젝트 언어 또는 `--lang`에 맞춰 현지화된 문서 및 PlantUML 템플릿을 조회합니다. |
 | `sa-spec pdf <target> [--split] [--output out.pdf] [--browser <path>] [--online-uml \| --no-uml-render]` | 지정한 `.md` 또는 요구사항(`REQ-001`)을 PDF로 변환합니다(기본값은 외부 서버 전송 없이 로컬 `plantuml`만 사용, 온라인 렌더링 시 `--online-uml` 지정). |
 | `sa-spec reindex` | `project/REQ-*`를 스캔하고 SRS 제목·요약을 추출해 `project/index.md`를 동적으로 재구축합니다. |
-| `sa-spec check [--strict]` | 필수 파일, 중복 번호, 문서 간 정합성, 산출물 무결성을 검증하고 오류 시 exit code 1을 반환합니다(`--strict`는 버전 불일치 및 구버전 `skills/`·`rules/`도 실패 처리). |
+| `sa-spec check [--strict] [--json] [--allow-multi-req]` | 필수 파일, 중복 번호, 문서 간 정합성, OpenAPI YAML 구조, 산출물 무결성을 검증합니다(`--json`으로 구조화된 수정 힌트 출력, `--strict`는 버전 불일치·구버전 `skills/`/`rules/`·다중 `REQ-*` 동시 수정도 실패 처리하며 `--allow-multi-req`로 허용 가능). |
 | `sa-spec hooks [install\|remove\|status] [--force]` | 커밋 전 `sa-spec check --strict`를 자동 실행하는 Git `pre-commit` hook을 설치·제거·조회합니다(기존 커스텀 hook 보호). |
 | `sa-spec status` | 요구사항 및 시스템 사양 현황을 확인합니다. |
 | `sa-spec doctor` | 워크스페이스 무결성 및 필수 의존 파일을 진단합니다. |

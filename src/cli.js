@@ -1552,7 +1552,7 @@ Usage:
   sa-spec pdf --all [--split] [--browser <path>] [--online-uml | --no-uml-render]
   sa-spec hooks [install|remove|status] [--force]
   sa-spec reindex
-  sa-spec check [--strict]
+  sa-spec check [--strict] [--json] [--allow-multi-req]
   sa-spec doctor
   sa-spec status
   sa-spec upgrade [--dry-run] [--keep-legacy]

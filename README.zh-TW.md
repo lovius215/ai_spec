@@ -286,7 +286,7 @@ sa-spec check
 | `sa-spec templates [name] [--lang <code>] [--list] [--json]` | 讀取或列出套件內建規格與圖表範本（依專案語言或 `--lang` 輸出對應語系的 `srs`、`db-schema`、`handoff`、`history`、`uml-main`、`uml-wireframe` 等）。 |
 | `sa-spec pdf <target> [--split] [--output out.pdf] [--browser <path>] [--online-uml \| --no-uml-render]` | 將指定 `.md` 或需求目錄匯出為 PDF（優先使用本機 `plantuml` 轉繪 SVG；預設不外傳至公開網路伺服器，需線上轉繪請加 `--online-uml` 或設定 `SA_SPEC_PLANTUML_SERVER`，無法轉繪時退回程式碼區塊）。 |
 | `sa-spec reindex` | 掃描 `project/REQ-*` 目錄，依專案鎖定語言與序號重新生成 `project/index.md`（自動從 `srs.md` 擷取標題與 `## 摘要`）。 |
-| `sa-spec check [--strict]` | 檢查核心檔案、規範版本鎖定、重複序號、跨文件契約一致性與交付物完整度（有錯誤時回傳 exit code `1`；加 `--strict` 時若規範版本不一致或殘留舊版 `skills/`/`rules/` 亦回傳 exit code `1`）。 |
+| `sa-spec check [--strict] [--json] [--allow-multi-req]` | 檢查核心檔案、規範版本鎖定、重複序號、跨文件契約一致性、YAML 結構與交付物完整度（加 `--json` 輸出結構化規則碼與修復建議；加 `--strict` 時版本不一致、舊版 `skills/`/`rules/` 或同時修改多個既有 `REQ-*` 目錄皆回傳 exit code `1`，可用 `--allow-multi-req` 放行跨需求變更）。 |
 | `sa-spec hooks [install\|remove\|status] [--force]` | 安裝、移除或查詢 Git `pre-commit` hook（於每次 `git commit` 前自動執行 `sa-spec check --strict`，並保護既有自訂 hook）。 |
 | `sa-spec status` | 顯示系統規格與需求索引狀態。 |
 | `sa-spec doctor` | 檢查必要檔案是否存在。 |

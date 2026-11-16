@@ -108,7 +108,7 @@ sa-spec --version
 | `sa-spec templates [name] [--lang <code>] [--list] [--json]` | プロジェクト言語または `--lang` に合わせてローカライズされたテンプレートを表示します。 |
 | `sa-spec pdf <target> [--split] [--output out.pdf] [--browser <path>] [--online-uml \| --no-uml-render]` | 指定した `.md` または要件（`REQ-001`）を PDF 出力します（デフォルトはローカル `plantuml` のみ使用し外部送信しません。オンライン描画時は `--online-uml` を指定）。 |
 | `sa-spec reindex` | `project/REQ-*` をスキャンし、SRS のタイトル・概要を抽出して `project/index.md` を再構築します。 |
-| `sa-spec check [--strict]` | 必須ファイル・番号重複・ドキュメント間整合性・成果物完全性を検証し失敗時は終了コード 1 を返します（`--strict` でバージョン不一致や旧 `skills/`・`rules/` もエラー扱い）。 |
+| `sa-spec check [--strict] [--json] [--allow-multi-req]` | 必須ファイル・番号重複・ドキュメント間整合性・OpenAPI YAML 構造・成果物完全性を検証します（`--json` で機械可読な修正ヒントを出力、`--strict` ではバージョン不一致・旧 `skills/`/`rules/`・複数 `REQ-*` 同時変更も失敗扱い、`--allow-multi-req` で許可）。 |
 | `sa-spec hooks [install\|remove\|status] [--force]` | コミット前に `sa-spec check --strict` を自動実行する Git `pre-commit` hook を導入・削除・確認します（既存のカスタム hook は保護）。 |
 | `sa-spec status` | 要件とシステム仕様の概要ステータスを表示します。 |
 | `sa-spec doctor` | ワークスペースの依存関係と整合性を診断します。 |
