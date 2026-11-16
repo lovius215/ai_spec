@@ -303,7 +303,7 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
     if (srsText !== undefined) {
       const srsStatus = extractStatusFromContent(srsText);
       const handoffStatus = extractStatusFromContent(handoffText);
-      const isPendingStatus = (st) => /^(?:待確認|草稿|Pending|Draft|待确认|未確認|확인 대기|초안)/i.test(String(st || "").trim());
+      const isPendingStatus = (st) => /^(?:待確認|草稿|Pending|Draft|待确认|未確認|確認待ち|ドラフト|확인 대기|초안)/i.test(String(st || "").trim());
       const isApprovedStatus = (st) => /^(?:已審核|已核准|Approved|已审核|承認済み|승인됨)/i.test(String(st || "").trim());
       if (srsStatus && handoffStatus && isPendingStatus(srsStatus) && isApprovedStatus(handoffStatus)) {
         issues.push(`srs.md 狀態為「${srsStatus}」，但 handoff.md 已標示為「${handoffStatus}」，兩者狀態矛盾`);

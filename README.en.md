@@ -100,7 +100,7 @@ sa-spec --version
 
 | Command | Description |
 |---|---|
-| `sa-spec init [--full] [--lang <lang>]` | Scaffolds a clean workspace skeleton without exposing `skills/` or `rules/` folders (`--full` kept for compatibility; rules are served via CLI). Supports `zh-TW`, `en`, `zh-CN`, `ja`, `ko`. |
+| `sa-spec init [--full] [--hooks] [--lang <lang>]` | Scaffolds a clean workspace skeleton without exposing `skills/` or `rules/` folders (`--full` kept for compatibility; `--hooks` installs the Git `pre-commit` guardrail). Supports `zh-TW`, `en`, `zh-CN`, `ja`, `ko`. |
 | `sa-spec new [--id REQ-001] --name login [--slug login] [--branch]` | Creates a requirement folder template (pass `--slug <ascii-slug>` for non-ASCII/CJK names). Omitting `--id` starts a draft in a feature branch (`feat/<slug>`). |
 | `sa-spec finalize --name login [--slug login] [--no-merge \| --pr]` | Assigns the latest available sequential ID to a draft requirement, renames directory, substitutes `{{REQ_ID}}`, regenerates index, and handles merge/PR mode (`Merge Strategy: pr`) with remote collision guard. |
 | `sa-spec instructions [stage] [--with-rules] [--json]` | Prints live workspace context, workflow steps, language directive, and built-in `SKILL.md` guidance for a stage (`init`, `propose`, `analyze`, `commit`, `pdf`). |
@@ -108,7 +108,8 @@ sa-spec --version
 | `sa-spec templates [name] [--lang <code>] [--list] [--json]` | Reads or lists built-in document and PlantUML templates localized for the workspace language or `--lang`. |
 | `sa-spec pdf <target> [--split] [--output out.pdf] [--browser <path>] [--online-uml \| --no-uml-render]` | Converts a `.md` file or requirement (`REQ-001`) to a merged or split PDF (privacy-safe by default: uses local `plantuml`, or `--online-uml` / `SA_SPEC_PLANTUML_SERVER` if explicitly requested). |
 | `sa-spec reindex` | Scans `project/REQ-*` directories and dynamically rebuilds `project/index.md` sorted by numerical ID with extracted SRS title and summary. |
-| `sa-spec check [--strict]` | Validates required files, duplicate IDs, deliverable integrity, and exits non-zero on errors (`--strict` also fails on spec version mismatch or legacy `skills/`/`rules/`). |
+| `sa-spec check [--strict]` | Validates required files, duplicate IDs, cross-file consistency, deliverable integrity, and exits non-zero on errors (`--strict` also fails on spec version mismatch or legacy `skills/`/`rules/`). |
+| `sa-spec hooks [install\|remove\|status] [--force]` | Installs, removes, or checks the Git `pre-commit` hook that automatically runs `sa-spec check --strict` before commits (preserving custom hooks unless `--force` is given). |
 | `sa-spec status` | Displays overview status of requirements and specs. |
 | `sa-spec doctor` | Diagnostic tool to verify workspace integrity. |
 | `sa-spec upgrade [--dry-run] [--keep-legacy]` | Upgrades `AGENTS.md`, removes legacy managed `skills/` and `rules/` files (preserving custom files and language), and migrates legacy `uml.puml`. Alias: `sa-spec update`. |

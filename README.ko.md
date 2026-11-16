@@ -100,7 +100,7 @@ sa-spec --version
 
 | 명령어 | 설명 |
 |---|---|
-| `sa-spec init [--full] [--lang <lang>]` | 프로젝트 디렉토리에 `skills/`·`rules/`를 노출하지 않고 깔끔한 워크스페이스 골격을 생성합니다 (`--full`은 하위 호환용, 5개 언어 지원). |
+| `sa-spec init [--full] [--hooks] [--lang <lang>]` | 프로젝트 디렉토리에 `skills/`·`rules/`를 노출하지 않고 깔끔한 워크스페이스 골격을 생성합니다 (`--full`은 하위 호환용, `--hooks`로 Git `pre-commit` 가드레일 설치, 5개 언어 지원). |
 | `sa-spec new [--id REQ-001] --name login [--slug login] [--branch]` | 요구사항 템플릿 폴더를 생성합니다(한국어 등 비 ASCII 이름은 `--slug <ascii-slug>` 지정 필수). `--id` 생략 시 `feat/<slug>` 초안 브랜치로 시작합니다. |
 | `sa-spec finalize --name login [--slug login] [--no-merge \| --pr]` | 초안 요구사항에 최신 번호를 부여하며 `--no-merge` / `--pr` 또는 `병합 전략：pr`과 원격 브랜치 간 번호 충돌 방지를 지원합니다. |
 | `sa-spec instructions [stage] [--with-rules] [--json]` | 현재 워크스페이스 상태, 언어 지시문 및 단계별 내장 분석 규범을 출력합니다. |
@@ -108,7 +108,8 @@ sa-spec --version
 | `sa-spec templates [name] [--lang <code>] [--list] [--json]` | 프로젝트 언어 또는 `--lang`에 맞춰 현지화된 문서 및 PlantUML 템플릿을 조회합니다. |
 | `sa-spec pdf <target> [--split] [--output out.pdf] [--browser <path>] [--online-uml \| --no-uml-render]` | 지정한 `.md` 또는 요구사항(`REQ-001`)을 PDF로 변환합니다(기본값은 외부 서버 전송 없이 로컬 `plantuml`만 사용, 온라인 렌더링 시 `--online-uml` 지정). |
 | `sa-spec reindex` | `project/REQ-*`를 스캔하고 SRS 제목·요약을 추출해 `project/index.md`를 동적으로 재구축합니다. |
-| `sa-spec check [--strict]` | 필수 파일, 중복 번호, 산출물 무결성을 검증하고 오류 시 exit code 1을 반환합니다(`--strict`는 버전 불일치 및 구버전 `skills/`·`rules/`도 실패 처리). |
+| `sa-spec check [--strict]` | 필수 파일, 중복 번호, 문서 간 정합성, 산출물 무결성을 검증하고 오류 시 exit code 1을 반환합니다(`--strict`는 버전 불일치 및 구버전 `skills/`·`rules/`도 실패 처리). |
+| `sa-spec hooks [install\|remove\|status] [--force]` | 커밋 전 `sa-spec check --strict`를 자동 실행하는 Git `pre-commit` hook을 설치·제거·조회합니다(기존 커스텀 hook 보호). |
 | `sa-spec status` | 요구사항 및 시스템 사양 현황을 확인합니다. |
 | `sa-spec doctor` | 워크스페이스 무결성 및 필수 의존 파일을 진단합니다. |
 | `sa-spec upgrade [--dry-run] [--keep-legacy]` | `AGENTS.md`를 업데이트하고 구버전 패키지 관리 `skills/`·`rules/`를 삭제(사용자 정의 파일 및 언어 설정 보존)하며 구버전 `uml.puml`을 마이그레이션합니다. 별칭: `sa-spec update`. |

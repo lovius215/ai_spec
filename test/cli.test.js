@@ -1735,6 +1735,52 @@ test("#29 cross-file contradiction detection in check and Git pre-commit hook ma
     const checkRevRes = runCli(tmpDir, ["check"]);
     assert.notEqual(checkRevRes.status, 0);
     assert.match(checkRevRes.stdout, /openapi\.yaml 已定義 API paths，但 handoff\.md 標記無 API/);
+
+    // Japanese status contradiction (確認待ち vs 承認済み)
+    fs.writeFileSync(
+      path.join(reqDir, "srs.md"),
+      "# REQ-001 ログイン\n\n- ステータス: 確認待ち\n\n## 概要\nログイン。\n\n## 機能要件\nログイン。\n\n## 受入条件\n合格。\n",
+      "utf8"
+    );
+    fs.writeFileSync(
+      path.join(reqDir, "handoff.md"),
+      [
+        "# Handoff",
+        "- ステータス: 承認済み",
+        "## 6. API",
+        "- POST /api/login",
+        "## 7. データベース",
+        "- なし",
+        "## 8. UI",
+        "- wireframe 参照",
+        "## 9. 受入条件",
+        "- 合格"
+      ].join("\n"),
+      "utf8"
+    );
+    const checkJaRes = runCli(tmpDir, ["check"]);
+    assert.notEqual(checkJaRes.status, 0);
+    assert.match(checkJaRes.stdout, /srs\.md 狀態為「確認待ち」，但 handoff\.md 已標示為「承認済み」/);
+
+    // Actual git commit is blocked by installed pre-commit hook when check --strict fails
+    const shimBinDir = path.join(tmpDir, ".shim-bin");
+    fs.mkdirSync(shimBinDir, { recursive: true });
+    const cliEntry = path.resolve(__dirname, "..", "bin", "sa-spec.js");
+    fs.writeFileSync(
+      path.join(shimBinDir, "sa-spec"),
+      `#!/bin/sh\nexec "${process.execPath}" "${cliEntry}" "$@"\n`,
+      { mode: 0o755 }
+    );
+    execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: tmpDir });
+    execFileSync("git", ["config", "user.name", "Tester"], { cwd: tmpDir });
+    execFileSync("git", ["add", "project", "AGENTS.md", "readme.md"], { cwd: tmpDir });
+    const { spawnSync } = require("child_process");
+    const blockedCommit = spawnSync("git", ["commit", "-m", "should be blocked"], {
+      cwd: tmpDir,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${shimBinDir}:${process.env.PATH || ""}` }
+    });
+    assert.notEqual(blockedCommit.status, 0);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

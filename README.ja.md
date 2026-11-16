@@ -100,7 +100,7 @@ sa-spec --version
 
 | コマンド | 説明 |
 |---|---|
-| `sa-spec init [--full] [--lang <lang>]` | `skills/` や `rules/` をプロジェクトに出力せずクリーンな骨格を初期化します（`--full` は互換用・5 言語対応）。 |
+| `sa-spec init [--full] [--hooks] [--lang <lang>]` | `skills/` や `rules/` をプロジェクトに出力せずクリーンな骨格を初期化します（`--full` は互換用・`--hooks` で Git `pre-commit` ガードレールも導入・5 言語対応）。 |
 | `sa-spec new [--id REQ-001] --name login [--slug login] [--branch]` | 要件テンプレートを作成します（日本語など非 ASCII 名には `--slug <ascii-slug>` を指定）。`--id` を省略すると `feat/<slug>` ドラフトモードで開始します。 |
 | `sa-spec finalize --name login [--slug login] [--no-merge \| --pr]` | ドラフト要件に最新の連続番号を割り当て、`--no-merge` / `--pr` または `マージ戦略：pr` に対応しつつ他ブランチ含むリモート番号競合を防止します。 |
 | `sa-spec instructions [stage] [--with-rules] [--json]` | 現在のワークスペース状態、言語指示ディレクティブ、各段階の組み込み規範を出力します。 |
@@ -108,7 +108,8 @@ sa-spec --version
 | `sa-spec templates [name] [--lang <code>] [--list] [--json]` | プロジェクト言語または `--lang` に合わせてローカライズされたテンプレートを表示します。 |
 | `sa-spec pdf <target> [--split] [--output out.pdf] [--browser <path>] [--online-uml \| --no-uml-render]` | 指定した `.md` または要件（`REQ-001`）を PDF 出力します（デフォルトはローカル `plantuml` のみ使用し外部送信しません。オンライン描画時は `--online-uml` を指定）。 |
 | `sa-spec reindex` | `project/REQ-*` をスキャンし、SRS のタイトル・概要を抽出して `project/index.md` を再構築します。 |
-| `sa-spec check [--strict]` | 必須ファイル・番号重複・成果物整合性を検証し失敗時は終了コード 1 を返します（`--strict` でバージョン不一致や旧 `skills/`・`rules/` もエラー扱い）。 |
+| `sa-spec check [--strict]` | 必須ファイル・番号重複・ドキュメント間整合性・成果物完全性を検証し失敗時は終了コード 1 を返します（`--strict` でバージョン不一致や旧 `skills/`・`rules/` もエラー扱い）。 |
+| `sa-spec hooks [install\|remove\|status] [--force]` | コミット前に `sa-spec check --strict` を自動実行する Git `pre-commit` hook を導入・削除・確認します（既存のカスタム hook は保護）。 |
 | `sa-spec status` | 要件とシステム仕様の概要ステータスを表示します。 |
 | `sa-spec doctor` | ワークスペースの依存関係と整合性を診断します。 |
 | `sa-spec upgrade [--dry-run] [--keep-legacy]` | `AGENTS.md` を更新し、旧版パッケージ管理下の `skills/`・`rules/` を削除（独自ファイルと言語は保持）し、旧 `uml.puml` を移行します。別名：`sa-spec update`。 |
