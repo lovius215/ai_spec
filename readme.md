@@ -739,10 +739,17 @@ git push origin master
 - 未經使用者確認，不得標示為 `已審核`。
 - `spec:analyze` 發現衝突時不得產出最終文件，也不得修改既有需求文件。
 - `project/system-spec.md` 只能在 `spec:commit` 依使用者確認內容更新。
-- **鐵律**：只要 Git 有設定 remote，`scp` 與 `scc` 都會自動將分支與主分支推送至 remote。
+- **鐵律**：只要 Git 有設定 remote，`scp` 與 `scc` 都會自動將 feature 分支推送至 remote（預設走 PR 模式；僅在啟用 `--auto-merge` 或 `合併策略：auto-merge` 時才會自動合併並推送主分支）。
 - 一次最多問 3 個待確認問題，優先詢問會影響範圍、資料、權限、API、DB 或驗收的問題。
 
 ## 更新紀錄
+
+### v0.2.11
+- **預設安全 PR 合併、`已審核` 佔位閘門與 `sequence.puml` 語意命名**：
+  - **預設合併策略改為 `pr`**：`sa-spec finalize` 預設只推送 feature 分支，不再未經 `--auto-merge`（或 `合併策略：auto-merge`）直接動主分支。
+  - **`已審核` 佔位內容完整度閘門**：`sa-spec check`（`APPROVED_HAS_PLACEHOLDER`）在需求標示為 `已審核` / `Approved` 時，自動阻擋仍殘留「待補充 / TBD」的交付物。
+  - **影響索引過濾與誠實邊界說明**：`sa-spec instructions analyze` 改為先透過 `impactIndex` 過濾相關 `REQ-*` 再細讀；README 明確區分 CLI 確定性保證與 AI 規範約束。
+  - **預設 UML 範本語意化**：預設圖檔由 `uml/main.puml` 更名為 `uml/sequence.puml`（保留 `uml-main` 向下相容別名）。
 
 ### v0.2.10
 - **語法層預檢、跨需求影響矩陣與無瀏覽器 HTML 匯出**：
