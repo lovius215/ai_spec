@@ -742,106 +742,19 @@ git push origin master
 - **鐵律**：只要 Git 有設定 remote，`scp` 與 `scc` 都會自動將 feature 分支推送至 remote（預設走 PR 模式；僅在啟用 `--auto-merge` 或 `合併策略：auto-merge` 時才會自動合併並推送主分支）。
 - 一次最多問 3 個待確認問題，優先詢問會影響範圍、資料、權限、API、DB 或驗收的問題。
 
+## 範例專案（完整產出與衝突示範）
+
+想直接看實際產出的完整規格與衝突攔截範例，可參考 [`examples/basic-login/`](examples/basic-login/)：
+- 已審核需求範例：[`examples/basic-login/project/REQ-001-user-login/`](examples/basic-login/project/REQ-001-user-login/)（可切換至 `examples/basic-login` 執行 `sa-spec check --strict --json` 或 `sa-spec impact --json` 實測）。
+- 衝突攔截示範：[`examples/basic-login/CONFLICT-DEMO.md`](examples/basic-login/CONFLICT-DEMO.md)。
+
 ## 更新紀錄
 
 ### v0.2.11
 - **預設安全 PR 合併、`已審核` 佔位閘門與 `sequence.puml` 語意命名**：
-  - **預設合併策略改為 `pr`**：`sa-spec finalize` 預設只推送 feature 分支，不再未經 `--auto-merge`（或 `合併策略：auto-merge`）直接動主分支。
-  - **`已審核` 佔位內容完整度閘門**：`sa-spec check`（`APPROVED_HAS_PLACEHOLDER`）在需求標示為 `已審核` / `Approved` 時，自動阻擋仍殘留「待補充 / TBD」的交付物。
-  - **影響索引過濾與誠實邊界說明**：`sa-spec instructions analyze` 改為先透過 `impactIndex` 過濾相關 `REQ-*` 再細讀；README 明確區分 CLI 確定性保證與 AI 規範約束。
-  - **預設 UML 範本語意化**：預設圖檔由 `uml/main.puml` 更名為 `uml/sequence.puml`（保留 `uml-main` 向下相容別名）。
+  - `sa-spec finalize` 預設改為 `pr` 模式（`--auto-merge` / `合併策略：auto-merge` 為顯式 opt-in），`SKILL.md` 與 `AGENTS.md` 同步更新。
+  - `sa-spec check` 新增 `已審核` 需求佔位內容閘門（`APPROVED_HAS_PLACEHOLDER`），並將 `analyze` 改為優先透過 `impactIndex` 過濾相關 `REQ-*`。
+  - 預設 UML 範本由 `uml/main.puml` 更名為 `uml/sequence.puml`，並新增完整範例專案 [`examples/basic-login/`](examples/basic-login/)。
 
-### v0.2.10
-- **語法層預檢、跨需求影響矩陣與無瀏覽器 HTML 匯出**：
-  - **OpenAPI 3.0.3 & PlantUML 語法預檢**：`sa-spec check` 新增檢查 `paths` 路徑前綴、HTTP method `responses` 必填、內部 `$ref` 存在性（`OPENAPI_CONTRACT_INVALID`），以及 `.puml` 空圖與大括號配對檢查（`PLANTUML_SYNTAX_INVALID`）。
-  - **跨需求輕量影響矩陣 (`sa-spec impact`)**：自動萃取各需求的 API Endpoints 與 DB Tables、偵測重疊碰撞，並自動注入 `sa-spec instructions analyze`，大幅降低多需求時的 AI Context 成本與漏檢率。
-  - **無頭／CI 環境支援**：新增 `sa-spec pdf <target> --html` 輸出獨立 HTML，並在 `sa-spec doctor` 主動回報本機 PDF 瀏覽器與 PlantUML CLI 可用狀態。
-
-### v0.2.9
-- **任務雙重檢查規範與 Harness Engineering 硬護欄升級**：
-  - **事前說明與雙重檢查清單**：`sa-spec instructions`、`SKILL.md`、`rules review` 與 5 語系 `AGENTS.md` 全面強制「做事前先說明任務＋任務清單（Task Checklist）＋流程檢查清單（Process Checklist）＋業務檢查清單（Business Checklist）」。
-  - **跨文件矛盾與 OpenAPI YAML 結構檢查**：`sa-spec check` 新增 UI / 審核狀態（含 5 語系狀態詞）/ API 契約跨文件矛盾偵測，以及 OpenAPI YAML 縮排與必要欄位驗證。
-  - **結構化回饋與範圍鎖定**：新增 `sa-spec check --json`（輸出結構化 `rule` 與 `fixHint`）與多 `REQ-*` 範圍鎖定檢查（`--strict` 阻擋跨需求誤改，必要時可用 `--allow-multi-req` 放行）。
-  - **Git `pre-commit` Hook 與多項邊界防護**：新增 `sa-spec init --hooks` 與 `sa-spec hooks [install|remove|status]`；強化 PDF 暫存渲染與 `--browser` 驗證、合併衝突自動 `git merge --abort` 復原，以及全專案檔案／目錄型別（`EISDIR`/`ENOTDIR`）與大小寫 `REQ-*` 防撞檢查。
-
-### v0.2.8
-- **OpenSpec 風格 CLI 內建規範架構（隱藏工作區 `skills/` 與 `rules/`）**：
-  - **乾淨初始化架構**：執行 `sa-spec init`（含 `--full` 向下相容參數）建立的工作區不再產生 `skills/` 與 `rules/` 資料夾，僅保留 `AGENTS.md`、`readme.md` 與 `project/`，保持規格專案整潔並避免規範副本與套件更新脫鉤。
-  - **新增動態規範與範本指令**：新增 `sa-spec instructions [init|propose|analyze|commit|pdf] [--with-rules] [--json]`、`sa-spec rules [name|all] [--list] [--json]` 與 `sa-spec templates [name] [--list] [--json]`，即時由全域套件輸出工作區上下文、系統分析技能與補充規則。
-  - **舊版工作區升級自動清理**：執行 `sa-spec upgrade`（新增別名 `sa-spec update`）時，會更新 `AGENTS.md`（保留既有 `<claude-mem-context>`）、自動刪除舊版由套件產生的 `skills/` 與 `rules/`（自訂檔案會保留並發出 `WARNING` 提示，亦支援 `--dry-run` 與 `--keep-legacy`），並保護套件原始碼主目錄不被誤刪。
-
-### v0.2.7
-- **新增 Markdown 轉 PDF 指令（`spec:pdf` / `spd` / `sa-spec pdf`）與跨平台獨立安裝腳本**：
-  - **Markdown 轉 PDF 支援**：新增 AI 指令 `spec:pdf`（簡寫 `spd`）與 CLI 指令 `sa-spec pdf <target> [--split] [--output out.pdf]`（及 `--all`），支援單一 `.md` 轉換、需求目錄整包合併匯出成一份完整規格書 PDF，或加 `--split` 各檔獨立匯出。
-  - **跨平台獨立管理腳本**：新增 macOS / Linux（`install.sh`、`update.sh`、`uninstall.sh`）與 Windows（`install.bat`、`update.bat`、`uninstall.bat`）6 個獨立執行腳本，一鍵完成安裝、更新與解除安裝。
-
-### v0.2.6
-- **Git Remote 自動推送鐵律（Remote Auto-Push）**：
-  - **`scp` 建立分支自動推上遠端**：執行 `spec:propose`（`scp`）或 `sa-spec new --branch` 建立 feature 分支後，自動偵測是否有設定 Git remote；若有則立即將新分支推送至遠端（`git push -u <remote> feat/<name>`）。
-  - **`scc` 先推分支再領號與主分支自動推送**：執行 `spec:commit`（`scc`）或 `sa-spec finalize` 時，若有設定 Git remote，會**先將目前分支推送至 remote 並同步遠端狀態**，接著才查詢主分支（`master`/`main`）最新可用序號定號，完成 feature 分支提交與推送、自動合併回主分支後，**自動將主分支推送至 remote**。
-
-### v0.2.5
-- **支援前端 UI 線框圖（PlantUML Salt Code-as-Wireframe）**：
-  - **純文字代碼化線框圖**：在 `uml/` 目錄新增標準 `uml/wireframe.puml`，使用 PlantUML Salt 語法（`@startsalt ... @endsalt`）以純文字定義頁面排版、輸入欄位、選項與按鈕，可直接在 VS Code 渲染預覽，並可納入 Git 版本追蹤。
-  - **AI 開發交接前後閉環**：`srs.md` 與 `handoff.md` 新增「UI / 畫面規格」區塊，前端需求直接引用 `uml/wireframe.puml`，供 OpenSpec / Claude Code 精準產出前端元件；純後端需求則標示「無 UI 介面需求」。
-  - **版本升級（`sa-spec upgrade`）既有需求防護**：升級時主動掃描既有需求，若偵測到前端介面描述且缺少 wireframe 則發出補齊提示；已標記無 UI 之純後端需求則略過，不盲目覆蓋既有規格。
-
-### v0.2.4
-- **序號重複主動告警與重新定號自癒支援**：
-  - **唯一性主動檢驗**：`sa-spec check` 與 `sa-spec reindex` 加入重複序號檢測，遇到衝突時即時發出 WARNING 告警並列出衝突目錄與修復建議。
-  - **重新定號（Re-number）自癒**：`sa-spec finalize` 智慧支援既有 `REQ-xxx` 目錄重新定號，自動計算最新序號並批次更新目錄內所有檔案的舊編號，零手動修復負擔。
-  - **Quick Start 精簡**：移除頂部容易引起誤解的手動建立分支指令，聚焦 AI 4 指令全自動工作流。
-
-### v0.2.3
-- **自動領號與自動合併至主分支（Git-Flow 自動化閉環）**：
-  - **自動從主分支取新號**：執行 `spec:commit`（`scc`）或 `sa-spec finalize` 時，自動向主分支（`master`/`main`）查詢最新已使用最大序號並定號（`REQ-xxx`），自動置換內部佔位符 `{{REQ_ID}}`，徹底防止多人協作時在 feature 分支發生的號碼撞車與落後問題。
-  - **自動合併回主分支**：完成 feature 分支 commit 後，自動切換至主分支（`git checkout master`）並將該 feature 分支自動合併回主分支（`git merge feat/<name>`），並在主分支自動重新整理 `project/index.md`，打造完全自動化的 Git-Flow 零衝突閉環。
-  - **CLI 自動化支援**：`sa-spec finalize --name <name>` 預設自動執行主分支序號運算、定號置換、提交與合併回主分支（支援 `--no-merge` 參數跳過自動合併）。
-
-### v0.2.2
-- **npm 首頁與專案文件全多語系化（Multi-Language Documentation on npm）**：
-  - **5 國獨立完整說明文件**：新增 `README.en.md`（英文）、`README.zh-CN.md`（簡中）、`README.ja.md`（日文）、`README.ko.md`（韓文）與 `README.zh-TW.md`（繁中）。
-  - **npm 國際化首頁最佳化**：在主 `readme.md` 頂部加入醒目的 5 語系導覽切換列與英文 Quick Start 區塊，全球開發者造訪 npm 頁面時能秒懂工具用途與使用方式。
-  - **npm 發布配置補全**：在 `package.json` 補充 `repository`、`homepage` 與 `bugs` 欄位，確保 npm 頁面上的多語系相對連結能自動正確導向 GitHub。
-
-### v0.2.1
-- **5 國語言與國際化支援（i18n）**：
-  - **支援語系**：繁體中文 (`zh-TW`，台灣常用語)、英文 (`en`)、簡體中文 (`zh-CN`)、日文 (`ja`)、韓文 (`ko`)。
-  - **初始化強制鎖定**：`sa-spec init [--lang <lang>]` 或在 AI 對話中輸入 `spec:init`，未指定時主動彈出選單詢問使用者選擇，選定後寫入 `system-spec.md`。
-  - **專案語言單一純粹**：全專案規格產出 100% 統一該語言。
-  - **技術專有名詞保留原生英文**：非英語系模式下強制保留標準英文術語（如 REST API, Webhook, JWT），嚴禁生硬直譯。
-  - **升級保護**：`sa-spec upgrade` 自動偵測並繼承現有專案語言，不變更設定。
-
-### v0.2.0
-- **多人協作 Git-Flow 解決方案（延遲綁定序號與零衝突索引）**：
-  - **解決痛點**：多人平行開發時，傳統流水號（`REQ-001`）容易在各自分支撞車，且中心化的 `project/index.md` 容易造成 Git merge conflict。
-  - **延遲綁定序號（Late-Binding ID）**：開需求時不搶號，在 feature branch 上以語意名稱建立草稿需求（如 `project/cart`），內部使用 `{{REQ_ID}}` 佔位；只有在 `spec:commit` 最終歸檔時，才向 master/遠端確認最新可用序號並定號（如 `REQ-003`），自動批次置換佔位符，徹底避免幽靈跳號與序號競爭。
-  - **動態重建需求索引（`sa-spec reindex`）**：將 `project/index.md` 改為根據 `project/REQ-*` 目錄動態掃描並依序號排序生成，消除手動 append 造成的 Git 合併衝突。
-  - **CLI 指令升級**：
-    - `sa-spec new [--id REQ-001] --name login [--branch]`：支援草稿模式與自動切換 feature 分支。
-    - `sa-spec finalize --name login`：自動定號、重命名目錄、置換佔位符並重建索引。
-    - `sa-spec reindex`：一鍵掃描並重新排序生成乾淨的 `project/index.md`。
-  - **分析前防護**：`spec:analyze` 執行前確保取得 master/遠端最新規格，避免分支規格落後導致漏檢衝突。
-
-### v0.1.3
-- **支援指令簡寫別名（同時保留完整指令）**：
-  - `sci` ＝ `spec:init`
-  - `scp` ＝ `spec:propose`
-  - `sca` ＝ `spec:analyze`
-  - `scc` ＝ `spec:commit`
-  - 兩者完全等價，使用者可依輸入習慣自由選擇長指令或 3 字母縮寫。
-
-### v0.1.2
-- **新增 `sa-spec upgrade` 版本升級指令**：
-  - **工作區規則同步**：自動檢查並更新專案中的 `AGENTS.md`、`skills/system-analysis/SKILL.md` 以及 `rules/` 目錄下的規則文件至最新版本（自動保留既有的 memory context）。
-  - **既有需求自動遷移**：掃描 `project/REQ-*` 目錄，將舊版 `uml.puml` 自動重構移動為 `uml/main.puml`，並自動修復 `handoff.md` 中的來源引用路徑。
-  - **提供 `--dry-run` 模擬模式**：可加上 `--dry-run` 參數先行預覽哪些檔案會被更新或遷移，而不實際寫入檔案。
-
-### v0.1.1
-- **PlantUML 檔案架構重構（解決多圖渲染與預覽開不起來問題）**：
-  - **目錄化結構**：每個需求目錄下由原本單一檔案 `uml.puml` 改為 `uml/` 資料夾（預設提供 `uml/main.puml` 骨架）。
-  - **單檔單圖原則**：嚴格規範每個 `.puml` 檔案僅包含單一組 `@startuml` 與 `@enduml`，禁止在單一檔案內混放多張圖。
-  - **支援多面向拆分**：需求若涉及多個面向（如業務流程、循序互動、狀態轉換），必須拆分為獨立 `.puml` 檔案（例如 `uml/main.puml`、`uml/sequence.puml`、`uml/state.puml`），確保 PlantUML 預覽外掛能順暢開啟與渲染。
-  - **CLI 自動化**：`sa-spec new` 與 `sa-spec template req` 自動建立 `uml/` 資料夾並產出預設的 `uml/main.puml`。
-  - **全專案規範同步**：同步更新 `AGENTS.md`、`system-analysis` skill、`rules/uml-style.md`、`rules/file-style.md` 與 `handoff.md`。
+> 完整歷史版本紀錄請見 [CHANGELOG.md](CHANGELOG.md)。
 

@@ -2015,3 +2015,28 @@ test("#32 safe-by-default pr merge strategy, Approved placeholder completeness g
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test("#33 examples/basic-login passes check --strict --json, and SKILL/AGENTS sync pr default + impact-filtered analyze", () => {
+  const exampleDir = path.resolve(__dirname, "..", "examples", "basic-login");
+  const checkRes = runCli(exampleDir, ["check", "--strict", "--json"]);
+  assert.equal(checkRes.status, 0, checkRes.stdout + checkRes.stderr);
+  const parsed = JSON.parse(checkRes.stdout);
+  assert.equal(parsed.ok, true);
+  assert.deepEqual(parsed.issues, []);
+
+  const impactRes = runCli(exampleDir, ["impact", "--json"]);
+  assert.equal(impactRes.status, 0, impactRes.stderr);
+  const impact = JSON.parse(impactRes.stdout);
+  assert.equal(impact.requirements.length, 1);
+  assert.deepEqual(impact.requirements[0].apis, ["POST /api/v1/auth/login"]);
+  assert.deepEqual(impact.requirements[0].tables, ["login_audit_logs", "users"]);
+
+  const skillText = fs.readFileSync(path.resolve(__dirname, "..", "templates", "skills", "system-analysis", "SKILL.md"), "utf8");
+  assert.match(skillText, /預設為 `pr` 模式/);
+  assert.match(skillText, /sa-spec impact/);
+  assert.doesNotMatch(skillText, /AI 必須自動切換回主分支/);
+
+  const agentsTplText = fs.readFileSync(path.resolve(__dirname, "..", "templates", "AGENTS.md"), "utf8");
+  assert.match(agentsTplText, /預設為 `pr` 模式/);
+  assert.doesNotMatch(agentsTplText, /AI 必須自動切換回主分支/);
+});
