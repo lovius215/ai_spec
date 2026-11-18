@@ -1,0 +1,12 @@
+@startuml
+title {{REQ_ID}} 無密碼登入 - 互動循序圖
+
+actor "一般會員" as User
+participant "Auth API" as API
+database "PostgreSQL" as DB
+
+User -> API : POST /api/v1/auth/login
+API -> DB : 查詢 users (email)
+DB --> API : 回傳結果
+API --> User : 待釐清與 REQ-001 衝突後定案
+@enduml

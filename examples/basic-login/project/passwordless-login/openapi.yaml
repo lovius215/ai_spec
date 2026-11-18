@@ -1,0 +1,11 @@
+openapi: 3.0.3
+info:
+  title: "{{REQ_ID}} 無密碼登入草稿 API"
+  version: 0.1.0
+paths:
+  /api/v1/auth/login:
+    post:
+      summary: 與 REQ-001 重疊之登入端點（衝突示範）
+      responses:
+        '200':
+          description: 待確認

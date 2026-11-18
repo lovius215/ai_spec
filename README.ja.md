@@ -22,6 +22,8 @@
 
 OpenSpec、Claude Code、OpenAI Codex、Gemini CLI などの AI 開発ツールがコード実装を始める前に、要件のスコープ、境界線、データモデル、API 規約、権限マトリクス、受入条件を事前に明確化し、安全で堅牢な開発境界を定義します。
 
+> **サンプルプロジェクト**：[`examples/basic-login/`](examples/basic-login/) に承認済み要件（`REQ-001-user-login`）・競合ドラフト（`passwordless-login`）・[`CONFLICT-DEMO.md`](examples/basic-login/CONFLICT-DEMO.md) を収録しています（`sa-spec check --strict` / `sa-spec impact --json` をそのまま試せます）。
+
 AI ワークフローは 5 つの標準コマンド（エイリアス対応）で動作します：
 
 | コマンド | エイリアス | 目的 | 説明 |

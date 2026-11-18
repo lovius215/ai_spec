@@ -22,6 +22,8 @@
 
 在 OpenSpec、Claude Code、OpenAI Codex、Gemini CLI 等代码生成工具介入之前，`sa-spec` 先行厘清需求边界、业务规则、数据模型、API 契约、权限矩阵与验收条件，避免 AI 编码时随心所欲破坏系统架构。
 
+> **完整示例项目**：参考 [`examples/basic-login/`](examples/basic-login/)（包含已审核需求 `REQ-001-user-login`、冲突草稿 `passwordless-login` 与 [`CONFLICT-DEMO.md`](examples/basic-login/CONFLICT-DEMO.md)，可直接运行 `sa-spec check --strict` 与 `sa-spec impact --json` 实测）。
+
 AI 工作流使用五个标准指令（支持简写别名）：
 
 | 标准指令 | 简写 | 阶段 | 说明 |

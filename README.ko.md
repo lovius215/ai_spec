@@ -22,6 +22,8 @@
 
 OpenSpec, Claude Code, OpenAI Codex, Gemini CLI 등 코드 생성 AI 도구가 구현을 시작하기 전에, 요구사항의 범위, 경계, 데이터 모델, API 인터페이스, 권한 매트릭스, 인수 조건을 사전에 명확히 정의하여 후속 개발이 안전하고 명확한 경계 내에서 진행되도록 보장합니다.
 
+> **예제 프로젝트**: [`examples/basic-login/`](examples/basic-login/)에서 승인 완료된 요구사항(`REQ-001-user-login`), 충돌 초안(`passwordless-login`), [`CONFLICT-DEMO.md`](examples/basic-login/CONFLICT-DEMO.md)를 확인할 수 있으며, `sa-spec check --strict` 및 `sa-spec impact --json`을 바로 실행해 볼 수 있습니다.
+
 AI 워크플로는 5가지 표준 명령어(별칭 지원)를 기반으로 동작합니다:
 
 | 표준 명령어 | 별칭 | 단계 | 설명 |

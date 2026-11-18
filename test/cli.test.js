@@ -2027,9 +2027,9 @@ test("#33 examples/basic-login passes check --strict --json, and SKILL/AGENTS sy
   const impactRes = runCli(exampleDir, ["impact", "--json"]);
   assert.equal(impactRes.status, 0, impactRes.stderr);
   const impact = JSON.parse(impactRes.stdout);
-  assert.equal(impact.requirements.length, 1);
-  assert.deepEqual(impact.requirements[0].apis, ["POST /api/v1/auth/login"]);
-  assert.deepEqual(impact.requirements[0].tables, ["login_audit_logs", "users"]);
+  assert.equal(impact.requirements.length, 2);
+  assert.ok(impact.apiCollisions.some((c) => c.endpoint === "POST /api/v1/auth/login" && c.dirs.length === 2));
+  assert.ok(impact.tableCollisions.some((c) => c.table === "users" && c.dirs.length === 2));
 
   const skillText = fs.readFileSync(path.resolve(__dirname, "..", "templates", "skills", "system-analysis", "SKILL.md"), "utf8");
   assert.match(skillText, /預設為 `pr` 模式/);

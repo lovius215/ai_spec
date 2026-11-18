@@ -22,6 +22,8 @@
 
 Before code-generation AI tools (OpenSpec, Claude Code, OpenAI Codex, Gemini CLI, Cursor) start implementation, `sa-spec` clarifies scopes, boundaries, data schemas, API contracts, permission matrices, and acceptance criteria to ensure that subsequent coding proceeds within safe, well-defined boundaries.
 
+> **Example Workspace**: See [`examples/basic-login/`](examples/basic-login/) for a complete approved requirement package (`REQ-001-user-login`) plus an overlapping draft (`passwordless-login`) and [`CONFLICT-DEMO.md`](examples/basic-login/CONFLICT-DEMO.md) demonstrating live `sa-spec impact --json` collision detection.
+
 The AI workflow operates on five standard commands (with shorthand aliases):
 
 | Command | Alias | Purpose | Description |

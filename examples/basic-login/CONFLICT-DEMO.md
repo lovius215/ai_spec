@@ -1,20 +1,39 @@
 # 衝突檢查實戰示範（Conflict Demo）
 
-假設團隊已經歸檔了 `REQ-001-user-login`（本範例目錄），現在另一位成員提出新需求：**「無密碼登入（Magic Link）」**，預計新增或調整 `POST /api/v1/auth/login` 並修改 `users` 資料表的 `password_hash` 為可空（Nullable）。
+假設團隊已經歸檔了 `REQ-001-user-login`，現在另一位成員提出新需求草稿 **`passwordless-login`（「無密碼登入」）**，同樣觸及 `POST /api/v1/auth/login` 與 `users` 資料表。
 
 ## 1. `spec:analyze` 執行 `sa-spec impact --json`
 
-AI 在分析階段先透過 `impactIndex` 快速定位重疊資源，不需全量讀取無關需求：
+在本範例目錄（`examples/basic-login`）直接執行 `sa-spec impact --json`，CLI 會實測輸出以下碰撞矩陣：
 
 ```json
 {
   "requirements": [
+    {
+      "dir": "passwordless-login",
+      "isDraft": true,
+      "status": "待確認",
+      "apis": ["POST /api/v1/auth/login"],
+      "tables": ["users"]
+    },
     {
       "dir": "REQ-001-user-login",
       "isDraft": false,
       "status": "已審核",
       "apis": ["POST /api/v1/auth/login"],
       "tables": ["login_audit_logs", "users"]
+    }
+  ],
+  "apiCollisions": [
+    {
+      "endpoint": "POST /api/v1/auth/login",
+      "dirs": ["passwordless-login", "REQ-001-user-login"]
+    }
+  ],
+  "tableCollisions": [
+    {
+      "table": "users",
+      "dirs": ["passwordless-login", "REQ-001-user-login"]
     }
   ]
 }
