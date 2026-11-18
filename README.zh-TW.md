@@ -280,14 +280,18 @@ sa-spec check
 |---|---|
 | `sa-spec init [--full] [--hooks] [--lang zh-TW|en|zh-CN|ja|ko]` | 建立乾淨的專案文件骨架（支援 5 種語言，預設 `zh-TW`；所有規範改由 CLI 內建提供，不建立 `skills/` 與 `rules/`；加 `--hooks` 可一併安裝 Git `pre-commit` 護欄）。 |
 | `sa-spec new [--id REQ-001] --name login [--slug login] [--branch]` | 建立需求資料夾與對應語言模板（若名稱為中文/日文/韓文，請搭配 `--slug <ascii-slug>`；未帶 `--id` 時啟用多人草稿模式，可選 `--branch` 切換至 `feat/<slug>`）。 |
-| `sa-spec finalize --name login [--slug login] [--no-merge \| --pr]` | 將草稿需求定號歸檔為最新序號（支援 `--no-merge` / `--pr` 或於 `system-spec.md` 設定 `合併策略：pr` 改走 PR 流程，並具備遠端撞號防護）。 |
+| `sa-spec finalize --name login [--slug login] [--auto-merge \| --pr \| --no-merge]` | 將草稿需求定號歸檔為最新序號（預設走 PR 模式只推 feature 分支，需自動合併回主分支請加 `--auto-merge` 或於 `system-spec.md` 設定 `合併策略：auto-merge`，具備遠端撞號防護）。 |
 | `sa-spec instructions [init\|propose\|analyze\|commit\|pdf] [--with-rules] [--json]` | 輸出目前工作區狀態、對應階段步驟與套件內建完整系統分析規範（供 AI 動態讀取）。 |
 | `sa-spec rules [name\|all] [--list] [--json]` | 讀取或列出套件內建補充規則（`spec`、`uml-style`、`wireframe`、`db-table`、`estimation`、`system-spec`、`file-style`、`history`、`review`）。 |
 | `sa-spec templates [name] [--lang <code>] [--list] [--json]` | 讀取或列出套件內建規格與圖表範本（依專案語言或 `--lang` 輸出對應語系的 `srs`、`db-schema`、`handoff`、`history`、`uml-main`、`uml-wireframe` 等）。 |
 | `sa-spec pdf <target> [--split] [--html] [--output out.pdf] [--browser <path>] [--online-uml \| --no-uml-render]` | 將指定 `.md` 或需求目錄匯出為 PDF（或加 `--html` 輸出不依賴瀏覽器的獨立 HTML；優先使用本機 `plantuml` 轉繪 SVG，預設不外傳公開伺服器）。 |
 | `sa-spec impact [--json]` | 掃描 `project/` 產出跨需求 API / DB 輕量影響矩陣並偵測潛在重疊碰撞（亦自動注入 `sa-spec instructions analyze`）。 |
 | `sa-spec reindex` | 掃描 `project/REQ-*` 目錄，依專案鎖定語言與序號重新生成 `project/index.md`（自動從 `srs.md` 擷取標題與 `## 摘要`）。 |
-| `sa-spec check [--strict] [--json] [--allow-multi-req]` | 檢查核心檔案、規範版本鎖定、重複序號、跨文件契約一致性、YAML 結構與交付物完整度（加 `--json` 輸出結構化規則碼與修復建議；加 `--strict` 時版本不一致、舊版 `skills/`/`rules/` 或同時修改多個既有 `REQ-*` 目錄皆回傳 exit code `1`，可用 `--allow-multi-req` 放行跨需求變更）。 |
+| `sa-spec check [--strict] [--json] [--allow-multi-req]` | 檢查核心檔案、規範版本鎖定、重複序號、跨文件契約一致性、OpenAPI/PlantUML 語法與**已審核需求佔位內容完整度**（加 `--json` 輸出結構化規則碼與修復建議；加 `--strict` 時版本不一致、舊版 `skills/`/`rules/` 或未授權多 `REQ-*` 修改皆回傳 exit code `1`）。 |
+
+> **CLI 確定性保證 vs. AI 規範約束**：
+> - **CLI 程式保證（確定性）**：檔案結構、序號唯一與遠端防撞、`index.md` 同步、OpenAPI 3.0.3 / YAML / PlantUML 語法預檢、跨文件 UI/狀態/API 契約比對、已審核需求佔位文字阻擋、多需求範圍鎖定，以及 `pre-commit` hook 攔截。
+> - **AI 規範約束（指引層）**：業務語意衝突判斷（先依 `sa-spec impact` 過濾相關需求再細讀）、不臆測未確認規則，以及執行前任務清單與流程/業務雙重檢查清單。
 | `sa-spec hooks [install\|remove\|status] [--force]` | 安裝、移除或查詢 Git `pre-commit` hook（於每次 `git commit` 前自動執行 `sa-spec check --strict`，並保護既有自訂 hook）。 |
 | `sa-spec status` | 顯示系統規格與需求索引狀態。 |
 | `sa-spec doctor` | 檢查必要檔案是否存在。 |

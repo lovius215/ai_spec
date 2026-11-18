@@ -127,13 +127,13 @@ const STAGE_CONFIG = {
     recommendedTemplates: ["srs", "openapi", "db-schema", "handoff", "history", "uml-sequence", "uml-wireframe"],
     steps: [
       "先確認已同步主分支最新規格（如有 remote 先執行 git fetch），避免多人平行開發漏檢衝突。",
-      "讀取 project/index.md、project/system-spec.md 與所有 project/REQ-*/{srs.md,openapi.yaml,db-schema.md,handoff.md,uml/*.puml}，檢查目標流程、角色權限、API、DB 與驗收條件衝突。",
+      "優先檢視下方「跨需求輕量影響索引 (impactIndex)」過濾出 API Paths、DB Tables 重疊或領域相關的 REQ-* 目錄，再讀取這些相關需求與 project/index.md、project/system-spec.md 進行語意衝突分析（避免無差別全量讀取）。",
       "若發現衝突：列出衝突需求編號與檔案、原因、影響範圍及最多 3 個待釐清問題，立即停止產出設計文件且不修改既有需求。",
       "若無衝突：以鎖定語言產出 SRS、uml/*.puml（每檔單一 @start...@end；涉及 UI 必產出 PlantUML Salt uml/wireframe.puml；純後端在 handoff.md 標註「無 UI 介面需求」）、OpenAPI YAML、DB Schema、Handoff 草稿、system-spec 更新建議與未修改其他需求聲明；此階段不可直接寫入 project/system-spec.md。"
     ],
     tasks: [
       "說明本次分析任務目標、檢視對象與預期交付文件",
-      "同步遠端/主分支最新規格並全面檢查既有 REQ-* 與 system-spec.md 是否衝突",
+      "同步遠端/主分支最新規格，並先用 impactIndex（sa-spec impact）過濾相關 REQ-* 與 system-spec.md 檢查語意衝突",
       "確認無衝突後，依序起草 srs.md、uml/*.puml、openapi.yaml、db-schema.md、handoff.md 與 history.md",
       "整理 project/system-spec.md 更新建議（僅提出建議，不直接寫入）",
       "核對流程與業務檢查清單後提交草稿供使用者審核"
@@ -159,9 +159,9 @@ const STAGE_CONFIG = {
     recommendedTemplates: ["history", "index", "system-spec"],
     steps: [
       "若有設定 Git remote，先執行 git push -u <remote> <branch> 與 git fetch <remote> 同步遠端狀態。",
-      "查詢主分支（main/master 與遠端主分支）最新可用序號定號 REQ-xxx，執行 sa-spec finalize --name <slug>（若主分支有保護策略可加 --no-merge 或將 system-spec.md 的合併策略設為 pr）。",
+      "查詢主分支（main/master 與遠端主分支）最新可用序號定號 REQ-xxx，執行 sa-spec finalize --name <slug>（預設走 pr 模式不直接動主分支；若需自動合併請加 --auto-merge 或將 system-spec.md 的合併策略設為 auto-merge）。",
       "依使用者確認內容更新 project/system-spec.md，補齊 handoff.md 11 項必要章節與 history.md（未經確認不可標示「已審核」）。",
-      "只 stage 本次歸檔相關檔案並 commit（格式：docs(REQ-xxx): 需求名稱 - 簡短需求說明）；auto-merge 模式下自動合併回主分支並 push，pr 模式下推送 feature 分支並提示建立 PR。"
+      "只 stage 本次歸檔相關檔案並 commit（格式：docs(REQ-xxx): 需求名稱 - 簡短需求說明）；pr 模式下推送 feature 分支並提示建立 PR，auto-merge 模式下自動合併回主分支並 push。"
     ],
     tasks: [
       "說明本次歸檔任務目標、確認版本狀態與預期 Git 操作",
@@ -307,7 +307,7 @@ function collectWorkspaceContext(cwd, isSourceRepoFlag, packageVersion) {
 
   let systemSpecStatus = null;
   let recordedSpecVersion = null;
-  let mergeStrategy = "auto-merge";
+  let mergeStrategy = "pr";
   if (isExistingFile(systemSpecPath)) {
     const content = fs.readFileSync(systemSpecPath, "utf8");
     systemSpecStatus = extractStatusFromContent(content) || "未標示";

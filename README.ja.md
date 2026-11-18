@@ -102,7 +102,7 @@ sa-spec --version
 |---|---|
 | `sa-spec init [--full] [--hooks] [--lang <lang>]` | `skills/` や `rules/` をプロジェクトに出力せずクリーンな骨格を初期化します（`--full` は互換用・`--hooks` で Git `pre-commit` ガードレールも導入・5 言語対応）。 |
 | `sa-spec new [--id REQ-001] --name login [--slug login] [--branch]` | 要件テンプレートを作成します（日本語など非 ASCII 名には `--slug <ascii-slug>` を指定）。`--id` を省略すると `feat/<slug>` ドラフトモードで開始します。 |
-| `sa-spec finalize --name login [--slug login] [--no-merge \| --pr]` | ドラフト要件に最新の連続番号を割り当て、`--no-merge` / `--pr` または `マージ戦略：pr` に対応しつつ他ブランチ含むリモート番号競合を防止します。 |
+| `sa-spec finalize --name login [--slug login] [--auto-merge \| --pr \| --no-merge]` | ドラフト要件に最新の連続番号を割り当てます（既定は安全な PR モード。自動マージする場合は `--auto-merge` または `マージ戦略：auto-merge` を指定）。 |
 | `sa-spec instructions [stage] [--with-rules] [--json]` | 現在のワークスペース状態、言語指示ディレクティブ、各段階の組み込み規範を出力します。 |
 | `sa-spec rules [name\|all] [--list] [--json]` | パッケージに組み込まれた補助ルールの一覧表示または内容参照を行います。 |
 | `sa-spec templates [name] [--lang <code>] [--list] [--json]` | プロジェクト言語または `--lang` に合わせてローカライズされたテンプレートを表示します。 |
@@ -114,6 +114,8 @@ sa-spec --version
 | `sa-spec status` | 要件とシステム仕様の概要ステータスを表示します。 |
 | `sa-spec doctor` | ワークスペースの依存関係と整合性を診断します。 |
 | `sa-spec upgrade [--dry-run] [--keep-legacy]` | `AGENTS.md` を更新し、旧版パッケージ管理下の `skills/`・`rules/` を削除（独自ファイルと言語は保持）し、旧 `uml.puml` を移行します。別名：`sa-spec update`。 |
+
+> **CLI の確定的保証 vs. AI ガイドライン**：CLI はファイル構成・番号一意性・索引同期・OpenAPI/YAML/PlantUML 構文検査・ドキュメント間整合性・承認済みプレースホルダー遮断・スコープロックを決定的に検証します。業務上の意味的競合分析（`sa-spec impact` で事前絞り込み）とチェックリストは AI 規範として運用されます。
 
 ---
 

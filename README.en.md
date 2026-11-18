@@ -102,7 +102,7 @@ sa-spec --version
 |---|---|
 | `sa-spec init [--full] [--hooks] [--lang <lang>]` | Scaffolds a clean workspace skeleton without exposing `skills/` or `rules/` folders (`--full` kept for compatibility; `--hooks` installs the Git `pre-commit` guardrail). Supports `zh-TW`, `en`, `zh-CN`, `ja`, `ko`. |
 | `sa-spec new [--id REQ-001] --name login [--slug login] [--branch]` | Creates a requirement folder template (pass `--slug <ascii-slug>` for non-ASCII/CJK names). Omitting `--id` starts a draft in a feature branch (`feat/<slug>`). |
-| `sa-spec finalize --name login [--slug login] [--no-merge \| --pr]` | Assigns the latest available sequential ID to a draft requirement, renames directory, substitutes `{{REQ_ID}}`, regenerates index, and handles merge/PR mode (`Merge Strategy: pr`) with remote collision guard. |
+| `sa-spec finalize --name login [--slug login] [--auto-merge \| --pr \| --no-merge]` | Assigns the latest available sequential ID to a draft requirement, renames directory, substitutes `{{REQ_ID}}`, regenerates index, and pushes with remote collision guard (defaults to `pr` mode; pass `--auto-merge` or set `Merge Strategy: auto-merge` to merge into `main`/`master`). |
 | `sa-spec instructions [stage] [--with-rules] [--json]` | Prints live workspace context, workflow steps, language directive, and built-in `SKILL.md` guidance for a stage (`init`, `propose`, `analyze`, `commit`, `pdf`). |
 | `sa-spec rules [name\|all] [--list] [--json]` | Reads or lists built-in analysis rule documents bundled in the package. |
 | `sa-spec templates [name] [--lang <code>] [--list] [--json]` | Reads or lists built-in document and PlantUML templates localized for the workspace language or `--lang`. |
@@ -114,6 +114,8 @@ sa-spec --version
 | `sa-spec status` | Displays overview status of requirements and specs. |
 | `sa-spec doctor` | Diagnostic tool to verify workspace integrity. |
 | `sa-spec upgrade [--dry-run] [--keep-legacy]` | Upgrades `AGENTS.md`, removes legacy managed `skills/` and `rules/` files (preserving custom files and language), and migrates legacy `uml.puml`. Alias: `sa-spec update`. |
+
+> **CLI Guarantees vs. AI Guidelines**: The CLI deterministically enforces file structure, sequential ID uniqueness, index sync, OpenAPI/YAML/PlantUML syntax pre-checks, cross-file UI/status/API contract consistency, approved-spec placeholder blocking, and multi-REQ scope lock. Semantic requirement conflict analysis (filtering via `sa-spec impact` first) and pre-task/dual checklists are AI workflow guidelines.
 
 ---
 

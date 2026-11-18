@@ -102,7 +102,7 @@ sa-spec --version
 |---|---|
 | `sa-spec init [--full] [--hooks] [--lang <lang>]` | 初始化干净的工作区骨架，不在项目目录暴露 `skills/` 与 `rules/`（`--full` 仅作兼容保留；`--hooks` 可一并安装 Git `pre-commit` 护栏；支持 5 种语言）。 |
 | `sa-spec new [--id REQ-001] --name login [--slug login] [--branch]` | 创建需求模板文件夹（若名称含中文/日文/韩文等非 ASCII 字符请搭配 `--slug <ascii-slug>`）。省略 `--id` 时启用多人草稿分支（`feat/<slug>`）。 |
-| `sa-spec finalize --name login [--slug login] [--no-merge \| --pr]` | 将草稿需求正式定号归档为最新序号，支持 `--no-merge` / `--pr` 或 `合并策略：pr` 流程，并具备跨分支远端撞号防护。 |
+| `sa-spec finalize --name login [--slug login] [--auto-merge \| --pr \| --no-merge]` | 将草稿需求正式定号归档为最新序号，默认走 PR 模式不直接修改主分支（需自动合并请加 `--auto-merge` 或设置 `合并策略：auto-merge`），具备远端撞号防护。 |
 | `sa-spec instructions [stage] [--with-rules] [--json]` | 输出当前工作区上下文、语言强制规范、阶段步骤与内置完整分析规范（`init` / `propose` / `analyze` / `commit` / `pdf`）。 |
 | `sa-spec rules [name\|all] [--list] [--json]` | 读取或列出套件内置补充规则文档。 |
 | `sa-spec templates [name] [--lang <code>] [--list] [--json]` | 读取或列出按项目语言或 `--lang` 本地化的文档与 PlantUML 模板。 |
@@ -114,6 +114,8 @@ sa-spec --version
 | `sa-spec status` | 查看系统规格与需求总览状态。 |
 | `sa-spec doctor` | 诊断工作区环境与必要文件依赖。 |
 | `sa-spec upgrade [--dry-run] [--keep-legacy]` | 更新 `AGENTS.md`，自动移除旧版套件托管的 `skills/` 与 `rules/`（保留自定义文件与原语言），并迁移旧版 `uml.puml`。别名：`sa-spec update`。 |
+
+> **CLI 确定性保证 vs. AI 规范约束**：CLI 确定性负责文件结构、编号唯一性、索引同步、OpenAPI/YAML/PlantUML 语法预检、跨文件契约比对、已审核占位内容拦截与多需求范围锁定；业务语义冲突判断（优先用 `sa-spec impact` 过滤相关需求）与双重检查清单由 AI 规范指引执行。
 
 ---
 

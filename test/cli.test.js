@@ -168,15 +168,15 @@ test("#5 & #6 finalize respects --pr / --no-merge and guards against concurrent 
   const branchA = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: workA, encoding: "utf8" }).trim();
   assert.equal(branchA, "feat/auth");
 
-  // B creates feat/pay and finalizes -> scans origin/feat/auth, reserves REQ-002-pay without colliding!
+  // B creates feat/pay and finalizes with --auto-merge -> scans origin/feat/auth, reserves REQ-002-pay without colliding!
   assert.equal(runCli(workB, ["new", "--name", "pay", "--branch"]).status, 0);
-  const finB = runCli(workB, ["finalize", "--name", "pay"]);
+  const finB = runCli(workB, ["finalize", "--name", "pay", "--auto-merge"]);
   assert.equal(finB.status, 0, finB.stderr);
   assert.equal(fs.existsSync(path.join(workB, "project", "REQ-002-pay")), true);
 
-  // Now A finalizes auth with auto-merge -> sees origin/master REQ-002-pay, assigns REQ-003-auth and merges cleanly!
+  // Now A finalizes auth with --auto-merge -> sees origin/master REQ-002-pay, assigns REQ-003-auth and merges cleanly!
   execFileSync("git", ["checkout", "feat/auth"], { cwd: workA });
-  const finA2 = runCli(workA, ["finalize", "--name", "auth"]);
+  const finA2 = runCli(workA, ["finalize", "--name", "auth", "--auto-merge"]);
   assert.equal(finA2.status, 0, finA2.stderr);
   assert.equal(fs.existsSync(path.join(workA, "project", "REQ-003-auth")), true);
   assert.equal(fs.existsSync(path.join(workA, "project", "REQ-002-pay")), true);
@@ -359,7 +359,7 @@ test("#13 finalize scopes git staging and skips auto-merge safely when working t
   fs.writeFileSync(path.join(dir, "project", "other-draft", "srs.md"), "# Keep untracked\n", "utf8");
   fs.appendFileSync(path.join(dir, "readme.md"), "\nLocal uncommitted edit\n", "utf8");
 
-  const finRes = runCli(dir, ["finalize", "--name", "shopping-cart"]);
+  const finRes = runCli(dir, ["finalize", "--name", "shopping-cart", "--auto-merge"]);
   assert.equal(finRes.status, 0, finRes.stderr);
   assert.match(finRes.stderr, /工作區仍有未提交的變更/);
   assert.equal(fs.existsSync(path.join(dir, "project", "REQ-001-shopping-cart", "srs.md")), true);
@@ -578,7 +578,7 @@ test("#17 finalize preserves own ID on re-run without collision, tables escape p
   assert.equal(fs.existsSync(path.join(dir, "project", "REQ-001-cart", "srs.md")), true);
 
   execFileSync("git", ["checkout", "--", "readme.md"], { cwd: dir });
-  const fin2 = runCli(dir, ["finalize", "--name", "cart"]);
+  const fin2 = runCli(dir, ["finalize", "--name", "cart", "--auto-merge"]);
   assert.equal(fin2.status, 0, fin2.stderr);
   assert.equal(fs.existsSync(path.join(dir, "project", "REQ-001-cart", "srs.md")), true);
   assert.equal(fs.existsSync(path.join(dir, "project", "REQ-002-cart")), false);
@@ -926,7 +926,7 @@ test("#21 finalize stages system-spec.md, safe renumber regex & --name REQ-xxx, 
   const sysSpecPath = path.join(dir, "project", "system-spec.md");
   fs.writeFileSync(sysSpecPath, `${fs.readFileSync(sysSpecPath, "utf8")}\n## 系統模組\n- Auth\n`, "utf8");
 
-  const finAuth = runCli(dir, ["finalize", "--name", "auth"]);
+  const finAuth = runCli(dir, ["finalize", "--name", "auth", "--auto-merge"]);
   assert.equal(finAuth.status, 0, finAuth.stderr);
   assert.doesNotMatch(finAuth.stderr, /工作區仍有未提交的變更/);
   assert.equal(execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: dir, encoding: "utf8" }).trim(), "master");
@@ -1071,7 +1071,7 @@ test("#22 templates --lang validation, i18n edge cases, finalize conflict/failur
   execFileSync("git", ["add", "-A"], { cwd: conflictDir });
   execFileSync("git", ["commit", "-m", "master spec update"], { cwd: conflictDir });
   execFileSync("git", ["checkout", "feat/side"], { cwd: conflictDir });
-  const mergeConflictRes = runCli(conflictDir, ["finalize", "--name", "side"]);
+  const mergeConflictRes = runCli(conflictDir, ["finalize", "--name", "side", "--auto-merge"]);
   assert.equal(mergeConflictRes.status, 1);
   assert.match(mergeConflictRes.stderr, /\[Git 警告\] 合併至 master 發生衝突/);
   assert.equal(execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: conflictDir, encoding: "utf8" }).trim(), "feat/side");
@@ -1225,7 +1225,7 @@ test("#23 regression checks: slug disambiguation, binary safety, underscore lang
     fs.writeFileSync(srs2Path, `${fs.readFileSync(srs2Path, "utf8")}\n<!-- marker:{{REQ_ID}} -->\n`, "utf8");
 
     // Finalize "--name auth" targets REQ-002-auth (preserving own non-colliding ID), replaces text placeholders, and preserves sample.pdf bytes
-    const finAuth = runCli(dir, ["finalize", "--name", "auth"]);
+    const finAuth = runCli(dir, ["finalize", "--name", "auth", "--auto-merge"]);
     assert.equal(finAuth.status, 0, finAuth.stderr + "\n" + finAuth.stdout);
     assert.ok(fs.existsSync(req2Dir));
     assert.ok(fs.existsSync(path.join(dir, "project", "REQ-001-user-auth")));
@@ -1243,9 +1243,9 @@ test("#24 comprehensive edge cases: merge strategy word boundaries, AGENTS escap
   const { extractMergeStrategy, buildLocalizedAgentsMarkdown } = require("../src/i18n");
   const { convertMarkdownFileToPdf } = require("../src/pdf");
 
-  // 1. extractMergeStrategy word-boundary matching
-  assert.equal(extractMergeStrategy("- Merge Strategy: approve"), "auto-merge");
-  assert.equal(extractMergeStrategy("- 合併策略：production"), "auto-merge");
+  // 1. extractMergeStrategy word-boundary matching (defaults to pr for safety)
+  assert.equal(extractMergeStrategy("- Merge Strategy: approve"), "pr");
+  assert.equal(extractMergeStrategy("- 合併策略：production"), "pr");
   assert.equal(extractMergeStrategy("- Merge Strategy: auto-merge"), "auto-merge");
   assert.equal(extractMergeStrategy("- Merge Strategy: pr"), "pr");
   assert.equal(extractMergeStrategy("- 合併策略：走PR流程"), "pr");
@@ -1256,7 +1256,7 @@ test("#24 comprehensive edge cases: merge strategy word boundaries, AGENTS escap
   // 2. AGENTS_LOCALIZED table pipe escaping & --no-uml-render flag alignment
   for (const lang of ["zh-CN", "ja", "ko"]) {
     const agentsText = buildLocalizedAgentsMarkdown(lang);
-    assert.match(agentsText, /\[--pr \\\| --no-merge\]/);
+    assert.match(agentsText, /\[--auto-merge \\\| --pr \\\| --no-merge\]/);
     assert.match(agentsText, /\[--online-uml \\\| --no-uml-render\]/);
   }
 
@@ -1952,6 +1952,65 @@ test("#31 OpenAPI 3.0.3 & PlantUML syntax pre-checks, cross-REQ impact index, pd
     const htmlSingleRes = runCli(tmpDir, ["pdf", "project/REQ-001-auth/srs.md", "--html"]);
     assert.equal(htmlSingleRes.status, 0, htmlSingleRes.stderr);
     assert.equal(fs.existsSync(path.join(req1Dir, "srs.html")), true);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("#32 safe-by-default pr merge strategy, Approved placeholder completeness gate, and impact-filtered analyze", () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sa-spec-32-pr-gate-"));
+  try {
+    assert.equal(runCli(tmpDir, ["init", "--lang", "zh-TW"]).status, 0);
+    execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: tmpDir });
+    execFileSync("git", ["config", "user.name", "Tester"], { cwd: tmpDir });
+    assert.match(fs.readFileSync(path.join(tmpDir, "project", "system-spec.md"), "utf8"), /合併策略：pr/);
+
+    execFileSync("git", ["add", "-A"], { cwd: tmpDir });
+    execFileSync("git", ["commit", "-m", "init"], { cwd: tmpDir });
+
+    // 1. finalize defaults to pr mode (does not touch master without --auto-merge)
+    assert.equal(runCli(tmpDir, ["new", "--name", "billing", "--branch"]).status, 0);
+    const finDefault = runCli(tmpDir, ["finalize", "--name", "billing"]);
+    assert.equal(finDefault.status, 0, finDefault.stderr);
+    assert.match(finDefault.stdout, /已略過自動合併/);
+    assert.equal(
+      execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: tmpDir, encoding: "utf8" }).trim(),
+      "feat/billing"
+    );
+
+    // 2. Approved status forbids template placeholders (待補充 / TBD)
+    const reqDir = path.join(tmpDir, "project", "REQ-001-billing");
+    fs.writeFileSync(
+      path.join(reqDir, "srs.md"),
+      "# REQ-001 計費\n\n- 狀態：已審核\n\n## 摘要\n計費。\n\n## 功能需求\n- 待補充。\n\n## 驗收條件\n通過。\n",
+      "utf8"
+    );
+    fs.writeFileSync(
+      path.join(reqDir, "handoff.md"),
+      [
+        "# Handoff",
+        "- 狀態：已審核",
+        "## 6. API 契約",
+        "- 無 API",
+        "## 7. DB 變更",
+        "- 無",
+        "## 8. UI / 畫面規格",
+        "- 參考 wireframe",
+        "## 9. 驗收條件",
+        "- 通過"
+      ].join("\n"),
+      "utf8"
+    );
+    const checkApprovedRes = runCli(tmpDir, ["check", "--strict", "--json"]);
+    assert.notEqual(checkApprovedRes.status, 0);
+    const approvedParsed = JSON.parse(checkApprovedRes.stdout);
+    assert.ok(approvedParsed.issues.some((i) => i.rule === "APPROVED_HAS_PLACEHOLDER"));
+
+    // 3. instructions analyze references impactIndex filtering
+    const analyzeRes = runCli(tmpDir, ["instructions", "analyze"]);
+    assert.equal(analyzeRes.status, 0, analyzeRes.stderr);
+    assert.match(analyzeRes.stdout, /impactIndex/);
+    assert.match(analyzeRes.stdout, /過濾出/);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

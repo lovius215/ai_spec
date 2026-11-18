@@ -102,7 +102,7 @@ sa-spec --version
 |---|---|
 | `sa-spec init [--full] [--hooks] [--lang <lang>]` | 프로젝트 디렉토리에 `skills/`·`rules/`를 노출하지 않고 깔끔한 워크스페이스 골격을 생성합니다 (`--full`은 하위 호환용, `--hooks`로 Git `pre-commit` 가드레일 설치, 5개 언어 지원). |
 | `sa-spec new [--id REQ-001] --name login [--slug login] [--branch]` | 요구사항 템플릿 폴더를 생성합니다(한국어 등 비 ASCII 이름은 `--slug <ascii-slug>` 지정 필수). `--id` 생략 시 `feat/<slug>` 초안 브랜치로 시작합니다. |
-| `sa-spec finalize --name login [--slug login] [--no-merge \| --pr]` | 초안 요구사항에 최신 번호를 부여하며 `--no-merge` / `--pr` 또는 `병합 전략：pr`과 원격 브랜치 간 번호 충돌 방지를 지원합니다. |
+| `sa-spec finalize --name login [--slug login] [--auto-merge \| --pr \| --no-merge]` | 초안 요구사항에 최신 번호를 부여합니다(기본값은 안전한 PR 모드, 자동 병합 시 `--auto-merge` 또는 `병합 전략：auto-merge` 지정). |
 | `sa-spec instructions [stage] [--with-rules] [--json]` | 현재 워크스페이스 상태, 언어 지시문 및 단계별 내장 분석 규범을 출력합니다. |
 | `sa-spec rules [name\|all] [--list] [--json]` | 패키지에 내장된 보조 규칙 문서를 조회하거나 목록을 출력합니다. |
 | `sa-spec templates [name] [--lang <code>] [--list] [--json]` | 프로젝트 언어 또는 `--lang`에 맞춰 현지화된 문서 및 PlantUML 템플릿을 조회합니다. |
@@ -114,6 +114,8 @@ sa-spec --version
 | `sa-spec status` | 요구사항 및 시스템 사양 현황을 확인합니다. |
 | `sa-spec doctor` | 워크스페이스 무결성 및 필수 의존 파일을 진단합니다. |
 | `sa-spec upgrade [--dry-run] [--keep-legacy]` | `AGENTS.md`를 업데이트하고 구버전 패키지 관리 `skills/`·`rules/`를 삭제(사용자 정의 파일 및 언어 설정 보존)하며 구버전 `uml.puml`을 마이그레이션합니다. 별칭: `sa-spec update`. |
+
+> **CLI 결정적 보장 vs. AI 가이드라인**: CLI는 파일 구조, 번호 유일성, 인덱스 동기화, OpenAPI/YAML/PlantUML 구문 검사, 문서 간 정합성, 승인 완료 플레이스홀더 차단, 범위 잠금을 결정적으로 강제합니다. 비즈니스 의미 충돌 분석(`sa-spec impact`로 선별 후 조회)과 체크리스트는 AI 워크플로 규범으로 작동합니다.
 
 ---
 

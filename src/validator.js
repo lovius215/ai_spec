@@ -431,6 +431,20 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
     }
   }
 
+  // Approved completeness gate: once srs.md or handoff.md is marked Approved, forbid template placeholders
+  const isApprovedStatus = (st) => /^(?:已審核|已核准|Approved|已审核|承認済み|승인됨)/i.test(String(st || "").trim());
+  const srsApproved = srsText !== undefined && isApprovedStatus(extractStatusFromContent(srsText));
+  const handoffApproved = handoffText !== undefined && isApprovedStatus(extractStatusFromContent(handoffText));
+  if (srsApproved || handoffApproved) {
+    const placeholderLineRe = /(?:^[-*]\s*|(?:：|:)\s*)(?:待補充|TBD|待确认|未定|미정)[。.]?\s*$/im;
+    for (const checkName of ["srs.md", "db-schema.md", "handoff.md"]) {
+      const text = deliverableContents.get(checkName);
+      if (text !== undefined && placeholderLineRe.test(text)) {
+        issues.push(`${checkName} 已標示為已審核，但仍殘留「待補充 / TBD」佔位內容`);
+      }
+    }
+  }
+
   return issues.map((msg) => ({ reqDirName, msg }));
 }
 
@@ -460,6 +474,9 @@ function classifyRequirementIssue(reqDirName, msg) {
   } else if (msg.includes("狀態矛盾")) {
     rule = "CROSS_FILE_STATUS_CONFLICT";
     fixHint = "確認 srs.md 與 handoff.md 的審核狀態一致。";
+  } else if (msg.includes("殘留「待補充")) {
+    rule = "APPROVED_HAS_PLACEHOLDER";
+    fixHint = "已審核需求不可保留待補充 / TBD 佔位內容，請補齊規格或將狀態改回待確認。";
   } else if (msg.includes("API 端點") || msg.includes("已定義 API paths")) {
     rule = "CROSS_FILE_API_CONFLICT";
     fixHint = "同步更新 openapi.yaml 與 handoff.md 的 API 契約章節。";

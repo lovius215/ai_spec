@@ -415,7 +415,7 @@ function finalizeReq(args) {
   const rawName = getOption(args, "--name");
   const explicitSlug = getOption(args, "--slug");
   if (!rawName) {
-    fail("Usage: sa-spec finalize --name <name-or-slug> [--slug <ascii-slug>] [--no-merge | --pr]");
+    fail("Usage: sa-spec finalize --name <name-or-slug> [--slug <ascii-slug>] [--auto-merge | --pr | --no-merge]");
     return;
   }
 
@@ -582,8 +582,11 @@ function finalizeReq(args) {
   const systemSpecPath = path.join(cwd, "project", "system-spec.md");
   const configMergeStrategy = isExistingFile(systemSpecPath)
     ? extractMergeStrategy(fs.readFileSync(systemSpecPath, "utf8"))
-    : "auto-merge";
-  const shouldAutoMerge = !args.includes("--no-merge") && !args.includes("--pr") && configMergeStrategy !== "pr";
+    : "pr";
+  const shouldAutoMerge =
+    !args.includes("--no-merge") &&
+    !args.includes("--pr") &&
+    (args.includes("--auto-merge") || configMergeStrategy === "auto-merge");
 
   const commitSubjectName = /^REQ-\d+$/i.test(rawName.trim()) ? cleanSlug || nextId : rawName;
   if (currentBranch && mainBranch && currentBranch !== mainBranch) {
@@ -705,7 +708,7 @@ function finalizeReq(args) {
       }
     } else {
       console.log(
-        `提示：已略過自動合併（${configMergeStrategy === "pr" ? "合併策略為 pr" : "指定 --no-merge / --pr"}）。請透過 PR 審核合併，或手動執行：`
+        `提示：已略過自動合併（${args.includes("--no-merge") || args.includes("--pr") ? "指定 --no-merge / --pr" : "預設/設定合併策略為 pr；若需自動合併請加 --auto-merge"}）。請透過 PR 審核合併，或手動執行：`
       );
       console.log(`  git checkout ${mainBranch} && git merge ${currentBranch}`);
     }
@@ -1584,7 +1587,7 @@ function showHelp() {
 Usage:
   sa-spec init [--full] [--hooks] [--lang zh-TW|en|zh-CN|ja|ko]
   sa-spec new [--id REQ-001] --name login [--slug login] [--branch]
-  sa-spec finalize --name login [--slug login] [--no-merge | --pr]
+  sa-spec finalize --name login [--slug login] [--auto-merge | --pr | --no-merge]
   sa-spec instructions [init|propose|analyze|commit|pdf] [--with-rules] [--json]
   sa-spec rules [name|all] [--list] [--json]
   sa-spec templates [name] [--lang <code>] [--list] [--json]
