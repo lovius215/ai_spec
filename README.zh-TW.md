@@ -750,6 +750,10 @@ git push origin master
 
 ## 更新紀錄
 
+### v0.2.12
+- **主分支 `pr` 防護、純後端 `--no-ui` 旗標與 OpenAPI / DB 解析精度強化**：
+  - `sa-spec finalize` 在主分支且非 `--auto-merge` 時略過直接 commit / push；`sa-spec new --no-ui` 支援全 5 語系純後端建檔；OpenAPI 冒號路徑／引號 schema 與 `extractDbTables` 解析精度強化。
+
 ### v0.2.11
 - **預設安全 PR 合併、`已審核` 佔位閘門與 `sequence.puml` 語意命名**：
   - `sa-spec finalize` 預設改為 `pr` 模式（`--auto-merge` / `合併策略：auto-merge` 為顯式 opt-in），`SKILL.md` 與 `AGENTS.md` 同步更新。

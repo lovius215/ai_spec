@@ -1,11 +1,15 @@
 # Changelog (`@loviusc/sa-spec`)
 
+### v0.2.12
+- **主分支 `pr` 防護、純後端 `--no-ui` 旗標與 OpenAPI / DB 解析精度強化**：
+  - **主分支 `finalize` 安全防護**：在 `main`/`master` 上執行 `sa-spec finalize` 時，非 `--auto-merge`（預設 `pr` 模式）會略過直接 commit 與 push 主分支；尚未建立首次 commit 的 unborn branch 亦安全略過遠端推送。
+  - **純後端需求建檔旗標 (`--no-ui`)**：`sa-spec new --no-ui` 支援全 5 語系，建立時自動略過 `uml/wireframe.puml` 並於 `srs.md` 與 `handoff.md` 標記無 UI 介面需求。
+  - **OpenAPI / DB 解析與 JSON 輸出修正**：支援含冒號自訂動詞路徑（如 `/api/v1/orders/{id}:cancel`）、PathItem 同層欄位接在 HTTP method 後方、巢狀 `components.<section>.<name>` 與引號 schema 名稱檢查；`extractDbTables` 支援章節編號並排除多字英文說明標題誤判；修正非 `--strict` 模式下 `check --json` 的 `SCOPE_LOCK_MULTI_REQ` 一致性。
+
 ### v0.2.11
 - **預設安全 PR 合併、`已審核` 佔位閘門與 `sequence.puml` 語意命名**：
-  - **預設合併策略改為 `pr`（含主分支保護）**：`sa-spec finalize` 預設只推送 feature 分支，即使誤在主分支執行也會在非 `--auto-merge` 模式下略過直接 commit 與 push；尚未建立首次 commit 的 unborn branch 亦安全略過推送。
+  - **預設合併策略改為 `pr`**：`sa-spec finalize` 預設只推送 feature 分支，不再未經 `--auto-merge`（或 `合併策略：auto-merge`）直接動主分支。
   - **`已審核` 佔位內容完整度閘門**：`sa-spec check`（`APPROVED_HAS_PLACEHOLDER`）在需求標示為 `已審核` / `Approved` 時，自動阻擋仍殘留「待補充 / TBD」的交付物。
-  - **純後端需求建檔旗標 (`--no-ui`)**：`sa-spec new --no-ui` 支援全 5 語系，建立時自動略過 `uml/wireframe.puml` 並於 `srs.md` / `handoff.md` 標記無 UI 介面需求。
-  - **OpenAPI / DB 解析與 JSON 輸出精度強化**：支援含冒號自訂動詞路徑（如 `/api/v1/orders/{id}:cancel`）、PathItem 同層欄位接在 HTTP method 後方、巢狀 `components.<section>.<name>` 與引號 schema 名稱檢查；`extractDbTables` 支援章節編號並排除多字英文說明標題誤判；修正非 `--strict` 模式下 `check --json` 的 `SCOPE_LOCK_MULTI_REQ` 一致性。
   - **影響索引過濾與誠實邊界說明**：`sa-spec instructions analyze` 與 `SKILL.md` / `AGENTS.md` 同步改為先透過 `impactIndex`（`sa-spec impact`）過濾相關 `REQ-*` 再細讀；README 明確區分 CLI 確定性保證與 AI 規範約束。
   - **預設 UML 範本語意化**：預設圖檔由 `uml/main.puml` 更名為 `uml/sequence.puml`（保留 `uml-main` 向下相容別名）。
   - **完整範例專案**：新增 [`examples/basic-login/`](examples/basic-login/)（含完整已審核 `REQ-001-user-login` 規格套件、`passwordless-login` 碰撞草稿與 `CONFLICT-DEMO.md` 衝突示範）。
