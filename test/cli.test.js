@@ -828,7 +828,7 @@ test("#19 legacy 5-column index migration, nested code fences, AGENTS --lang doc
   execFileSync("git", ["config", "--unset", "user.name"], { cwd: gitDir });
   execFileSync("git", ["config", "--unset", "user.email"], { cwd: gitDir });
   execFileSync("git", ["config", "user.useConfigOnly", "true"], { cwd: gitDir });
-  const finFail = spawnSync(process.execPath, [CLI_PATH, "finalize", "--name", "main-direct"], {
+  const finFail = spawnSync(process.execPath, [CLI_PATH, "finalize", "--name", "main-direct", "--auto-merge"], {
     cwd: gitDir,
     encoding: "utf8",
     env: { ...process.env, SA_SPEC_NO_UML_NET: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" }
@@ -1350,7 +1350,7 @@ test("#24 comprehensive edge cases: merge strategy word boundaries, AGENTS escap
 
     // Seed REQ-001-existing on main after branching side branches
     assert.equal(runCli(dirGit, ["new", "--name", "existing"]).status, 0);
-    assert.equal(runCli(dirGit, ["finalize", "--name", "existing"]).status, 0);
+    assert.equal(runCli(dirGit, ["finalize", "--name", "existing", "--auto-merge"]).status, 0);
 
     // Case A: bare REQ-001 without slug renumbers to REQ-002 (NOT REQ-002-req-001) even on case-insensitive FS
     git(["checkout", "feat/bare-req"]);
@@ -2039,4 +2039,177 @@ test("#33 examples/basic-login passes check --strict --json, and SKILL/AGENTS sy
   const agentsTplText = fs.readFileSync(path.resolve(__dirname, "..", "templates", "AGENTS.md"), "utf8");
   assert.match(agentsTplText, /預設為 `pr` 模式/);
   assert.doesNotMatch(agentsTplText, /AI 必須自動切換回主分支/);
+});
+
+test("#34 main-branch finalize PR guard, OpenAPI parser edge cases, DB heading accuracy, unborn-branch push guard, and --no-ui", () => {
+  const { inspectOpenApiPathsAndRefs, extractDbTables } = require("../src/validator");
+  const { pushBranchToRemote } = require("../src/git");
+
+  // 1. finalize on main/master without --auto-merge must NOT commit or push mainBranch
+  const bareRemote = fs.mkdtempSync(path.join(os.tmpdir(), "sa-spec-34-remote-"));
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "sa-spec-34-work-"));
+  try {
+    execFileSync("git", ["init", "--bare"], { cwd: bareRemote });
+    execFileSync("git", ["init", "-b", "main"], { cwd: workDir });
+    execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: workDir });
+    execFileSync("git", ["config", "user.name", "Tester"], { cwd: workDir });
+    execFileSync("git", ["remote", "add", "origin", bareRemote], { cwd: workDir });
+
+    assert.equal(runCli(workDir, ["init", "--lang", "zh-TW"]).status, 0);
+    execFileSync("git", ["add", "-A"], { cwd: workDir });
+    execFileSync("git", ["commit", "-m", "init"], { cwd: workDir });
+    execFileSync("git", ["push", "-u", "origin", "main"], { cwd: workDir });
+
+    const beforeHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: workDir, encoding: "utf8" }).trim();
+    const beforeRemoteHead = execFileSync("git", ["rev-parse", "refs/heads/main"], { cwd: bareRemote, encoding: "utf8" }).trim();
+
+    assert.equal(runCli(workDir, ["new", "--name", "direct-main"]).status, 0);
+    const finOnMain = runCli(workDir, ["finalize", "--name", "direct-main"]);
+    assert.equal(finOnMain.status, 0, finOnMain.stderr);
+    assert.match(finOnMain.stdout, /\[Git 保護\]/);
+    assert.equal(fs.existsSync(path.join(workDir, "project", "REQ-001-direct-main", "srs.md")), true);
+
+    const afterHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: workDir, encoding: "utf8" }).trim();
+    const afterRemoteHead = execFileSync("git", ["rev-parse", "refs/heads/main"], { cwd: bareRemote, encoding: "utf8" }).trim();
+    assert.equal(afterHead, beforeHead, "main HEAD must not advance without --auto-merge");
+    assert.equal(afterRemoteHead, beforeRemoteHead, "origin/main must not be pushed without --auto-merge");
+  } finally {
+    fs.rmSync(bareRemote, { recursive: true, force: true });
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
+
+  // 2. OpenAPI parser: colon custom-verb paths, PathItem sibling after method, nested components & quoted names
+  const openapiSample = [
+    "openapi: 3.0.3",
+    "info:",
+    "  title: Edge API",
+    "  version: 0.1.0",
+    "paths:",
+    "  /api/v1/orders/{id}:cancel:",
+    "    post:",
+    "      requestBody:",
+    "        content:",
+    "          application/json:",
+    "            schema:",
+    "              $ref: '#/components/schemas/WrongLocation'",
+    "      responses:",
+    "        '200':",
+    "          description: ok",
+    "          content:",
+    "            application/json:",
+    "              schema:",
+    "                $ref: '#/components/schemas/Login.Response'",
+    "    parameters:",
+    "      - name: id",
+    "        in: path",
+    "        WrongLocation: true",
+    "        responses: fake",
+    "    get:",
+    "      summary: missing responses must still be caught after parameters sibling",
+    "components:",
+    "  schemas:",
+    "    \"Login.Response\":",
+    "      type: object",
+    "  parameters:",
+    "    WrongLocation:",
+    "      name: x",
+    "      in: query"
+  ].join("\n");
+  const inspected = inspectOpenApiPathsAndRefs(openapiSample);
+  assert.deepEqual(inspected.invalidPathKeys, []);
+  assert.deepEqual(inspected.endpoints, [
+    "POST /api/v1/orders/{id}:cancel",
+    "GET /api/v1/orders/{id}:cancel"
+  ]);
+  assert.deepEqual(inspected.missingResponses, [
+    { path: "/api/v1/orders/{id}:cancel", method: "get" }
+  ]);
+  assert.deepEqual(inspected.missingRefs, [
+    { section: "schemas", name: "WrongLocation" }
+  ]);
+
+  // 3. extractDbTables: reject English prose headings & capture numbered headings
+  const dbSample = [
+    "# REQ-001 DB Schema",
+    "",
+    "## Purpose & Scope",
+    "## Data Retention Policy",
+    "## Foreign Keys",
+    "## User Table Design",
+    "## 1. users",
+    "### 2.1 Table: order_items",
+    "### 3. 資料表：payments",
+    "## 4. `audit_logs` (Audit trail)",
+    "```sql",
+    "CREATE TABLE IF NOT EXISTS public.webhooks (id BIGSERIAL PRIMARY KEY);",
+    "```"
+  ].join("\n");
+  assert.deepEqual(extractDbTables(dbSample), [
+    "audit_logs",
+    "order_items",
+    "payments",
+    "users",
+    "webhooks"
+  ]);
+
+  // 4. Unborn branch (0 commits) with remote does not fail push on new --branch or pushBranchToRemote
+  const unbornRemote = fs.mkdtempSync(path.join(os.tmpdir(), "sa-spec-34-unborn-rem-"));
+  const unbornWork = fs.mkdtempSync(path.join(os.tmpdir(), "sa-spec-34-unborn-work-"));
+  try {
+    execFileSync("git", ["init", "--bare"], { cwd: unbornRemote });
+    assert.equal(runCli(unbornWork, ["init", "--lang", "en"]).status, 0);
+    execFileSync("git", ["remote", "add", "origin", unbornRemote], { cwd: unbornWork });
+    const newUnborn = runCli(unbornWork, ["new", "--name", "first-spec", "--branch", "--no-ui"]);
+    assert.equal(newUnborn.status, 0, newUnborn.stderr);
+    assert.doesNotMatch(newUnborn.stderr, /src refspec/);
+    assert.equal(pushBranchToRemote(unbornWork, "origin", "feat/first-spec"), false);
+
+    // 5. --no-ui skips wireframe.puml, marks localized no-UI note, and passes check --strict
+    const draftDir = path.join(unbornWork, "project", "first-spec");
+    assert.equal(fs.existsSync(path.join(draftDir, "uml", "wireframe.puml")), false);
+    assert.match(fs.readFileSync(path.join(draftDir, "srs.md"), "utf8"), /No UI required/);
+    assert.match(fs.readFileSync(path.join(draftDir, "handoff.md"), "utf8"), /No UI required/);
+
+    const numberedNoUi = runCli(unbornWork, ["new", "--id", "REQ-001", "--name", "cron-job", "--no-ui"]);
+    assert.equal(numberedNoUi.status, 0, numberedNoUi.stderr);
+    const reqDir = path.join(unbornWork, "project", "REQ-001-cron-job");
+    assert.equal(fs.existsSync(path.join(reqDir, "uml", "wireframe.puml")), false);
+    assert.match(fs.readFileSync(path.join(reqDir, "handoff.md"), "utf8"), /No UI required/);
+
+    // Custom-verb colon path & quoted component schema must pass full CLI check --strict --json
+    fs.writeFileSync(
+      path.join(reqDir, "openapi.yaml"),
+      [
+        "openapi: 3.0.3",
+        "info:",
+        "  title: Cron Job API",
+        "  version: 0.1.0",
+        "paths:",
+        "  /api/v1/jobs/{id}:trigger:",
+        "    post:",
+        "      responses:",
+        "        '200':",
+        "          description: ok",
+        "          content:",
+        "            application/json:",
+        "              schema:",
+        "                $ref: '#/components/schemas/Job.Result'",
+        "components:",
+        "  schemas:",
+        "    \"Job.Result\":",
+        "      type: object",
+        ""
+      ].join("\n"),
+      "utf8"
+    );
+
+    const strictCheck = runCli(unbornWork, ["check", "--strict", "--json"]);
+    assert.equal(strictCheck.status, 0, strictCheck.stdout + strictCheck.stderr);
+    const strictParsed = JSON.parse(strictCheck.stdout);
+    assert.equal(strictParsed.ok, true);
+    assert.deepEqual(strictParsed.issues, []);
+  } finally {
+    fs.rmSync(unbornRemote, { recursive: true, force: true });
+    fs.rmSync(unbornWork, { recursive: true, force: true });
+  }
 });

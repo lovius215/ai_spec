@@ -283,8 +283,8 @@ function resolveSlugOrFail(name, explicitSlug) {
   return slug;
 }
 
-function writeReqArtifact(langCode, relType, targetRelPath, replacements) {
-  const localized = buildLocalizedReqFileContent(langCode, relType, replacements);
+function writeReqArtifact(langCode, relType, targetRelPath, replacements, options = {}) {
+  const localized = buildLocalizedReqFileContent(langCode, relType, replacements, options);
   if (localized !== null) {
     return writeGeneratedFileIfMissing(targetRelPath, localized);
   }
@@ -311,9 +311,10 @@ function createReqTemplate(args, label = "new") {
   const rawId = getOption(args, "--id");
   const name = getOption(args, "--name");
   const explicitSlug = getOption(args, "--slug");
+  const noUi = args.includes("--no-ui");
 
   if (!name) {
-    fail("Usage: sa-spec new [--id REQ-001] --name login [--slug login] [--branch]");
+    fail("Usage: sa-spec new [--id REQ-001] --name login [--slug login] [--branch] [--no-ui]");
     return;
   }
 
@@ -368,20 +369,23 @@ function createReqTemplate(args, label = "new") {
     const reqDir = path.join("project", slug);
     const umlDir = path.join(reqDir, "uml");
     const replacements = { REQ_ID: "{{REQ_ID}}", REQ_NAME: name };
+    const artifactOpts = { noUi };
     const results = [
       ensureDir(reqDir),
       ensureDir(umlDir),
-      writeReqArtifact(langConfig.code, "srs.md", path.join(reqDir, "srs.md"), replacements),
-      writeReqArtifact(langConfig.code, "uml/sequence.puml", path.join(umlDir, "sequence.puml"), replacements),
-      writeReqArtifact(langConfig.code, "uml/wireframe.puml", path.join(umlDir, "wireframe.puml"), replacements),
-      writeReqArtifact(langConfig.code, "openapi.yaml", path.join(reqDir, "openapi.yaml"), replacements),
-      writeReqArtifact(langConfig.code, "db-schema.md", path.join(reqDir, "db-schema.md"), replacements),
-      writeReqArtifact(langConfig.code, "handoff.md", path.join(reqDir, "handoff.md"), replacements),
-      writeReqArtifact(langConfig.code, "history.md", path.join(reqDir, "history.md"), replacements)
+      writeReqArtifact(langConfig.code, "srs.md", path.join(reqDir, "srs.md"), replacements, artifactOpts),
+      writeReqArtifact(langConfig.code, "uml/sequence.puml", path.join(umlDir, "sequence.puml"), replacements, artifactOpts),
+      ...(!noUi
+        ? [writeReqArtifact(langConfig.code, "uml/wireframe.puml", path.join(umlDir, "wireframe.puml"), replacements, artifactOpts)]
+        : []),
+      writeReqArtifact(langConfig.code, "openapi.yaml", path.join(reqDir, "openapi.yaml"), replacements, artifactOpts),
+      writeReqArtifact(langConfig.code, "db-schema.md", path.join(reqDir, "db-schema.md"), replacements, artifactOpts),
+      writeReqArtifact(langConfig.code, "handoff.md", path.join(reqDir, "handoff.md"), replacements, artifactOpts),
+      writeReqArtifact(langConfig.code, "history.md", path.join(reqDir, "history.md"), replacements, artifactOpts)
     ];
 
     printResultList(label, results);
-    console.log(`\n已建立草稿需求：${reqDir}（內部使用 {{REQ_ID}} 佔位符）`);
+    console.log(`\n已建立草稿需求：${reqDir}（內部使用 {{REQ_ID}} 佔位符${noUi ? "，純後端無 UI 模式" : ""}）`);
     console.log(`分析確認後，可使用 sa-spec finalize --name ${slug} 定號歸檔。`);
     return;
   }
@@ -390,16 +394,19 @@ function createReqTemplate(args, label = "new") {
   const reqDir = path.join("project", `${id}-${slug}`);
   const umlDir = path.join(reqDir, "uml");
   const replacements = { REQ_ID: id, REQ_NAME: name };
+  const artifactOpts = { noUi };
   const results = [
     ensureDir(reqDir),
     ensureDir(umlDir),
-    writeReqArtifact(langConfig.code, "srs.md", path.join(reqDir, "srs.md"), replacements),
-    writeReqArtifact(langConfig.code, "uml/sequence.puml", path.join(umlDir, "sequence.puml"), replacements),
-    writeReqArtifact(langConfig.code, "uml/wireframe.puml", path.join(umlDir, "wireframe.puml"), replacements),
-    writeReqArtifact(langConfig.code, "openapi.yaml", path.join(reqDir, "openapi.yaml"), replacements),
-    writeReqArtifact(langConfig.code, "db-schema.md", path.join(reqDir, "db-schema.md"), replacements),
-    writeReqArtifact(langConfig.code, "handoff.md", path.join(reqDir, "handoff.md"), replacements),
-    writeReqArtifact(langConfig.code, "history.md", path.join(reqDir, "history.md"), replacements),
+    writeReqArtifact(langConfig.code, "srs.md", path.join(reqDir, "srs.md"), replacements, artifactOpts),
+    writeReqArtifact(langConfig.code, "uml/sequence.puml", path.join(umlDir, "sequence.puml"), replacements, artifactOpts),
+    ...(!noUi
+      ? [writeReqArtifact(langConfig.code, "uml/wireframe.puml", path.join(umlDir, "wireframe.puml"), replacements, artifactOpts)]
+      : []),
+    writeReqArtifact(langConfig.code, "openapi.yaml", path.join(reqDir, "openapi.yaml"), replacements, artifactOpts),
+    writeReqArtifact(langConfig.code, "db-schema.md", path.join(reqDir, "db-schema.md"), replacements, artifactOpts),
+    writeReqArtifact(langConfig.code, "handoff.md", path.join(reqDir, "handoff.md"), replacements, artifactOpts),
+    writeReqArtifact(langConfig.code, "history.md", path.join(reqDir, "history.md"), replacements, artifactOpts),
     ensureIndexRow(id, name, langConfig.code)
   ];
 
@@ -501,13 +508,23 @@ function finalizeReq(args) {
     return;
   }
 
-  // 先推目前分支並同步遠端狀態，接著才查詢主分支最新 REQ 序號
+  // 先判斷合併策略；若有遠端，僅對 feature 分支預先推送，主分支只 fetch 不主動推
   const mainBranch = detectMainBranch(cwd);
   const currentBranch = getCurrentBranch(cwd);
   const remote = getDefaultRemote(cwd);
+  const systemSpecPath = path.join(cwd, "project", "system-spec.md");
+  const configMergeStrategy = isExistingFile(systemSpecPath)
+    ? extractMergeStrategy(fs.readFileSync(systemSpecPath, "utf8"))
+    : "pr";
+  const shouldAutoMerge =
+    !args.includes("--no-merge") &&
+    !args.includes("--pr") &&
+    (args.includes("--auto-merge") || configMergeStrategy === "auto-merge");
 
-  if (remote && currentBranch) {
-    pushBranchToRemote(cwd, remote, currentBranch);
+  if (remote) {
+    if (currentBranch && currentBranch !== mainBranch) {
+      pushBranchToRemote(cwd, remote, currentBranch);
+    }
     fetchRemote(cwd, remote);
   }
 
@@ -578,15 +595,6 @@ function finalizeReq(args) {
       }
     }
   };
-
-  const systemSpecPath = path.join(cwd, "project", "system-spec.md");
-  const configMergeStrategy = isExistingFile(systemSpecPath)
-    ? extractMergeStrategy(fs.readFileSync(systemSpecPath, "utf8"))
-    : "pr";
-  const shouldAutoMerge =
-    !args.includes("--no-merge") &&
-    !args.includes("--pr") &&
-    (args.includes("--auto-merge") || configMergeStrategy === "auto-merge");
 
   const commitSubjectName = /^REQ-\d+$/i.test(rawName.trim()) ? cleanSlug || nextId : rawName;
   if (currentBranch && mainBranch && currentBranch !== mainBranch) {
@@ -713,21 +721,31 @@ function finalizeReq(args) {
       console.log(`  git checkout ${mainBranch} && git merge ${currentBranch}`);
     }
   } else if (currentBranch && currentBranch === mainBranch) {
-    stageFinalizePaths();
-    const commitRes = spawnSync("git", ["commit", "-m", `docs(${nextId}): ${commitSubjectName} - 規格確認歸檔`], {
-      cwd,
-      encoding: "utf8"
-    });
-    if (commitRes.status === 0) {
-      console.log(`[Git] 已直接於主分支 ${mainBranch} 建立提交完成。`);
-      if (remote) {
-        pushBranchToRemote(cwd, remote, mainBranch);
-      }
-    } else {
-      const errMsg = (commitRes.stderr || commitRes.stdout || "").trim();
-      console.warn(
-        `[Git 警告] 主分支 ${mainBranch} 提交未建立（可能無變更或尚未設定 Git user.name / user.email）${errMsg ? `: ${errMsg}` : "。"}`
+    if (!shouldAutoMerge) {
+      console.log(
+        `[Git 保護] 目前位於主分支 ${mainBranch}，因合併策略為 pr（或指定 --pr / --no-merge），已略過直接提交與推送至 ${mainBranch}。`
       );
+      console.log("建議切換至 feature 分支後再提交（或加上 --auto-merge 明確允許直接提交主分支）：");
+      console.log(`  git checkout -b feat/${cleanSlug || nextId.toLowerCase()}`);
+      console.log(`  git add -A -- ${finalRel} project/index.md project/system-spec.md`);
+      console.log(`  git commit -m "docs(${nextId}): ${commitSubjectName} - 規格確認歸檔"`);
+    } else {
+      stageFinalizePaths();
+      const commitRes = spawnSync("git", ["commit", "-m", `docs(${nextId}): ${commitSubjectName} - 規格確認歸檔`], {
+        cwd,
+        encoding: "utf8"
+      });
+      if (commitRes.status === 0) {
+        console.log(`[Git] 已直接於主分支 ${mainBranch} 建立提交完成。`);
+        if (remote) {
+          pushBranchToRemote(cwd, remote, mainBranch);
+        }
+      } else {
+        const errMsg = (commitRes.stderr || commitRes.stdout || "").trim();
+        console.warn(
+          `[Git 警告] 主分支 ${mainBranch} 提交未建立（可能無變更或尚未設定 Git user.name / user.email）${errMsg ? `: ${errMsg}` : "。"}`
+        );
+      }
     }
   } else {
     console.log("建議接下來執行：");
@@ -1586,7 +1604,7 @@ function showHelp() {
 
 Usage:
   sa-spec init [--full] [--hooks] [--lang zh-TW|en|zh-CN|ja|ko]
-  sa-spec new [--id REQ-001] --name login [--slug login] [--branch]
+  sa-spec new [--id REQ-001] --name login [--slug login] [--branch] [--no-ui]
   sa-spec finalize --name login [--slug login] [--auto-merge | --pr | --no-merge]
   sa-spec instructions [init|propose|analyze|commit|pdf] [--with-rules] [--json]
   sa-spec rules [name|all] [--list] [--json]

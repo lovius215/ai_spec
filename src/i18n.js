@@ -66,6 +66,7 @@ const LANG_COPY = {
       "建議實作範圍"
     ],
     handoffUiNote: "若有前端操作介面，實作時請參照 `uml/wireframe.puml`；若為純後端需求，請保留「無 UI 介面需求」。",
+    noUiText: "無 UI 介面需求（純後端需求）。",
     historyTitle: "版本歷程",
     historyHeader: "| 版本 | 日期 | 異動類型 | 異動摘要 | 影響範圍 | 狀態 |",
     readmeTitle: "系統分析規格專案",
@@ -141,6 +142,7 @@ const LANG_COPY = {
       "Suggested Implementation Scope"
     ],
     handoffUiNote: "If frontend UI is required, follow `uml/wireframe.puml`; for backend-only requirements, explicitly keep \"No UI required\".",
+    noUiText: "No UI required (backend-only requirement).",
     historyTitle: "Version History",
     historyHeader: "| Version | Date | Change Type | Summary | Impact Scope | Status |",
     readmeTitle: "System Analysis Specification Workspace",
@@ -216,6 +218,7 @@ const LANG_COPY = {
       "建议实现范围"
     ],
     handoffUiNote: "若涉及前端界面请参照 `uml/wireframe.puml`；纯后端需求请保留「无 UI 界面需求」。",
+    noUiText: "无 UI 界面需求（纯后端需求）。",
     historyTitle: "版本历程",
     historyHeader: "| 版本 | 日期 | 异动类型 | 异动摘要 | 影响范围 | 状态 |",
     readmeTitle: "系统分析规格项目",
@@ -291,6 +294,7 @@ const LANG_COPY = {
       "推奨実装範囲"
     ],
     handoffUiNote: "UI がある場合は `uml/wireframe.puml` を参照してください。バックエンド専用の場合は「UI 要件なし」と明記してください。",
+    noUiText: "UI 要件なし（バックエンド専用）。",
     historyTitle: "変更履歴",
     historyHeader: "| バージョン | 日付 | 変更種別 | 変更概要 | 影響範囲 | ステータス |",
     readmeTitle: "システム分析仕様ワークスペース",
@@ -366,6 +370,7 @@ const LANG_COPY = {
       "권장 구현 범위"
     ],
     handoffUiNote: "UI 구현이 필요한 경우 `uml/wireframe.puml`을 참조하세요. 백엔드 전용 요구사항은 \"UI 요구사항 없음\"을 유지하세요.",
+    noUiText: "UI 요구사항 없음 (백엔드 전용).",
     historyTitle: "변경 이력",
     historyHeader: "| 버전 | 날짜 | 변경 유형 | 변경 요약 | 영향 범위 | 상태 |",
     readmeTitle: "시스템 분석 사양 워크스페이스",
@@ -586,9 +591,10 @@ function buildWorkspaceReadmeMarkdown(langCode) {
   ].join("\n");
 }
 
-function buildLocalizedReqFileContent(langCode, relType, replacements = {}) {
+function buildLocalizedReqFileContent(langCode, relType, replacements = {}, options = {}) {
   const t = getLangStrings(langCode);
   const safeReplacements = replacements || {};
+  const noUi = Boolean(options && options.noUi);
   const reqId = safeReplacements.REQ_ID || safeReplacements["{{REQ_ID}}"] || "{{REQ_ID}}";
   const reqName = safeReplacements.REQ_NAME || safeReplacements["{{REQ_NAME}}"] || "";
 
@@ -621,7 +627,7 @@ function buildLocalizedReqFileContent(langCode, relType, replacements = {}) {
         `- ${t.tbd}`,
         "",
         `## ${s.uiSpec}`,
-        s.uiRef,
+        noUi ? t.noUiText : s.uiRef,
         "",
         `## ${s.acceptance}`,
         `- ${t.tbd}`,
@@ -678,7 +684,7 @@ function buildLocalizedReqFileContent(langCode, relType, replacements = {}) {
             ];
           }
           if (idx === 7) {
-            return [`## ${h}`, t.handoffUiNote, ""];
+            return [`## ${h}`, noUi ? t.noUiText : t.handoffUiNote, ""];
           }
           return [`## ${h}`, `${t.tbd}.`, ""];
         })

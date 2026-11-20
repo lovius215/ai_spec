@@ -295,6 +295,7 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
 
   // Validate openapi.yaml basic contract & YAML structure
   const openapiText = deliverableContents.get("openapi.yaml");
+  let parsedOpenApi = null;
   if (openapiText !== undefined) {
     const explicitNoApi = /(?:無\s*API|No API|無需\s*API|无\s*API|API\s*不要|API\s*불필요)/i.test(openapiText);
     if (!explicitNoApi && (!/^openapi\s*:/m.test(openapiText) || !/^paths\s*:/m.test(openapiText))) {
@@ -322,10 +323,12 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
         if (indentLen > blockScalarIndent) continue;
         blockScalarIndent = null;
       }
-      const keyValMatch = line.match(/^([ ]*(?:-[ ]+)?)[^#\s][^:]*:[ \t]*(.*)$/);
+      const keyValMatch =
+        line.match(/^([ ]*(?:-[ ]+)?)(?:"(?:\\.|[^"\\])*"|'(?:''|[^'])*')[ \t]*:(?:[ \t]+(.*)|[ \t]*)$/) ||
+        line.match(/^([ ]*(?:-[ ]+)?)[^#\s"'][^#]*?:(?:[ \t]+(.*)|[ \t]*)$/);
       if (keyValMatch) {
         const keyStartIndent = keyValMatch[1].length;
-        const val = keyValMatch[2].replace(/\s+#.*$/, "").trim();
+        const val = (keyValMatch[2] || "").replace(/\s+#.*$/, "").trim();
         if (/^[|>][+-]?\d*$/.test(val)) {
           blockScalarIndent = keyStartIndent;
           continue;
@@ -350,14 +353,14 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
 
     // OpenAPI 3.0.3 paths/methods/responses & internal $ref pre-check
     if (!explicitNoApi && !hasTabIndent) {
-      const parsedApi = inspectOpenApiPathsAndRefs(openapiText);
-      for (const badPath of parsedApi.invalidPathKeys) {
+      parsedOpenApi = inspectOpenApiPathsAndRefs(openapiText);
+      for (const badPath of parsedOpenApi.invalidPathKeys) {
         issues.push(`openapi.yaml paths 路徑 "${badPath}" 必須以 "/" 開頭`);
       }
-      for (const op of parsedApi.missingResponses) {
+      for (const op of parsedOpenApi.missingResponses) {
         issues.push(`openapi.yaml 端點 ${op.method.toUpperCase()} ${op.path} 缺少 responses 定義`);
       }
-      for (const ref of parsedApi.missingRefs) {
+      for (const ref of parsedOpenApi.missingRefs) {
         issues.push(`openapi.yaml 找不到 $ref 目標: #/components/${ref.section}/${ref.name}`);
       }
     }
@@ -415,7 +418,9 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
 
     if (openapiText !== undefined) {
       const openapiNoApi = /(?:無\s*API|No API|無需\s*API|无\s*API|API\s*不要|API\s*불필요)/i.test(openapiText);
-      const hasOpenApiPaths = /^\s{1,4}\/[^\s:]*\s*:/m.test(openapiText);
+      const hasOpenApiPaths =
+        (parsedOpenApi && parsedOpenApi.endpoints.length > 0) ||
+        /^\s{1,4}["']?\/[^\s]*\s*:(?:\s|$)/m.test(openapiText);
       const apiSectionMatch = handoffText.match(
         /##\s*[^\n]*API[^\n]*\n([\s\S]*?)(?=\n##\s+|$)/i
       );
@@ -495,6 +500,16 @@ function classifyRequirementIssue(reqDirName, msg) {
 
 const HTTP_METHOD_RE = /^(get|put|post|delete|options|head|patch|trace)$/i;
 
+function parseYamlMappingKey(trimmed) {
+  const dq = trimmed.match(/^"((?:\\.|[^"\\])+)"\s*:(?:\s|$)/);
+  if (dq) return dq[1].trim();
+  const sq = trimmed.match(/^'((?:''|[^'])+)'\s*:(?:\s|$)/);
+  if (sq) return sq[1].replace(/''/g, "'").trim();
+  const plain = trimmed.match(/^([^"'\s][^#]*?)\s*:(?:\s|$)/);
+  if (plain) return plain[1].trim();
+  return null;
+}
+
 function inspectOpenApiPathsAndRefs(openapiText) {
   const lines = String(openapiText || "").split(/\r?\n/);
   const endpoints = [];
@@ -517,7 +532,6 @@ function inspectOpenApiPathsAndRefs(openapiText) {
       }
     }
     currentMethod = null;
-    methodIndent = -1;
     methodHasResponseOrRef = false;
   };
 
@@ -530,6 +544,9 @@ function inspectOpenApiPathsAndRefs(openapiText) {
       if (/^paths\s*:\s*(?:#.*)?$/.test(trimmed)) {
         inPaths = true;
         pathsIndent = indent;
+        pathKeyIndent = -1;
+        currentPathKey = null;
+        methodIndent = -1;
       }
       continue;
     }
@@ -537,14 +554,16 @@ function inspectOpenApiPathsAndRefs(openapiText) {
     if (indent <= pathsIndent) {
       flushMethod();
       inPaths = false;
+      currentPathKey = null;
+      methodIndent = -1;
       continue;
     }
 
     if (pathKeyIndent === -1 || indent <= pathKeyIndent) {
       flushMethod();
-      const m = trimmed.match(/^["']?([^"':]+)["']?\s*:/);
-      if (m) {
-        const key = m[1].trim();
+      methodIndent = -1;
+      const key = parseYamlMappingKey(trimmed);
+      if (key) {
         pathKeyIndent = indent;
         currentPathKey = key;
         if (!key.startsWith("/") && !key.startsWith("x-")) {
@@ -555,16 +574,20 @@ function inspectOpenApiPathsAndRefs(openapiText) {
     }
 
     if (currentPathKey && (methodIndent === -1 || indent <= methodIndent)) {
-      const m = trimmed.match(/^([a-zA-Z0-9_-]+)\s*:/);
-      if (m && HTTP_METHOD_RE.test(m[1])) {
+      const key = parseYamlMappingKey(trimmed);
+      if (key && HTTP_METHOD_RE.test(key)) {
         flushMethod();
-        currentMethod = m[1].toLowerCase();
+        currentMethod = key.toLowerCase();
         methodIndent = indent;
         methodHasResponseOrRef = false;
         continue;
       }
-      if (m && /^\$ref\s*:/.test(trimmed)) {
-        // PathItem-level $ref
+      if (key) {
+        // Non-HTTP-method PathItem sibling (e.g. parameters, summary, description, servers, $ref, x-*)
+        flushMethod();
+        if (methodIndent === -1) {
+          methodIndent = indent;
+        }
         continue;
       }
     }
@@ -577,6 +600,53 @@ function inspectOpenApiPathsAndRefs(openapiText) {
   }
   flushMethod();
 
+  // Collect actual nested components.<section>.<name> definitions
+  const definedComponents = new Set();
+  let inComponents = false;
+  let componentsIndent = -1;
+  let sectionIndent = -1;
+  let currentSection = null;
+  let itemIndent = -1;
+  for (const rawLine of lines) {
+    if (!rawLine.trim() || /^\s*#/.test(rawLine)) continue;
+    const indent = (rawLine.match(/^( *)/) || ["", ""])[1].length;
+    const trimmed = rawLine.trim();
+
+    if (!inComponents) {
+      if (/^components\s*:\s*(?:#.*)?$/.test(trimmed)) {
+        inComponents = true;
+        componentsIndent = indent;
+        sectionIndent = -1;
+        currentSection = null;
+        itemIndent = -1;
+      }
+      continue;
+    }
+
+    if (indent <= componentsIndent) {
+      inComponents = false;
+      continue;
+    }
+
+    if (sectionIndent === -1 || indent <= sectionIndent) {
+      const secKey = parseYamlMappingKey(trimmed);
+      if (secKey) {
+        sectionIndent = indent;
+        currentSection = secKey;
+        itemIndent = -1;
+      }
+      continue;
+    }
+
+    if (currentSection && (itemIndent === -1 || indent <= itemIndent)) {
+      const itemKey = parseYamlMappingKey(trimmed);
+      if (itemKey) {
+        itemIndent = indent;
+        definedComponents.add(`${currentSection}/${itemKey}`);
+      }
+    }
+  }
+
   // Check internal $ref targets: #/components/<section>/<name>
   const missingRefs = [];
   const refMatches = String(openapiText || "").matchAll(/#\/components\/([a-zA-Z0-9_-]+)\/([a-zA-Z0-9_.-]+)/g);
@@ -587,10 +657,7 @@ function inspectOpenApiPathsAndRefs(openapiText) {
     const key = `${section}/${name}`;
     if (seenRefs.has(key)) continue;
     seenRefs.add(key);
-    const hasComponents = /^components\s*:/m.test(openapiText);
-    const hasSection = new RegExp(`^\\s+${section}\\s*:`, "m").test(openapiText);
-    const hasTarget = new RegExp(`^\\s+${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:`, "m").test(openapiText);
-    if (!hasComponents || !hasSection || !hasTarget) {
+    if (!definedComponents.has(key)) {
       missingRefs.push({ section, name });
     }
   }
@@ -607,6 +674,13 @@ function extractDbTables(dbText) {
     "总览", "数据库", "数据表", "概要", "テーブル", "データベース", "개요", "데이터베이스", "테이블"
   ]);
 
+  const addIfTable = (rawName) => {
+    const name = String(rawName || "").trim();
+    if (name && !ignoreHeadings.has(name.toLowerCase())) {
+      tables.add(name);
+    }
+  };
+
   for (const rawLine of String(dbText || "").split(/\r?\n/)) {
     const line = rawLine.trim();
     const createMatch = line.match(/^CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"']?([a-zA-Z_][a-zA-Z0-9_.]*)[`"']?/i);
@@ -614,12 +688,28 @@ function extractDbTables(dbText) {
       tables.add(createMatch[1].replace(/^[^.]+\./, ""));
       continue;
     }
-    const headingMatch = line.match(/^#{2,3}\s+(?:Table\s*:\s*|資料表\s*[：:]\s*|数据表\s*[：:]\s*)?[`"']?([a-zA-Z_][a-zA-Z0-9_]*)[`"']?(?:\s|$|\()/i);
-    if (headingMatch) {
-      const name = headingMatch[1];
-      if (!ignoreHeadings.has(name.toLowerCase())) {
-        tables.add(name);
-      }
+    // Explicit table prefix with optional section numbering (e.g. "## 1. Table: users", "### 2.1 資料表：users")
+    const prefixMatch = line.match(
+      /^#{2,3}\s+(?:\d+(?:\.\d+)*\.?\s+)?(?:Table|資料表|数据表|テーブル|테이블)\s*[：:]\s*[`"']?([a-zA-Z_][a-zA-Z0-9_]*)[`"']?/i
+    );
+    if (prefixMatch) {
+      addIfTable(prefixMatch[1]);
+      continue;
+    }
+    // Backtick-quoted identifier heading (e.g. "## `users`", "### 1. `user_sessions` (Sessions)")
+    const backtickMatch = line.match(
+      /^#{2,3}\s+(?:\d+(?:\.\d+)*\.?\s+)?`([a-zA-Z_][a-zA-Z0-9_]*)`(?:\s|$|[（(：:\-—–])/
+    );
+    if (backtickMatch) {
+      addIfTable(backtickMatch[1]);
+      continue;
+    }
+    // Bare table name heading (rejects multi-word English prose like "## Data Retention Policy")
+    const bareMatch = line.match(
+      /^#{2,3}\s+(?:\d+(?:\.\d+)*\.?\s+)?([a-zA-Z_][a-zA-Z0-9_]*)(?:\s*(?:$|[（(]|[-—–]\s)|\s+[^\x00-\x7F])/
+    );
+    if (bareMatch) {
+      addIfTable(bareMatch[1]);
     }
   }
   return Array.from(tables).sort();
@@ -876,7 +966,7 @@ function runCheck(cwd, isSourceRepoFlag, packageVersion, showStatusFn, args = []
         fixHint: "執行 sa-spec reindex 重建索引。"
       });
     }
-    if (!scopeLock.ok) {
+    if (strict && !scopeLock.ok) {
       structuredIssues.push({
         rule: "SCOPE_LOCK_MULTI_REQ",
         reqDir: scopeLock.modifiedReqDirs.join(", "),
@@ -946,6 +1036,8 @@ module.exports = {
   isDraftSpecDir,
   validateSingleRequirementDir,
   validateRequirementsContent,
+  inspectOpenApiPathsAndRefs,
+  extractDbTables,
   buildImpactIndex,
   runDoctor,
   runCheck

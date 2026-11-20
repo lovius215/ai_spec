@@ -54,8 +54,17 @@ function fetchRemote(cwd, remote) {
   return res.status === 0;
 }
 
+function hasHeadCommit(cwd) {
+  const res = spawnSync("git", ["rev-parse", "--verify", "--quiet", "HEAD"], { cwd, encoding: "utf8" });
+  return res.status === 0;
+}
+
 function pushBranchToRemote(cwd, remote, branch) {
   if (!remote || !branch) return false;
+  if (!hasHeadCommit(cwd)) {
+    console.log(`[Git] 目前尚無任何 commit，暫時略過推送分支 ${branch} 至 ${remote}（建立首次 commit 後即可推送）。`);
+    return false;
+  }
   console.log(`[Git] 偵測到遠端 (${remote})，正在將分支 ${branch} 推送至 ${remote}/${branch}...`);
   const pushRes = spawnSync("git", ["push", "-u", remote, branch], { cwd, encoding: "utf8" });
   if (pushRes.status === 0) {
@@ -274,6 +283,7 @@ function removePreCommitHook(cwd) {
 module.exports = {
   isGitWorkingTree,
   ensureGitRepository,
+  hasHeadCommit,
   getDefaultRemote,
   fetchRemote,
   pushBranchToRemote,

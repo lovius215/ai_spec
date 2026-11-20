@@ -139,7 +139,7 @@ const STAGE_CONFIG = {
       "核對流程與業務檢查清單後提交草稿供使用者審核"
     ],
     processChecklist: [
-      "已先同步主分支/遠端並完成所有既有 REQ-* 的衝突檢查（若曾有衝突則已先停止並釐清）",
+      "已先同步主分支/遠端，並透過 impactIndex 過濾相關 REQ-* 完成衝突檢查（若曾有衝突則已先停止並釐清）",
       "uml/ 嚴格遵守單檔單圖（每檔僅一組 @start...@end）；含 UI 者已產出 uml/wireframe.puml，純後端已於 handoff.md 標註無 UI",
       "未直接修改 project/system-spec.md 與其他 REQ-* 目錄，且文件未擅自標示「已審核」",
       "handoff.md 完整包含必要章節且僅整理已存在之規格契約，全文件 100% 符合鎖定語言"
