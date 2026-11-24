@@ -1,8 +1,13 @@
 # Changelog (`@loviusc/sa-spec`)
 
+### v0.2.13
+- **`scc` 預設自動合併清分支、既有 `REQ-xxx` 修訂分支與多語佔位詞閘門強化**：
+  - **`scc` 預設合併回主分支並自動清理分支**：`sa-spec finalize` 預設採 `auto-merge` 模式，自動切回 `master`/`main` 合併、推送遠端，並自動刪除已合併的本機與遠端 feature 分支；若遠端主分支受保護導致推送失敗，自動退回本機主分支並保留 feature 分支改走 PR（亦支援 `--pr` / `--no-merge` 與 `--keep-branch`）。
+  - **支援既有需求修訂 (`sa-spec revise --id REQ-xxx`)**：`scc` 後需再次修改已歸檔需求時，自動從最新主分支建立 `feat/REQ-xxx-<slug>` 修訂分支（自動推送遠端並將審核狀態重設為 `待確認`），再次 `finalize` 時自動識別主分支既有需求並**保留原 `REQ-xxx` 編號不跳號**。
+  - **佔位詞閘門與 5 語系規範同步**：`APPROVED_HAS_PLACEHOLDER` 補齊獨立段落佔位詞（如 `db-schema.md` 單行 `待補充。` / `TBD.`）與簡體中文 `待补充` 檢查；全面同步 5 語系 `AGENTS` 與 `SKILL.md`。
+
 ### v0.2.12
-- **主分支 `pr` 防護、純後端 `--no-ui` 旗標與 OpenAPI / DB 解析精度強化**：
-  - **主分支 `finalize` 安全防護**：在 `main`/`master` 上執行 `sa-spec finalize` 時，非 `--auto-merge`（預設 `pr` 模式）會略過直接 commit 與 push 主分支；尚未建立首次 commit 的 unborn branch 亦安全略過遠端推送。
+- **主分支保護、純後端 `--no-ui` 旗標與 OpenAPI / DB 解析精度強化**：
   - **純後端需求建檔旗標 (`--no-ui`)**：`sa-spec new --no-ui` 支援全 5 語系，建立時自動略過 `uml/wireframe.puml` 並於 `srs.md` 與 `handoff.md` 標記無 UI 介面需求。
   - **OpenAPI / DB 解析與 JSON 輸出修正**：支援含冒號自訂動詞路徑（如 `/api/v1/orders/{id}:cancel`）、PathItem 同層欄位接在 HTTP method 後方、巢狀 `components.<section>.<name>` 與引號 schema 名稱檢查；`extractDbTables` 支援章節編號並排除多字英文說明標題誤判；修正非 `--strict` 模式下 `check --json` 的 `SCOPE_LOCK_MULTI_REQ` 一致性。
 

@@ -85,10 +85,10 @@ const STAGE_CONFIG = {
     recommendedRules: ["spec", "file-style"],
     recommendedTemplates: ["srs", "handoff", "history", "openapi", "db-schema"],
     steps: [
-      "依需求英文短名建立並切換至專屬 feature 分支（feat/<name>）；若已在 feature branch 則沿用（若需求標題為中文，需提供英文 --slug）。",
-      "鐵律：若有設定 Git remote，立即執行 git push -u <remote> feat/<name>；推送失敗僅回報認證或網路問題。",
-      "執行 sa-spec new --name <name> [--slug <ascii-slug>] 建立 project/<slug>/ 草稿目錄（內部使用 {{REQ_ID}} 佔位）。",
-      "整理需求摘要、目標、初步流程與最多 3 個高影響待確認事項；不正式定號、不歸檔、不修改既有需求。"
+      "新需求：依需求英文短名建立並切換至專屬 feature 分支（feat/<name>）；若已在 feature branch 則沿用（若需求標題為中文，需提供英文 --slug）。",
+      "既有需求修改（scc 後再次修訂）：執行 sa-spec revise --id REQ-xxx 建立並切換至 feat/REQ-xxx-<slug> 新分支，直接針對既有 project/REQ-xxx-<slug>/ 修訂（保留原 REQ-xxx 編號，不另建新資料夾）。",
+      "鐵律：若有設定 Git remote，立即將新建分支執行 git push -u <remote> <branch>；推送失敗僅回報認證或網路問題。",
+      "新需求執行 sa-spec new --name <name> [--slug <ascii-slug>] [--no-ui] 建立 project/<slug>/ 草稿目錄（內部使用 {{REQ_ID}} 佔位）；整理摘要、目標、初步流程與最多 3 個高影響待確認事項。"
     ],
     tasks: [
       "說明本次提案任務目標、需求範圍與將建立的分支/草稿目錄",
@@ -159,9 +159,9 @@ const STAGE_CONFIG = {
     recommendedTemplates: ["history", "index", "system-spec"],
     steps: [
       "若有設定 Git remote，先執行 git push -u <remote> <branch> 與 git fetch <remote> 同步遠端狀態。",
-      "查詢主分支（main/master 與遠端主分支）最新可用序號定號 REQ-xxx，執行 sa-spec finalize --name <slug>（預設走 pr 模式不直接動主分支；若需自動合併請加 --auto-merge 或將 system-spec.md 的合併策略設為 auto-merge）。",
+      "執行 sa-spec finalize --name <slug-or-REQ-xxx>：新需求自動向主分支（main/master 與遠端主分支）查詢最新可用序號定號 REQ-xxx；若為主分支既有 REQ-xxx 修訂則自動保留原編號。",
       "依使用者確認內容更新 project/system-spec.md，補齊 handoff.md 11 項必要章節與 history.md（未經確認不可標示「已審核」）。",
-      "只 stage 本次歸檔相關檔案並 commit（格式：docs(REQ-xxx): 需求名稱 - 簡短需求說明）；pr 模式下推送 feature 分支並提示建立 PR，auto-merge 模式下自動合併回主分支並 push。"
+      "預設 auto-merge 模式會建立 commit、切回主分支合併、推送主分支至 remote，並自動刪除本機與遠端 feature 分支（若遠端主分支受保護推送失敗，則自動退回並保留 feature 分支改走 PR；若需強制 PR 模式可加 --pr / --no-merge 或設 合併策略：pr）。"
     ],
     tasks: [
       "說明本次歸檔任務目標、確認版本狀態與預期 Git 操作",
@@ -307,7 +307,7 @@ function collectWorkspaceContext(cwd, isSourceRepoFlag, packageVersion) {
 
   let systemSpecStatus = null;
   let recordedSpecVersion = null;
-  let mergeStrategy = "pr";
+  let mergeStrategy = "auto-merge";
   if (isExistingFile(systemSpecPath)) {
     const content = fs.readFileSync(systemSpecPath, "utf8");
     systemSpecStatus = extractStatusFromContent(content) || "未標示";
@@ -625,12 +625,12 @@ function getTemplatesPackageVersion(templatesDir) {
   try {
     const pkgPath = path.join(templatesDir, "..", "package.json");
     if (fs.existsSync(pkgPath)) {
-      return JSON.parse(fs.readFileSync(pkgPath, "utf8")).version || "0.2.12";
+      return JSON.parse(fs.readFileSync(pkgPath, "utf8")).version || "0.2.13";
     }
   } catch {
     // ignore read failure
   }
-  return "0.2.12";
+  return "0.2.13";
 }
 
 function buildLocalizedTemplateByName(name, langConfig, templatesDir) {

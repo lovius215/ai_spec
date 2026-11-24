@@ -454,7 +454,7 @@ function extractMergeStrategy(content) {
   const match = content.match(
     /^[-*]\s*\*{0,2}(?:合併策略|合并策略|マージ戦略|병합 전략|Merge Strategy)\*{0,2}[：:]\*{0,2}\s*(.+)$/im
   );
-  if (!match) return "pr";
+  if (!match) return "auto-merge";
   const val = match[1].trim().replace(/^[`*]+|[`*]+$/g, "").trim().toLowerCase();
   if (/\b(?:pr|pull[- ]?request|no[-_ ]?merge|manual)\b/i.test(val)) {
     return "pr";
@@ -462,7 +462,7 @@ function extractMergeStrategy(content) {
   if (/\bauto[-_ ]?merge\b/i.test(val)) {
     return "auto-merge";
   }
-  return "pr";
+  return "auto-merge";
 }
 
 function stampSpecVersionInContent(content, version, langCode = "zh-TW") {
@@ -568,7 +568,7 @@ function buildSystemSpecMarkdown(langConfig, version) {
     `- ${t.statusLabel}：${t.draft}`,
     `- ${t.langLabel}：${langConfig.label}`,
     `- ${t.specVersionLabel}：${version}`,
-    `- ${t.mergeStrategyLabel}：pr`,
+    `- ${t.mergeStrategyLabel}：auto-merge`,
     "",
     sections,
     ""
@@ -914,9 +914,9 @@ const AGENTS_LOCALIZED = {
 | 指令 | 简写 | 用途 | 核心规则 |
 |---|---|---|---|
 | \`spec:init\` | \`sci\` | 初始化 | 运行 \`sa-spec instructions init\` 与 \`sa-spec init --lang zh-CN\`。 |
-| \`spec:propose\` | \`scp\` | 提出需求 | 建立并切换 \`feat/<slug>\`（支持 \`--slug <ascii-slug>\`），存在 remote 时自动推送，在 \`project/<slug>/\` 建立 \`{{REQ_ID}}\` 占位草案。 |
+| \`spec:propose\` | \`scp\` | 提出需求 | 新需求建立并切换 \`feat/<slug>\`（支持 \`--slug <ascii-slug>\`）并在 \`project/<slug>/\` 建立 \`{{REQ_ID}}\` 草案；修改已归档需求时运行 \`sa-spec revise --id REQ-xxx\` 建立 \`feat/REQ-xxx-<slug>\` 修订分支（存在 remote 时自动推送）。 |
 | \`spec:analyze\` | \`sca\` | 分析与起草 | 先通过 \`sa-spec impact\` 过滤相关需求并检查冲突；有冲突则只列冲突并最多提 3 个待澄清问题；无冲突才产出整套草稿。 |
-| \`spec:commit\` | \`scc\` | 确认归档 | 运行 \`sa-spec finalize --name <slug> [--auto-merge \\| --pr \\| --no-merge]\`：仅归档已确认版本，默认走 PR 模式（需自动合并请设 \`auto-merge\`）。 |
+| \`spec:commit\` | \`scc\` | 确认归档 | 运行 \`sa-spec finalize --name <slug> [--auto-merge \\| --pr \\| --no-merge] [--keep-branch]\`：仅归档已确认版本（修订既有需求保留原 \`REQ-xxx\` 编号），默认自动合并回主分支、推送并删除已合并 feature 分支（若远端主分支受保护推送失败则自动退回保留分支；需走 PR 请加 \`--pr\` 或设 \`合并策略：pr\`）。 |
 | \`spec:pdf\` | \`spd\` | 导出 PDF | 运行 \`sa-spec pdf <target> [--split] [--online-uml \\| --no-uml-render] [--output <path>]\`。 |
 
 # 重要限制
@@ -953,9 +953,9 @@ const AGENTS_LOCALIZED = {
 | コマンド | 略称 | 用途 | ルール |
 |---|---|---|---|
 | \`spec:init\` | \`sci\` | 初期化 | \`sa-spec instructions init\` および \`sa-spec init --lang ja\` を実行。 |
-| \`spec:propose\` | \`scp\` | 要件提案 | \`feat/<slug>\` ブランチを作成・切替（日本語名の場合は \`--slug <ascii-slug>\` を必須指定）、remote があれば push し \`project/<slug>/\` に \`{{REQ_ID}}\` プレースホルダー付きドラフトを作成。 |
+| \`spec:propose\` | \`scp\` | 要件提案 | 新規要件は \`feat/<slug>\` ブランチを作成・切替（日本語名の場合は \`--slug <ascii-slug>\` を必須指定）し \`project/<slug>/\` に \`{{REQ_ID}}\` ドラフトを作成。既存要件の修正時は \`sa-spec revise --id REQ-xxx\` で \`feat/REQ-xxx-<slug>\` ブランチを作成（remote があれば自動 push）。 |
 | \`spec:analyze\` | \`sca\` | 分析・起草 | \`sa-spec impact\` で関連要件を絞り込んだ上で競合チェックを実施。競合がある場合は成果物を生成せず最大 3 つの確認質問のみ提示。競合なしの場合のみドラフトを生成。 |
-| \`spec:commit\` | \`scc\` | 確定アーカイブ | ユーザー承認済みの版のみ \`sa-spec finalize --name <slug> [--auto-merge \\| --pr \\| --no-merge]\` でアーカイブ（既定は PR モード）。 |
+| \`spec:commit\` | \`scc\` | 確定アーカイブ | ユーザー承認済みの版のみ \`sa-spec finalize --name <slug> [--auto-merge \\| --pr \\| --no-merge] [--keep-branch]\` でアーカイブ（既存要件の改訂は元の \`REQ-xxx\` を維持）。既定で主ブランチへ自動マージ・push し feature ブランチを削除します（主ブランチ保護等で push 失敗時はブランチを保持して退避；PR 運用時は \`--pr\` を指定）。 |
 | \`spec:pdf\` | \`spd\` | PDF 出力 | \`sa-spec pdf <target> [--split] [--online-uml \\| --no-uml-render] [--output <path>]\` を実行。 |
 
 # 重要な制約
@@ -992,9 +992,9 @@ const AGENTS_LOCALIZED = {
 | 명령 | 단축어 | 용도 | 규칙 |
 |---|---|---|---|
 | \`spec:init\` | \`sci\` | 초기화 | \`sa-spec instructions init\` 및 \`sa-spec init --lang ko\` 실행. |
-| \`spec:propose\` | \`scp\` | 요구사항 제안 | \`feat/<slug>\` 브랜치 생성 및 전환(비영문 이름은 \`--slug <ascii-slug>\` 필수), remote 설정 시 자동 push 후 \`project/<slug>/\`에 \`{{REQ_ID}}\` 플레이스홀더 초안 생성. |
+| \`spec:propose\` | \`scp\` | 요구사항 제안 | 신규 요구사항은 \`feat/<slug>\` 브랜치 생성 및 전환(비영문 이름은 \`--slug <ascii-slug>\` 필수) 후 \`project/<slug>/\`에 \`{{REQ_ID}}\` 초안 생성. 기존 요구사항 수정 시 \`sa-spec revise --id REQ-xxx\`로 \`feat/REQ-xxx-<slug>\` 브랜치 생성(remote 설정 시 자동 push). |
 | \`spec:analyze\` | \`sca\` | 분석 및 초안 작성 | \`sa-spec impact\`로 관련 요구사항을 먼저 선별해 충돌 여부를 검사. 충돌 시 초안 생성 없이 최대 3개의 확인 질문만 제시. 충돌이 없을 때만 전체 초안 작성. |
-| \`spec:commit\` | \`scc\` | 확정 아카이브 | 사용자 승인 버전에 한해 \`sa-spec finalize --name <slug> [--auto-merge \\| --pr \\| --no-merge]\`로 아카이브(기본값은 PR 모드). |
+| \`spec:commit\` | \`scc\` | 확정 아카이브 | 사용자 승인 버전에 한해 \`sa-spec finalize --name <slug> [--auto-merge \\| --pr \\| --no-merge] [--keep-branch]\`로 아카이브(기존 요구사항 수정은 기존 \`REQ-xxx\` 유지). 기본값으로 메인 브랜치에 자동 병합·push 후 feature 브랜치를 삭제하며, 메인 브랜치 보호로 push 실패 시 브랜치를 유지합니다(PR 모드는 \`--pr\` 지정). |
 | \`spec:pdf\` | \`spd\` | PDF 내보내기 | \`sa-spec pdf <target> [--split] [--online-uml \\| --no-uml-render] [--output <path>]\` 실행. |
 
 # 주요 제한 사항

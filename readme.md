@@ -279,8 +279,9 @@ sa-spec check
 | 指令 | 用途 |
 |---|---|
 | `sa-spec init [--full] [--hooks] [--lang zh-TW|en|zh-CN|ja|ko]` | 建立乾淨的專案文件骨架（支援 5 種語言，預設 `zh-TW`；所有規範改由 CLI 內建提供，不建立 `skills/` 與 `rules/`；加 `--hooks` 可一併安裝 Git `pre-commit` 護欄）。 |
-| `sa-spec new [--id REQ-001] --name login [--slug login] [--branch]` | 建立需求資料夾與對應語言模板（若名稱為中文/日文/韓文，請搭配 `--slug <ascii-slug>`；未帶 `--id` 時啟用多人草稿模式，可選 `--branch` 切換至 `feat/<slug>`）。 |
-| `sa-spec finalize --name login [--slug login] [--auto-merge \| --pr \| --no-merge]` | 將草稿需求定號歸檔為最新序號（預設走 PR 模式只推 feature 分支，需自動合併回主分支請加 `--auto-merge` 或於 `system-spec.md` 設定 `合併策略：auto-merge`，具備遠端撞號防護）。 |
+| `sa-spec new [--id REQ-001] --name login [--slug login] [--branch] [--no-ui]` | 建立需求資料夾與對應語言模板（中文/日文/韓文請搭配 `--slug <ascii-slug>`；`--no-ui` 建立純後端無 UI 規格；未帶 `--id` 時啟用草稿模式並可選 `--branch` 切換至 `feat/<slug>`）。 |
+| `sa-spec revise --id REQ-001 [--no-branch]` | 針對已歸檔需求從最新主分支新開修訂分支 `feat/REQ-001-<slug>`（自動推上 remote、將狀態重設為 `待確認` 並保留原 `REQ-001` 編號不跳號）。 |
+| `sa-spec finalize --name <login\|REQ-001> [--slug login] [--auto-merge \| --pr \| --no-merge] [--keep-branch]` | 將草稿定號歸檔（或保留既有 `REQ-xxx` 修訂編號），預設自動合併回 `master`/`main`、推送遠端並刪除已合併的 feature 分支（若遠端主分支受保護推送失敗則自動退回保留分支；需走 PR 請加 `--pr` 或設 `合併策略：pr`）。 |
 | `sa-spec instructions [init\|propose\|analyze\|commit\|pdf] [--with-rules] [--json]` | 輸出目前工作區狀態、對應階段步驟與套件內建完整系統分析規範（供 AI 動態讀取）。 |
 | `sa-spec rules [name\|all] [--list] [--json]` | 讀取或列出套件內建補充規則（`spec`、`uml-style`、`wireframe`、`db-table`、`estimation`、`system-spec`、`file-style`、`history`、`review`）。 |
 | `sa-spec templates [name] [--lang <code>] [--list] [--json]` | 讀取或列出套件內建規格與圖表範本（依專案語言或 `--lang` 輸出對應語系的 `srs`、`db-schema`、`handoff`、`history`、`uml-main`、`uml-wireframe` 等）。 |
@@ -739,7 +740,7 @@ git push origin master
 - 未經使用者確認，不得標示為 `已審核`。
 - `spec:analyze` 發現衝突時不得產出最終文件，也不得修改既有需求文件。
 - `project/system-spec.md` 只能在 `spec:commit` 依使用者確認內容更新。
-- **鐵律**：只要 Git 有設定 remote，`scp` 與 `scc` 都會自動將 feature 分支推送至 remote（預設走 PR 模式；僅在啟用 `--auto-merge` 或 `合併策略：auto-merge` 時才會自動合併並推送主分支）。
+- **鐵律**：只要 Git 有設定 remote，`scp` 與 `scc` 都會自動推送至 remote；`scc` 預設合併回主分支、推送成功後自動刪除已合併的 feature 分支（若遠端主分支受保護推送失敗則自動退回保留分支改走 PR；亦可設 `合併策略：pr`）。
 - 一次最多問 3 個待確認問題，優先詢問會影響範圍、資料、權限、API、DB 或驗收的問題。
 
 ## 範例專案（完整產出與衝突示範）
@@ -750,9 +751,13 @@ git push origin master
 
 ## 更新紀錄
 
+### v0.2.13
+- **`scc` 預設自動合併清分支、既有 `REQ-xxx` 修訂分支與多語佔位詞閘門強化**：
+  - `sa-spec finalize` 預設自動合併回 `master`/`main`、推送遠端並刪除已合併 feature 分支（遠端主分支受保護時自動退回保留分支）；新增 `sa-spec revise --id REQ-xxx` 開立 `feat/REQ-xxx-<slug>` 修訂分支且保留原編號；補齊獨立段落與簡中 `待补充` 佔位詞檢查。
+
 ### v0.2.12
-- **主分支 `pr` 防護、純後端 `--no-ui` 旗標與 OpenAPI / DB 解析精度強化**：
-  - `sa-spec finalize` 在主分支且非 `--auto-merge` 時略過直接 commit / push；`sa-spec new --no-ui` 支援全 5 語系純後端建檔；OpenAPI 冒號路徑／引號 schema 與 `extractDbTables` 解析精度強化。
+- **純後端 `--no-ui` 旗標與 OpenAPI / DB 解析精度強化**：
+  - `sa-spec new --no-ui` 支援全 5 語系純後端建檔；OpenAPI 冒號路徑／引號 schema 與 `extractDbTables` 解析精度強化。
 
 ### v0.2.11
 - **預設安全 PR 合併、`已審核` 佔位閘門與 `sequence.puml` 語意命名**：

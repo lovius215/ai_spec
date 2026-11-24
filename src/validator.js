@@ -441,7 +441,7 @@ function validateSingleRequirementDir(reqAbsDir, reqDirName, options = {}) {
   const srsApproved = srsText !== undefined && isApprovedStatus(extractStatusFromContent(srsText));
   const handoffApproved = handoffText !== undefined && isApprovedStatus(extractStatusFromContent(handoffText));
   if (srsApproved || handoffApproved) {
-    const placeholderLineRe = /(?:^[-*]\s*|(?:：|:)\s*)(?:待補充|TBD|待确认|未定|미정)[。.]?\s*$/im;
+    const placeholderLineRe = /^(?:\s*[-*]\s*|\s*[^#\n]*?[：:]\s*|\s*)(?:待補充|待补充|TBD|待确认|未定|미정)[。.]?\s*$/im;
     for (const checkName of ["srs.md", "db-schema.md", "handoff.md"]) {
       const text = deliverableContents.get(checkName);
       if (text !== undefined && placeholderLineRe.test(text)) {

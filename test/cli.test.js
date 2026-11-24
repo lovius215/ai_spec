@@ -1243,9 +1243,9 @@ test("#24 comprehensive edge cases: merge strategy word boundaries, AGENTS escap
   const { extractMergeStrategy, buildLocalizedAgentsMarkdown } = require("../src/i18n");
   const { convertMarkdownFileToPdf } = require("../src/pdf");
 
-  // 1. extractMergeStrategy word-boundary matching (defaults to pr for safety)
-  assert.equal(extractMergeStrategy("- Merge Strategy: approve"), "pr");
-  assert.equal(extractMergeStrategy("- 合併策略：production"), "pr");
+  // 1. extractMergeStrategy word-boundary matching (defaults to auto-merge)
+  assert.equal(extractMergeStrategy("- Merge Strategy: approve"), "auto-merge");
+  assert.equal(extractMergeStrategy("- 合併策略：production"), "auto-merge");
   assert.equal(extractMergeStrategy("- Merge Strategy: auto-merge"), "auto-merge");
   assert.equal(extractMergeStrategy("- Merge Strategy: pr"), "pr");
   assert.equal(extractMergeStrategy("- 合併策略：走PR流程"), "pr");
@@ -1957,26 +1957,36 @@ test("#31 OpenAPI 3.0.3 & PlantUML syntax pre-checks, cross-REQ impact index, pd
   }
 });
 
-test("#32 safe-by-default pr merge strategy, Approved placeholder completeness gate, and impact-filtered analyze", () => {
+test("#32 default auto-merge + branch cleanup, --pr override, Approved placeholder completeness gate, and impact-filtered analyze", () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sa-spec-32-pr-gate-"));
   try {
     assert.equal(runCli(tmpDir, ["init", "--lang", "zh-TW"]).status, 0);
     execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: tmpDir });
     execFileSync("git", ["config", "user.name", "Tester"], { cwd: tmpDir });
-    assert.match(fs.readFileSync(path.join(tmpDir, "project", "system-spec.md"), "utf8"), /合併策略：pr/);
+    assert.match(fs.readFileSync(path.join(tmpDir, "project", "system-spec.md"), "utf8"), /合併策略：auto-merge/);
 
     execFileSync("git", ["add", "-A"], { cwd: tmpDir });
     execFileSync("git", ["commit", "-m", "init"], { cwd: tmpDir });
+    const mainBranch = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: tmpDir, encoding: "utf8" }).trim();
 
-    // 1. finalize defaults to pr mode (does not touch master without --auto-merge)
+    // 1. finalize defaults to auto-merge + deletes merged feature branch; --pr skips merge
     assert.equal(runCli(tmpDir, ["new", "--name", "billing", "--branch"]).status, 0);
-    const finDefault = runCli(tmpDir, ["finalize", "--name", "billing"]);
-    assert.equal(finDefault.status, 0, finDefault.stderr);
-    assert.match(finDefault.stdout, /已略過自動合併/);
+    const finPr = runCli(tmpDir, ["finalize", "--name", "billing", "--pr"]);
+    assert.equal(finPr.status, 0, finPr.stderr);
+    assert.match(finPr.stdout, /已略過自動合併/);
     assert.equal(
       execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: tmpDir, encoding: "utf8" }).trim(),
       "feat/billing"
     );
+
+    const finAuto = runCli(tmpDir, ["finalize", "--name", "REQ-001"]);
+    assert.equal(finAuto.status, 0, finAuto.stderr);
+    assert.equal(
+      execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: tmpDir, encoding: "utf8" }).trim(),
+      mainBranch
+    );
+    const localBranches = execFileSync("git", ["branch", "--list", "feat/billing"], { cwd: tmpDir, encoding: "utf8" }).trim();
+    assert.equal(localBranches, "", "feat/billing must be deleted after auto-merge");
 
     // 2. Approved status forbids template placeholders (待補充 / TBD)
     const reqDir = path.join(tmpDir, "project", "REQ-001-billing");
@@ -2032,13 +2042,13 @@ test("#33 examples/basic-login passes check --strict --json, and SKILL/AGENTS sy
   assert.ok(impact.tableCollisions.some((c) => c.table === "users" && c.dirs.length === 2));
 
   const skillText = fs.readFileSync(path.resolve(__dirname, "..", "templates", "skills", "system-analysis", "SKILL.md"), "utf8");
-  assert.match(skillText, /預設為 `pr` 模式/);
+  assert.match(skillText, /預設為 `auto-merge` 模式/);
+  assert.match(skillText, /sa-spec revise --id REQ-xxx/);
   assert.match(skillText, /sa-spec impact/);
-  assert.doesNotMatch(skillText, /AI 必須自動切換回主分支/);
 
   const agentsTplText = fs.readFileSync(path.resolve(__dirname, "..", "templates", "AGENTS.md"), "utf8");
-  assert.match(agentsTplText, /預設為 `pr` 模式/);
-  assert.doesNotMatch(agentsTplText, /AI 必須自動切換回主分支/);
+  assert.match(agentsTplText, /預設為 `auto-merge` 模式/);
+  assert.match(agentsTplText, /sa-spec revise --id REQ-xxx/);
 });
 
 test("#34 main-branch finalize PR guard, OpenAPI parser edge cases, DB heading accuracy, unborn-branch push guard, and --no-ui", () => {
@@ -2064,7 +2074,7 @@ test("#34 main-branch finalize PR guard, OpenAPI parser edge cases, DB heading a
     const beforeRemoteHead = execFileSync("git", ["rev-parse", "refs/heads/main"], { cwd: bareRemote, encoding: "utf8" }).trim();
 
     assert.equal(runCli(workDir, ["new", "--name", "direct-main"]).status, 0);
-    const finOnMain = runCli(workDir, ["finalize", "--name", "direct-main"]);
+    const finOnMain = runCli(workDir, ["finalize", "--name", "direct-main", "--pr"]);
     assert.equal(finOnMain.status, 0, finOnMain.stderr);
     assert.match(finOnMain.stdout, /\[Git 保護\]/);
     assert.equal(fs.existsSync(path.join(workDir, "project", "REQ-001-direct-main", "srs.md")), true);
@@ -2211,5 +2221,135 @@ test("#34 main-branch finalize PR guard, OpenAPI parser edge cases, DB heading a
   } finally {
     fs.rmSync(unbornRemote, { recursive: true, force: true });
     fs.rmSync(unbornWork, { recursive: true, force: true });
+  }
+});
+
+test("#35 scc auto-merges + deletes local/remote feature branch, falls back on protected main, revises existing REQ-xxx without renumbering, and catches standalone/zh-CN placeholders", () => {
+  const bareRemote = fs.mkdtempSync(path.join(os.tmpdir(), "sa-spec-35-remote-"));
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "sa-spec-35-work-"));
+  try {
+    execFileSync("git", ["init", "--bare"], { cwd: bareRemote });
+    execFileSync("git", ["init", "-b", "main"], { cwd: workDir });
+    execFileSync("git", ["config", "user.email", "sa@example.com"], { cwd: workDir });
+    execFileSync("git", ["config", "user.name", "Senior SA"], { cwd: workDir });
+    execFileSync("git", ["remote", "add", "origin", bareRemote], { cwd: workDir });
+
+    assert.equal(runCli(workDir, ["init", "--lang", "zh-TW"]).status, 0);
+    execFileSync("git", ["add", "-A"], { cwd: workDir });
+    execFileSync("git", ["commit", "-m", "chore: init"], { cwd: workDir });
+    execFileSync("git", ["push", "-u", "origin", "main"], { cwd: workDir });
+
+    // 1. Default scc merges feat/checkout into main, pushes main, and deletes local + remote feat/checkout
+    assert.equal(runCli(workDir, ["new", "--name", "checkout", "--branch", "--no-ui"]).status, 0);
+    const remoteFeatBefore = execFileSync("git", ["branch", "--list", "feat/checkout"], { cwd: bareRemote, encoding: "utf8" }).trim();
+    assert.match(remoteFeatBefore, /feat\/checkout/);
+
+    const fin1 = runCli(workDir, ["finalize", "--name", "checkout"]);
+    assert.equal(fin1.status, 0, fin1.stderr);
+    assert.match(fin1.stdout, /已自動刪除已合併的本機分支: feat\/checkout/);
+    assert.match(fin1.stdout, /已自動刪除遠端已合併分支: origin\/feat\/checkout/);
+    assert.equal(execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: workDir, encoding: "utf8" }).trim(), "main");
+    assert.equal(execFileSync("git", ["branch", "--list", "feat/checkout"], { cwd: workDir, encoding: "utf8" }).trim(), "");
+    assert.equal(execFileSync("git", ["branch", "--list", "feat/checkout"], { cwd: bareRemote, encoding: "utf8" }).trim(), "");
+
+    // 2. Protected remote main branch: fallback keeps feat/profile on local + remote and resets local main cleanly
+    const preReceivePath = path.join(bareRemote, "hooks", "pre-receive");
+    fs.writeFileSync(
+      preReceivePath,
+      [
+        "#!/bin/sh",
+        "while read oldrev newrev refname; do",
+        "  if [ \"$refname\" = \"refs/heads/main\" ]; then",
+        "    echo \"Protected branch main: PR required\" >&2",
+        "    exit 1",
+        "  fi",
+        "done",
+        "exit 0",
+        ""
+      ].join("\n"),
+      { encoding: "utf8", mode: 0o755 }
+    );
+    fs.chmodSync(preReceivePath, 0o755);
+
+    const mainShaBeforeProtected = execFileSync("git", ["rev-parse", "main"], { cwd: workDir, encoding: "utf8" }).trim();
+    assert.equal(runCli(workDir, ["new", "--name", "profile", "--branch", "--no-ui"]).status, 0);
+    const finProtected = runCli(workDir, ["finalize", "--name", "profile"]);
+    assert.equal(finProtected.status, 0, finProtected.stderr);
+    assert.match(finProtected.stderr, /\[Git 保護退回\]/);
+    assert.equal(execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: workDir, encoding: "utf8" }).trim(), "feat/profile");
+    assert.equal(execFileSync("git", ["rev-parse", "main"], { cwd: workDir, encoding: "utf8" }).trim(), mainShaBeforeProtected);
+    assert.match(execFileSync("git", ["branch", "--list", "feat/profile"], { cwd: bareRemote, encoding: "utf8" }).trim(), /feat\/profile/);
+    assert.equal(fs.existsSync(path.join(workDir, "project", "REQ-002-profile", "srs.md")), true);
+
+    // Unblock main and finalize REQ-002-profile onto main
+    fs.unlinkSync(preReceivePath);
+    const fin2 = runCli(workDir, ["finalize", "--name", "REQ-002"]);
+    assert.equal(fin2.status, 0, fin2.stderr);
+    assert.equal(execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: workDir, encoding: "utf8" }).trim(), "main");
+    assert.equal(execFileSync("git", ["branch", "--list", "feat/profile"], { cwd: workDir, encoding: "utf8" }).trim(), "");
+
+    // 3. Revise existing REQ-001 after REQ-002 exists: opens feat/REQ-001-checkout, resets Approved->Pending, preserves REQ-001 on finalize, and deletes branch
+    const req1Srs = path.join(workDir, "project", "REQ-001-checkout", "srs.md");
+    fs.writeFileSync(
+      req1Srs,
+      fs.readFileSync(req1Srs, "utf8").replace("- 狀態：待確認", "- 狀態：已審核"),
+      "utf8"
+    );
+    execFileSync("git", ["add", "-A"], { cwd: workDir });
+    execFileSync("git", ["commit", "-m", "docs(REQ-001): mark approved"], { cwd: workDir });
+    execFileSync("git", ["push", "origin", "main"], { cwd: workDir });
+
+    const revRes = runCli(workDir, ["revise", "--id", "REQ-001"]);
+    assert.equal(revRes.status, 0, revRes.stderr);
+    assert.equal(
+      execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: workDir, encoding: "utf8" }).trim(),
+      "feat/REQ-001-checkout"
+    );
+    assert.match(
+      execFileSync("git", ["branch", "--list", "feat/REQ-001-checkout"], { cwd: bareRemote, encoding: "utf8" }).trim(),
+      /feat\/REQ-001-checkout/
+    );
+    assert.match(fs.readFileSync(req1Srs, "utf8"), /- 狀態：待確認/);
+
+    fs.appendFileSync(req1Srs, "\n<!-- v0.2 revision: support Apple Pay -->\n", "utf8");
+    const finRev = runCli(workDir, ["finalize", "--name", "REQ-001"]);
+    assert.equal(finRev.status, 0, finRev.stderr);
+    assert.match(finRev.stdout, /保留原編號 REQ-001/);
+    assert.equal(fs.existsSync(path.join(workDir, "project", "REQ-001-checkout", "srs.md")), true);
+    assert.equal(fs.existsSync(path.join(workDir, "project", "REQ-003-checkout")), false);
+    assert.equal(execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: workDir, encoding: "utf8" }).trim(), "main");
+    assert.equal(execFileSync("git", ["branch", "--list", "feat/REQ-001-checkout"], { cwd: workDir, encoding: "utf8" }).trim(), "");
+    assert.equal(execFileSync("git", ["branch", "--list", "feat/REQ-001-checkout"], { cwd: bareRemote, encoding: "utf8" }).trim(), "");
+  } finally {
+    fs.rmSync(bareRemote, { recursive: true, force: true });
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
+
+  // 4. Standalone placeholder line (db-schema.md) & Simplified Chinese 待补充 caught when Approved
+  const cnDir = fs.mkdtempSync(path.join(os.tmpdir(), "sa-spec-35-zhcn-"));
+  try {
+    assert.equal(runCli(cnDir, ["init", "--lang", "zh-CN"]).status, 0);
+    assert.equal(runCli(cnDir, ["new", "--id", "REQ-001", "--name", "order", "--no-ui"]).status, 0);
+    const cnReqDir = path.join(cnDir, "project", "REQ-001-order");
+    // Fill srs.md & handoff.md completely and mark Approved, leaving db-schema.md with standalone "待补充."
+    fs.writeFileSync(
+      path.join(cnReqDir, "srs.md"),
+      "# REQ-001 订单 SRS\n\n- 状态：已审核\n\n## 摘要\n订单建立。\n\n## 功能需求\n- 建立订单。\n\n## 验收条件\n- 成功。\n",
+      "utf8"
+    );
+    fs.writeFileSync(
+      path.join(cnReqDir, "handoff.md"),
+      "# Handoff\n\n- 状态：已审核\n\n## API 契约\n- 无 API 需求\n\n## DB 变更\n- orders\n\n## UI / 界面规格\n无 UI 界面需求。\n\n## 验收条件\n- 成功\n",
+      "utf8"
+    );
+    const cnCheck = runCli(cnDir, ["check", "--strict", "--json"]);
+    assert.notEqual(cnCheck.status, 0);
+    const cnParsed = JSON.parse(cnCheck.stdout);
+    assert.ok(
+      cnParsed.issues.some((i) => i.rule === "APPROVED_HAS_PLACEHOLDER" && /db-schema\.md/.test(i.file)),
+      "untouched standalone 待补充. in db-schema.md must be flagged when Approved"
+    );
+  } finally {
+    fs.rmSync(cnDir, { recursive: true, force: true });
   }
 });

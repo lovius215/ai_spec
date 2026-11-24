@@ -3,7 +3,7 @@
 - 狀態：草稿
 - 主要語言：{{LANG_LABEL}}
 - 規範版本：{{SPEC_VERSION}}
-- 合併策略：pr
+- 合併策略：auto-merge
 
 ## 這個系統要解決什麼
 待補充。

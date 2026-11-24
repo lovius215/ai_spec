@@ -35,6 +35,8 @@ const {
   getCurrentBranch,
   getLatestMaxReqId,
   remoteBranchHasReqId,
+  mainBranchHasSameReqDir,
+  deleteFeatureBranch,
   getPreCommitHookStatus,
   installPreCommitHook,
   removePreCommitHook
@@ -62,6 +64,9 @@ function main() {
         return;
       case "new":
         createReqTemplate(args.slice(1));
+        return;
+      case "revise":
+        reviseReq(args.slice(1));
         return;
       case "finalize":
         finalizeReq(args.slice(1));
@@ -308,13 +313,23 @@ function resolveReqIdOrFail(rawId) {
 }
 
 function createReqTemplate(args, label = "new") {
+  if (args.includes("--revise")) {
+    reviseReq(args);
+    return;
+  }
+
   const rawId = getOption(args, "--id");
   const name = getOption(args, "--name");
   const explicitSlug = getOption(args, "--slug");
   const noUi = args.includes("--no-ui");
 
+  if (rawId && !name && args.includes("--branch")) {
+    reviseReq(args);
+    return;
+  }
+
   if (!name) {
-    fail("Usage: sa-spec new [--id REQ-001] --name login [--slug login] [--branch] [--no-ui]");
+    fail("Usage: sa-spec new [--id REQ-001] --name login [--slug login] [--branch] [--no-ui]\n       sa-spec revise --id REQ-001 [--no-branch]");
     return;
   }
 
@@ -418,11 +433,124 @@ function parseReqIdNum(name) {
   return match ? Number(match[1]) : null;
 }
 
+function reviseReq(args = []) {
+  const rawTarget =
+    getOption(args, "--id") ||
+    getOption(args, "--revise") ||
+    getOption(args, "--name") ||
+    getPositionalArgs(args, ["--id", "--revise", "--name", "--slug"])[0];
+
+  if (!rawTarget) {
+    fail("Usage: sa-spec revise --id REQ-001 [--no-branch]");
+    return;
+  }
+
+  const projectDir = path.join(cwd, "project");
+  if (!isExistingDir(projectDir)) {
+    fail("project/ 目錄不存在。");
+    return;
+  }
+
+  const entries = fs
+    .readdirSync(projectDir, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && isReqDirName(e.name));
+  const trimmed = String(rawTarget).trim();
+  const idMatch = trimmed.match(/^(?:REQ-)?(\d+)$/i);
+  const targetNum = idMatch ? parseInt(idMatch[1], 10) : null;
+  const targetSlug = slugify(trimmed);
+
+  let matched = entries.find((e) => e.name.toUpperCase() === trimmed.toUpperCase());
+  if (!matched && targetNum !== null) {
+    const numMatches = entries.filter((e) => parseReqIdNum(e.name) === targetNum);
+    if (numMatches.length > 1) {
+      fail(`找到多個相同編號的需求目錄，請指定完整目錄名稱: ${numMatches.map((e) => e.name).join(", ")}`);
+      return;
+    }
+    matched = numMatches[0] || null;
+  }
+  if (!matched && targetSlug) {
+    const slugMatches = entries
+      .filter((e) => e.name.replace(/^REQ-\d+-?/i, "").toLowerCase() === targetSlug)
+      .sort((a, b) => (parseReqIdNum(b.name) || 0) - (parseReqIdNum(a.name) || 0));
+    matched = slugMatches[0] || null;
+  }
+
+  if (!matched) {
+    fail(`找不到可修訂的已歸檔需求目錄: "${rawTarget}"（請確認 project/REQ-* 是否存在）。`);
+    return;
+  }
+
+  const reqDirName = matched.name;
+  const reqId = (reqDirName.match(/^(REQ-\d+)/i) || ["", reqDirName])[1].toUpperCase();
+  const slugPart = reqDirName.replace(/^REQ-\d+-?/i, "");
+  const targetBranch = slugPart ? `feat/${reqId}-${slugPart}` : `feat/${reqId}`;
+
+  if (!args.includes("--no-branch")) {
+    const mainBranch = detectMainBranch(cwd);
+    let activeBranch = getCurrentBranch(cwd);
+
+    if (activeBranch === targetBranch) {
+      console.log(`已在修訂分支: ${targetBranch}`);
+    } else {
+      const existsRes = spawnSync("git", ["show-ref", "--verify", "--quiet", `refs/heads/${targetBranch}`], {
+        cwd,
+        encoding: "utf8"
+      });
+      if (existsRes.status === 0) {
+        const switchRes = spawnSync("git", ["checkout", targetBranch], { cwd, encoding: "utf8" });
+        if (switchRes.status === 0) {
+          console.log(`已切換至既有修訂分支: ${targetBranch}`);
+        } else {
+          console.warn(`警告: 切換至修訂分支 ${targetBranch} 失敗 (${(switchRes.stderr || "").trim()})`);
+        }
+      } else {
+        const branchRes = spawnSync("git", ["checkout", "-b", targetBranch], { cwd, encoding: "utf8" });
+        if (branchRes.status === 0) {
+          console.log(`已建立並切換至修訂分支: ${targetBranch}`);
+        } else {
+          console.log(`提示: 分支切換略過 (${(branchRes.stderr || "").trim() || "未在 git 目錄"})`);
+        }
+      }
+      activeBranch = getCurrentBranch(cwd);
+    }
+
+    const remote = getDefaultRemote(cwd);
+    if (remote && activeBranch && activeBranch !== mainBranch) {
+      pushBranchToRemote(cwd, remote, activeBranch);
+    }
+  }
+
+  const langConfig = detectProjectLanguage(cwd);
+  const t = getLangStrings(langConfig.code);
+  const reqAbsDir = path.join(projectDir, reqDirName);
+  const results = [];
+  const approvedStatusRe =
+    /^([-*]\s*\*{0,2}(?:狀態|状态|ステータス|상태|Status)\*{0,2}[：:]\*{0,2}\s*)(?:已審核|已核准|Approved|已审核|承認済み|승인됨)(\*{0,2})\s*$/im;
+
+  for (const fileName of ["srs.md", "handoff.md"]) {
+    const fileAbs = path.join(reqAbsDir, fileName);
+    const fileRel = path.join("project", reqDirName, fileName);
+    if (!isExistingFile(fileAbs)) continue;
+    const raw = fs.readFileSync(fileAbs, "utf8");
+    const next = raw.replace(approvedStatusRe, (_, prefix, suffix) => `${prefix}${t.pending}${suffix}`);
+    if (next !== raw) {
+      fs.writeFileSync(fileAbs, next, "utf8");
+      results.push({ action: "update", target: fileRel, message: `狀態重設為「${t.pending}」供修訂審核` });
+    } else {
+      results.push({ action: "skip", target: fileRel });
+    }
+  }
+
+  printResultList("revise", results);
+  console.log(`\n已開啟既有需求修訂：project/${reqDirName}（保留編號 ${reqId}，分支 ${targetBranch}）`);
+  console.log(`修訂確認後，請執行 sa-spec finalize --name ${reqId} 合併回主分支並自動清理分支。`);
+}
+
 function finalizeReq(args) {
   const rawName = getOption(args, "--name");
   const explicitSlug = getOption(args, "--slug");
   if (!rawName) {
-    fail("Usage: sa-spec finalize --name <name-or-slug> [--slug <ascii-slug>] [--auto-merge | --pr | --no-merge]");
+    fail("Usage: sa-spec finalize --name <name-or-REQ-xxx> [--slug <ascii-slug>] [--auto-merge | --pr | --no-merge] [--keep-branch]");
     return;
   }
 
@@ -515,11 +643,12 @@ function finalizeReq(args) {
   const systemSpecPath = path.join(cwd, "project", "system-spec.md");
   const configMergeStrategy = isExistingFile(systemSpecPath)
     ? extractMergeStrategy(fs.readFileSync(systemSpecPath, "utf8"))
-    : "pr";
+    : "auto-merge";
   const shouldAutoMerge =
     !args.includes("--no-merge") &&
     !args.includes("--pr") &&
     (args.includes("--auto-merge") || configMergeStrategy === "auto-merge");
+  const keepBranch = args.includes("--keep-branch");
 
   if (remote) {
     if (currentBranch && currentBranch !== mainBranch) {
@@ -531,13 +660,18 @@ function finalizeReq(args) {
   const oldDirName = path.basename(sourceDir);
   const oldIdMatch = oldDirName.match(/^(REQ-\d+)/i);
   const oldReqId = oldIdMatch ? oldIdMatch[1].toUpperCase() : null;
+  const isExistingOnMain = Boolean(
+    oldReqId && mainBranch && mainBranchHasSameReqDir(cwd, mainBranch, remote, oldDirName)
+  );
 
   const maxId = getLatestMaxReqId(cwd, projectDir, mainBranch, remote, oldReqId ? oldDirName : null);
   const nextNum = maxId + 1;
-  const nextId = `REQ-${String(nextNum).padStart(3, "0")}`;
+  const nextId = isExistingOnMain ? oldReqId : `REQ-${String(nextNum).padStart(3, "0")}`;
 
   if (oldReqId) {
-    if (nextId === oldReqId) {
+    if (isExistingOnMain) {
+      console.log(`偵測到主分支既有需求修訂，保留原編號 ${oldReqId} (${oldDirName})`);
+    } else if (nextId === oldReqId) {
       console.log(`序號無衝突，沿用既有編號 ${oldReqId}`);
     } else {
       console.log(`偵測到既有目錄 ${oldDirName}，重新定號 (Re-number): ${oldReqId} -> ${nextId}`);
@@ -622,8 +756,8 @@ function finalizeReq(args) {
     }
 
     if (shouldAutoMerge) {
-      // Pre-merge collision guard against remote main branch
-      if (remote && remoteBranchHasReqId(cwd, remote, mainBranch, nextId)) {
+      // Pre-merge collision guard against remote main branch (skip for revisions of an already-archived REQ on main)
+      if (!isExistingOnMain && remote && remoteBranchHasReqId(cwd, remote, mainBranch, nextId)) {
         console.error(
           `[Git 衝突防護] 遠端 ${remote}/${mainBranch} 在定號期間已新增 ${nextId}！已停止自動合併，請先更新主分支後重新執行 sa-spec finalize --name ${cleanSlug || nextId} 重新領號。`
         );
@@ -652,6 +786,9 @@ function finalizeReq(args) {
             console.warn(`[Git 警告] 同步 ${remote}/${mainBranch} 略過: ${(pullRes.stderr || "").trim()}`);
           }
         }
+
+        const preMergeShaRes = spawnSync("git", ["rev-parse", "HEAD"], { cwd, encoding: "utf8" });
+        const preMergeMainSha = preMergeShaRes.status === 0 ? (preMergeShaRes.stdout || "").trim() : null;
 
         const mergeRes = spawnSync("git", ["merge", currentBranch, "--no-edit"], { cwd, encoding: "utf8" });
         let mergedCleanly = mergeRes.status === 0;
@@ -699,12 +836,26 @@ function finalizeReq(args) {
               });
             }
           }
+          let mainPushOk = true;
           if (remote) {
-            pushBranchToRemote(cwd, remote, mainBranch);
+            mainPushOk = pushBranchToRemote(cwd, remote, mainBranch);
           }
-          console.log(
-            ` 全部歸檔流程完成！已自動領取新號 ${nextId} 並自動合併回主分支 ${mainBranch}${remote ? ` 且推送至 ${remote}` : ""}。`
-          );
+          if (remote && !mainPushOk) {
+            if (preMergeMainSha) {
+              spawnSync("git", ["reset", "--hard", preMergeMainSha], { cwd, encoding: "utf8" });
+            }
+            spawnSync("git", ["checkout", currentBranch], { cwd, encoding: "utf8" });
+            console.warn(
+              `[Git 保護退回] 推送主分支 ${mainBranch} 至 ${remote} 失敗（可能遠端主分支受保護或無權限）。已自動退回本機 ${mainBranch} 並保留分支 ${currentBranch}，請改以 PR 方式合併！`
+            );
+          } else {
+            if (!keepBranch) {
+              deleteFeatureBranch(cwd, currentBranch, remote);
+            }
+            console.log(
+              ` 全部歸檔流程完成！已領取/歸檔 ${nextId} 並自動合併回主分支 ${mainBranch}${remote ? ` 且推送至 ${remote}` : ""}${!keepBranch ? `（已清理分支 ${currentBranch}）` : ""}。`
+            );
+          }
         } else {
           spawnSync("git", ["merge", "--abort"], { cwd, encoding: "utf8" });
           spawnSync("git", ["checkout", currentBranch], { cwd, encoding: "utf8" });
@@ -910,6 +1061,7 @@ function ensureDir(relativeDir) {
   }
   if (fs.existsSync(targetDir)) {
     fail(`路徑已存在但為檔案而非目錄: ${relativeDir}`);
+    return { action: "warn", target: relativeDir, message: "路徑已存在但為檔案而非目錄" };
   }
   fs.mkdirSync(targetDir, { recursive: true });
   return { action: "create", target: relativeDir };
@@ -921,6 +1073,7 @@ function shouldSkipExistingTargetFile(targetPath, targetRelativePath) {
   }
   if (fs.existsSync(targetPath)) {
     fail(`路徑已存在但為目錄而非檔案: ${targetRelativePath}`);
+    return true;
   }
   return false;
 }
@@ -1605,7 +1758,8 @@ function showHelp() {
 Usage:
   sa-spec init [--full] [--hooks] [--lang zh-TW|en|zh-CN|ja|ko]
   sa-spec new [--id REQ-001] --name login [--slug login] [--branch] [--no-ui]
-  sa-spec finalize --name login [--slug login] [--auto-merge | --pr | --no-merge]
+  sa-spec revise --id REQ-001 [--no-branch]
+  sa-spec finalize --name <login|REQ-001> [--slug login] [--auto-merge | --pr | --no-merge] [--keep-branch]
   sa-spec instructions [init|propose|analyze|commit|pdf] [--with-rules] [--json]
   sa-spec rules [name|all] [--list] [--json]
   sa-spec templates [name] [--lang <code>] [--list] [--json]

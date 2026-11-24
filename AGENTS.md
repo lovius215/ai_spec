@@ -28,9 +28,9 @@
 | 指令 | 簡寫 | 用途 | 規則 |
 |---|---|---|---|
 | `spec:init` | `sci` | 初始化 | 執行 `sa-spec instructions init` 載入內建完整規範與必要規則，確認 `project/` 結構與語言設定是否存在。 |
-| `spec:propose` | `scp` | 提出需求 | 使用者提出需求後，自動依需求名稱建立並切換至專屬 feature 分支（`feat/<slug>`，若需求名稱含中文/日文/韓文等非 ASCII 字元必須搭配 `--slug <ascii-slug>`；已在 feature branch 則沿用），檢查是否有設定 Git remote，若有則自動將分支推上 remote（`git push -u <remote> feat/<slug>`），並建立草稿目錄 `project/<slug>/`（內部使用 `{{REQ_ID}}` 佔位），整理需求摘要、目標、初步流程與待確認事項，不歸檔、不修改既有需求。 |
-| `spec:analyze` | `sca` | 分析與起草 | 先檢查新需求是否與 `project/` 內所有既有需求衝突；無衝突才產出 SRS、UML、OpenAPI、DB Schema 草稿；有衝突則只列出衝突與待釐清問題，待使用者釐清後再次執行 `spec:analyze`（或 `sca`）。 |
-| `spec:commit` | `scc` | 確認歸檔 | 只把使用者已確認的版本歸檔到該需求資料夾；執行 `sa-spec finalize --name <slug> [--auto-merge \| --pr \| --no-merge]`：若有 Git remote 先推分支並 fetch 遠端最新狀態，向主分支（`master`/`main`）查詢可用序號定號（`REQ-xxx`）、替換佔位符並更新 `project/index.md`、`project/system-spec.md` 與 `history.md`，建立 Git commit 與推送分支。預設為 `pr` 模式（不直接動主分支）；僅當指定 `--auto-merge` 或 `system-spec.md` 設 `合併策略：auto-merge` 時，才在工作區乾淨後自動切回主分支合併並推送。 |
+| `spec:propose` | `scp` | 提出需求 | 新需求自動建立並切換至專屬 feature 分支（`feat/<slug>`，非 ASCII 名稱搭配 `--slug <ascii-slug>`）並建立草稿目錄 `project/<slug>/`（內部使用 `{{REQ_ID}}` 佔位）；若為修改已歸檔需求則執行 `sa-spec revise --id REQ-xxx` 建立 `feat/REQ-xxx-<slug>` 分支直接修訂該目錄（保留原編號）。若有設定 Git remote 則自動將分支推上 remote。 |
+| `spec:analyze` | `sca` | 分析與起草 | 先透過 `sa-spec impact` 過濾相關需求並檢查是否與 `project/` 內既有需求衝突；無衝突才產出 SRS、UML、OpenAPI、DB Schema 草稿；有衝突則只列出衝突與待釐清問題，待使用者釐清後再次執行 `spec:analyze`（或 `sca`）。 |
+| `spec:commit` | `scc` | 確認歸檔 | 只把使用者已確認的版本歸檔到該需求資料夾；執行 `sa-spec finalize --name <slug-or-REQ-xxx> [--auto-merge \| --pr \| --no-merge] [--keep-branch]`：若有 Git remote 先推分支並 fetch 遠端最新狀態，向主分支查詢可用序號定號（`REQ-xxx`；既有需求修訂保留原編號）、替換佔位符並更新 `project/index.md`、`project/system-spec.md` 與 `history.md`。預設為 `auto-merge` 模式：自動切回主分支合併、推送主分支並刪除已合併 feature 分支（若遠端主分支受保護推送失敗，自動退回保留分支改走 PR；若需 PR 模式可加 `--pr` 或設 `合併策略：pr`）。 |
 | `spec:pdf` | `spd` | 匯出 PDF | 呼叫 `sa-spec pdf <target> [--split] [--online-uml \| --no-uml-render] [--output <path>]`（或 `--all`），將指定 `.md` 或需求目錄（如 `REQ-001`）匯出 PDF（預設不將 `.puml` 傳送至公開 PlantUML 網路伺服器；僅使用本機 `plantuml` 或加 `--online-uml` / 自建 `SA_SPEC_PLANTUML_SERVER` 轉繪 SVG）。 |
 
 # 重要限制
@@ -52,14 +52,14 @@
 - `spec:commit` 只能套用已由 `spec:analyze` 產出的、且使用者已確認的無衝突版本。
 - `handoff.md` 只能根據已確認的 SRS、UML、OpenAPI、DB Schema 與限制整理，不得新增未確認的開發假設。
 - 交給 OpenSpec 或其他 AI 開發工具時，必須指定它先閱讀 `handoff.md`，並以 `handoff.md` 作為開發入口與限制摘要；其他規格文件作為詳細來源。
-- **鐵律（Git Remote 自動推送強制規範）**：只要 Git repository 有設定 remote（例如 `origin`），`spec:propose` 建立的 feature 分支與 `spec:commit` 的 feature 分支變更**都必須自動推送（`git push`）到 remote**，無需等待使用者額外指示；**主分支僅在顯式啟用 `auto-merge` 模式時才合併並推送**（預設 `pr` 模式不動主分支）；若 push 失敗時只回報認證或網路問題，不得回滾已完成的文件歸檔與本機 commit。
+- **鐵律（Git Remote 自動推送與合併清分支規範）**：只要 Git repository 有設定 remote（例如 `origin`），`spec:propose` 建立的分支與 `spec:commit` 歸檔變更**都必須自動推送（`git push`）到 remote**，無需等待使用者額外指示；預設 `auto-merge` 模式下合併回主分支並推送成功後，自動刪除本機與遠端已合併的 feature 分支（若遠端主分支受保護導致推送失敗，則自動退回並保留 feature 分支供建立 PR；若指定 `--pr` 或 `合併策略：pr` 則只推 feature 分支不動主分支）。
 - `spec:commit` 完成文件歸檔後，必須自動建立本機 Git commit；commit message 以需求編號與需求名稱為主，並加上簡短需求說明，格式為 `docs(REQ-001): 需求名稱 - 簡短需求說明`。
 - `spec:commit` 歸檔與合併閉環流程（含 Remote 同步順序）：
   1. **先推分支至 Remote**：執行 `spec:commit`（或 `scc`）時，若檢查到 Git 有設定 remote，必須**先將目前分支推送至 remote**（`git push -u <remote> <branch>`）並同步遠端最新狀態（`git fetch <remote>`）。
-  2. **再查主分支最新版號**：接著才向主分支（`main` / `master` 及遠端主分支）查詢最新已使用序號，決定下一個可用序號（`REQ-xxx`）。
+  2. **再查主分支最新版號（既有修訂保留原號）**：向主分支（`main` / `master` 及遠端主分支）查詢最新已使用序號定號 `REQ-xxx`；若該 `REQ-xxx-<slug>` 已存在於主分支（屬於 `scc` 後再次開分支修訂），則保留原編號不跳號。
   3. **定號歸檔與提交**：將草稿目錄重命名為正式 `project/REQ-xxx-<name>`、替換內部 `{{REQ_ID}}` 佔位符、更新索引與規格後，在 feature 分支建立 commit；若有 remote 則同步推送該 feature 分支至 remote。
-  4. **依合併策略決定是否合併主分支**：預設為 `pr` 模式（保留在 feature 分支等待 PR 審核，不直接動主分支）；**僅當明確指定 `--auto-merge` 或 `project/system-spec.md` 設定 `合併策略：auto-merge` 時**，才在工作區乾淨後自動切換回主分支（`main` / `master`）、合併該 feature 分支 (`git checkout <mainBranch> && git merge feat/<name>`)、重新生成 `project/index.md` 索引，並將主分支推送至 remote（`git push <remote> <mainBranch>`）。
-- 多人協作與 Git-Flow 模式（延遲綁定序號）：支援多人平行開發。執行 `spec:propose`（或 `scp`）時，若目前處於 master/main 分支，AI 必須自動依需求名稱建立並切換至專屬 feature branch（如 `feat/<name>`），檢查若有設定 Git remote 則立即將新分支推上 remote（`git push -u <remote> feat/<name>`），並在 `project/<name>/` 建立草稿目錄，內部使用 `{{REQ_ID}}` 佔位，無需使用者手動敲 CLI；執行 `spec:analyze` 前應先確保取得 master 最新規格並用 `sa-spec impact` 過濾相關需求；執行 `spec:commit` 歸檔時先推分支到 remote，再向 master 確認最新可用序號定號，自動將目錄定名為正式 `REQ-xxx`、替換內部佔位符並完成 feature 分支提交與推送（預設走 PR；僅在顯式啟用 `auto-merge` 時才自動合併回主分支），避免多人合併時的序號競爭與索引衝突。
+  4. **自動合併回主分支並刪除 feature 分支（預設 `auto-merge`）**：預設在工作區乾淨後自動切換回主分支（`main` / `master`）、合併該 feature 分支、重新生成 `project/index.md` 索引並推送主分支至 remote，成功後自動刪除本機與遠端 feature 分支（若遇遠端主分支受保護推送失敗，則自動退回保留 feature 分支；若設為 `pr` 模式則停留在 feature 分支等待 PR）。
+- 多人協作與一人一分支模式（延遲綁定序號＋修訂重開分支）：每位 SA 負責一顆需求獨立分支。新需求執行 `spec:propose`（`scp`）建立 `feat/<name>` 與 `project/<name>/` 草稿（`{{REQ_ID}}` 佔位）；若 `scc` 歸檔後需再次修改既有需求，則執行 `sa-spec revise --id REQ-xxx` 從最新主分支新開 `feat/REQ-xxx-<slug>` 分支直接修訂該需求；執行 `spec:analyze` 前先用 `sa-spec impact` 過濾相關需求檢查衝突；執行 `spec:commit` 歸檔合併回主分支後自動刪除暫存 feature 分支，確保下次修訂永遠從最新主分支乾淨切出。
 - 文件未經使用者確認，不得標示為 `已審核`。
 - `uml/` 內的 UML 圖不限單一 UML 圖型；`spec:analyze` 必須依需求選擇最能說明流程、互動、狀態、資料關係或介面佈局的圖表，例如活動圖、循序圖、使用案例圖、狀態圖、類別圖；**若需求涉及前端 UI 或使用者操作畫面，必須在 `uml/wireframe.puml` 產出線框圖（使用 PlantUML Salt 語法：`@startsalt ... @endsalt`）**；純後端需求則在 `handoff.md` 明確標記「無 UI 介面需求」。**嚴禁將多張圖混在同一個檔案中**，必須在需求資料夾下的 `uml/` 目錄拆分成獨立的 `.puml` 檔案（例如 `uml/sequence.puml`、`uml/activity.puml`、`uml/wireframe.puml`），且每個檔案只能包含一組 `@start...` 與 `@end...`，以避免 PlantUML 渲染或預覽失敗。
 - 一次最多問 3 個待確認問題，優先詢問會影響範圍、資料、權限、API、DB 或驗收的問題。
@@ -88,12 +88,12 @@
 # 狀態機
 
 ```text
-init (sci) -> propose (scp, 建分支並推至 remote) -> analyze (sca)
+init (sci) -> propose (scp: 新需求 feat/<slug> 或既有修訂 feat/REQ-xxx-<slug>，推至 remote) -> analyze (sca, impact 過濾)
 
 analyze 無衝突 -> 產出待確認版本 -> commit (scc)
 analyze 有衝突 -> 釐清問題 -> analyze (sca)
 
-commit (scc) -> 先推 feature 分支至 remote -> 查 master 最新版號定號 -> 歸檔 commit/push -> pr 模式提示 PR（或 auto-merge 模式下合併主分支並推至 remote）
+commit (scc) -> 先推分支至 remote -> 定號（既有修訂保留 REQ-xxx） -> 預設合併回主分支並 push -> 自動刪除 feature 分支（主分支受保護時退回保留分支）
 ```
 
 # 歸檔結構

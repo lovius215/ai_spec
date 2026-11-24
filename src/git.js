@@ -171,6 +171,62 @@ function remoteBranchHasReqId(cwd, remote, mainBranch, reqId) {
   });
 }
 
+function branchHasExactReqDir(cwd, ref, dirName) {
+  if (!ref || !dirName) return false;
+  const lsRes = spawnSync("git", ["ls-tree", "-d", "--name-only", ref, "project/"], {
+    cwd,
+    encoding: "utf8"
+  });
+  if (lsRes.status !== 0 || !lsRes.stdout) return false;
+  const targetLower = String(dirName).trim().toLowerCase();
+  return lsRes.stdout.split("\n").some((line) => path.basename(line.trim()).toLowerCase() === targetLower);
+}
+
+function mainBranchHasSameReqDir(cwd, mainBranch, remoteName, dirName) {
+  if (!mainBranch || !dirName) return false;
+  if (remoteName) {
+    fetchRemote(cwd, remoteName);
+    if (branchHasExactReqDir(cwd, `${remoteName}/${mainBranch}`, dirName)) {
+      return true;
+    }
+  }
+  return branchHasExactReqDir(cwd, mainBranch, dirName);
+}
+
+function deleteFeatureBranch(cwd, branch, remote = null) {
+  if (!branch) return { localDeleted: false, remoteDeleted: false };
+  let localDeleted = false;
+  let remoteDeleted = false;
+
+  const localRes = spawnSync("git", ["branch", "-d", branch], { cwd, encoding: "utf8" });
+  if (localRes.status === 0) {
+    localDeleted = true;
+    console.log(`[Git] 已自動刪除已合併的本機分支: ${branch}`);
+  } else {
+    console.warn(`[Git 警告] 本機分支 ${branch} 未刪除: ${(localRes.stderr || localRes.stdout || "").trim()}`);
+  }
+
+  if (remote) {
+    const remoteRef = spawnSync("git", ["show-ref", "--verify", "--quiet", `refs/remotes/${remote}/${branch}`], {
+      cwd,
+      encoding: "utf8"
+    });
+    if (remoteRef.status === 0) {
+      const delRemote = spawnSync("git", ["push", remote, "--delete", branch], { cwd, encoding: "utf8" });
+      if (delRemote.status === 0) {
+        remoteDeleted = true;
+        console.log(`[Git] 已自動刪除遠端已合併分支: ${remote}/${branch}`);
+      } else {
+        console.warn(
+          `[Git 警告] 遠端分支 ${remote}/${branch} 刪除略過: ${(delRemote.stderr || delRemote.stdout || "").trim()}`
+        );
+      }
+    }
+  }
+
+  return { localDeleted, remoteDeleted };
+}
+
 const PRE_COMMIT_HOOK_MARKER = "# sa-spec managed pre-commit hook";
 
 function resolvePreCommitHookPath(cwd) {
@@ -291,6 +347,8 @@ module.exports = {
   getCurrentBranch,
   getLatestMaxReqId,
   remoteBranchHasReqId,
+  mainBranchHasSameReqDir,
+  deleteFeatureBranch,
   getPreCommitHookStatus,
   installPreCommitHook,
   removePreCommitHook
